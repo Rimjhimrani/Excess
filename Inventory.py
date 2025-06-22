@@ -2150,6 +2150,5 @@ def main(self):
 
 # Usage example and initialization
 if __name__ == "__main__":
-    from some_other_file import InventoryAnalyzer
     analyzer = InventoryAnalyzer()
     analyzer.run()
