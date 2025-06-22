@@ -2148,4 +2148,4 @@ def main(self):
 if __name__ == "__main__":
     # Initialize the inventory analyzer
     analyzer = InventoryAnalyzer()
-    analyzer.main()
+    analyzer.run()
