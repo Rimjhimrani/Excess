@@ -189,8 +189,6 @@ class InventoryAnalyzer:
             }
             results.append(result)
         return results
-    def run(self):
-        self.display_analysis_interface()
 
     def get_vendor_summary(self, processed_data):
         """Summarize inventory by vendor using actual Stock_Value field from the file."""
