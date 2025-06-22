@@ -2143,6 +2143,8 @@ def main(self):
             st.rerun()
 
 # Usage example and initialization
+
+# Usage example and initialization
 if __name__ == "__main__":
     # Initialize the inventory analyzer
     analyzer = InventoryAnalyzer()
