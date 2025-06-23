@@ -1045,8 +1045,8 @@ class InventoryManagementSystem:
     
         # Auto re-analyze if tolerance changed
         if not analysis_data or last_tolerance != tolerance:
-            st.info(f"🔄 {'Re-analyzing' if analysis_data else 'Analyzing'} with tolerance ±{tolerance}%...")
-            with st.spinner("Processing inventory analysis..."):
+            st.info(f"🔄 Re-analyzing with ±{tolerance}% tolerance...")
+            with st.spinner("Analyzing inventory..."):
                 analysis_results = self.analyzer.analyze_inventory(
                     pfep_data, 
                     inventory_data, 
