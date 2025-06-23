@@ -1130,15 +1130,14 @@ class InventoryManagementSystem:
     
         # Enhanced metric cards with your original structure
         col1, col2, col3, col4 = st.columns(4)
-    
-       # Calculate values for each status
-       summary_data = {}
-       for status in status_counts:
-           status_data = df[df['Status'] == status] if 'Status' in df.columns else df[df['INVENTORY REMARK STATUS'] == status]
-           summary_data[status] = {
-               'count': status_counts[status],
-               'value': status_data['Stock_Value'].sum() if 'Stock_Value' in status_data.columns else 0
-           }
+        # Calculate values for each status
+        summary_data = {}
+        for status in status_counts:
+            status_data = df[df['Status'] == status] if 'Status' in df.columns else df[df['INVENTORY REMARK STATUS'] == status]
+            summary_data[status] = {
+                'count': status_counts[status],
+                'value': status_data['Stock_Value'].sum() if 'Stock_Value' in status_data.columns else 0
+            }
         with col1:
             st.markdown('<div class="metric-card status-normal">', unsafe_allow_html=True)
             st.metric(
