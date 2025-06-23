@@ -1902,19 +1902,19 @@ class InventoryManagementSystem:
                 (filtered_df['Stock_Value'] >= min_val) & 
                 (filtered_df['Stock_Value'] <= max_val)
             ]
-         # Apply status filter
-         if hasattr(st.session_state, 'filter_statuses') and st.session_state.filter_statuses:
-             filtered_df = filtered_df[filtered_df['Status'].isin(st.session_state.filter_statuses)]
-         # Apply category filter
-         if hasattr(st.session_state, 'filter_categories') and st.session_state.filter_categories:
-             category_col = 'Category' if 'Category' in filtered_df.columns else 'PART CATEGORY'
-             if category_col in filtered_df.columns:
-                 filtered_df = filtered_df[filtered_df[category_col].isin(st.session_state.filter_categories)]
-         # Apply vendor filter
-         if hasattr(st.session_state, 'filter_vendors') and st.session_state.filter_vendors:
-             if 'VENDOR' in filtered_df.columns:
-                 filtered_df = filtered_df[filtered_df['VENDOR'].isin(st.session_state.filter_vendors)]
-         return filtered_df
+        # Apply status filter
+        if hasattr(st.session_state, 'filter_statuses') and st.session_state.filter_statuses:
+            filtered_df = filtered_df[filtered_df['Status'].isin(st.session_state.filter_statuses)]
+        # Apply category filter
+        if hasattr(st.session_state, 'filter_categories') and st.session_state.filter_categories:
+            category_col = 'Category' if 'Category' in filtered_df.columns else 'PART CATEGORY'
+            if category_col in filtered_df.columns:
+                filtered_df = filtered_df[filtered_df[category_col].isin(st.session_state.filter_categories)]
+        # Apply vendor filter
+        if hasattr(st.session_state, 'filter_vendors') and st.session_state.filter_vendors:
+            if 'VENDOR' in filtered_df.columns:
+                filtered_df = filtered_df[filtered_df['VENDOR'].isin(st.session_state.filter_vendors)]
+        return filtered_df
 
     def generate_analysis_summary(self, analysis_results):
         """Generate a comprehensive analysis summary"""
