@@ -1713,39 +1713,6 @@ class InventoryManagementSystem:
             4. **Action Items**: Follow up on recommendations
             5. **Trend Analysis**: Monitor patterns over time
             """)
-            
-    def display_analysis_results(self):
-        """Main method to display all analysis results"""
-        analysis_results = self.persistence.load_data_from_session_state('persistent_analysis_results')
-        if not analysis_results:
-            st.error("❌ No analysis results available.")
-            return
-        # Display advanced filtering options
-        self.display_advanced_filtering_options(analysis_results)
-    
-        # Apply filters to data
-        df = pd.DataFrame(analysis_results)
-        filtered_df = self.apply_advanced_filters(df)
-        filtered_results = filtered_df.to_dict('records')
-    
-        # Display main dashboard
-        self.display_comprehensive_analysis(filtered_results)
-    
-        # Additional analysis sections
-        st.markdown("---")
-        self.display_trend_analysis(filtered_results)
-    
-        st.markdown("---")
-        self.display_executive_dashboard(filtered_results)
-    
-        st.markdown("---")
-        self.display_actionable_insights(filtered_results)
-    
-        st.markdown("---")
-        self.display_export_options(filtered_results)
-    
-        st.markdown("---")
-        self.display_help_and_documentation()
         
     def display_actionable_insights(self, analysis_results):
         """Display actionable insights and recommendations"""
@@ -1989,7 +1956,40 @@ class InventoryManagementSystem:
         if st.sidebar.button("🔄 Analyze New File", type="secondary"):
             st.session_state.analysis_complete = False
             st.rerun()
-
+            
+    def display_analysis_results(self):
+        """Main method to display all analysis results"""
+        analysis_results = self.persistence.load_data_from_session_state('persistent_analysis_results')
+        if not analysis_results:
+            st.error("❌ No analysis results available.")
+            return
+        # Display advanced filtering options
+        self.display_advanced_filtering_options(analysis_results)
+    
+        # Apply filters to data
+        df = pd.DataFrame(analysis_results)
+        filtered_df = self.apply_advanced_filters(df)
+        filtered_results = filtered_df.to_dict('records')
+    
+        # Display main dashboard
+        self.display_comprehensive_analysis(filtered_results)
+    
+        # Additional analysis sections
+        st.markdown("---")
+        self.display_trend_analysis(filtered_results)
+    
+        st.markdown("---")
+        self.display_executive_dashboard(filtered_results)
+    
+        st.markdown("---")
+        self.display_actionable_insights(filtered_results)
+    
+        st.markdown("---")
+        self.display_export_options(filtered_results)
+    
+        st.markdown("---")
+        self.display_help_and_documentation()
+                
 if __name__ == "__main__":
     app = InventoryManagementSystem()
     app.run()  # This runs the full dashboard
