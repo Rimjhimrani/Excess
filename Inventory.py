@@ -1921,7 +1921,7 @@ class InventoryManagementSystem:
         df = pd.DataFrame(analysis_results)
         summary = {
             'total_parts': len(df),
-            'total_value': df['Stock_Value'].sum(),
+            'total_value': df['Current Inventory - VALUE'].sum(),
             'within_norms': (df['Status'] == 'Within Norms').sum(),
             'excess_inventory': (df['Status'] == 'Excess Inventory').sum(),
             'short_inventory': (df['Status'] == 'Short Inventory').sum(),
