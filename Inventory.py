@@ -1589,8 +1589,8 @@ class InventoryManagementSystem:
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
                 st.success("✅ Comprehensive report prepared for download!")
-            except Exception as e:
-                st.error(f"❌ Export failed: {str(e)}")
+        except Exception as e:
+            st.error(f"❌ Export failed: {str(e)}")
 
     def export_critical_items(self, analysis_results):
         """Export only critical items"""
