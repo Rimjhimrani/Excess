@@ -145,55 +145,60 @@ class InventoryAnalyzer:
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)  # fallback
         results = []
-        # Normalize and create lookup dictionaries
+        # Normalize and create lookup dictionaries (FIX: case match)
         pfep_dict = {str(item['Part_No']).strip().upper(): item for item in pfep_data}
-        inventory_dict = {str(item['Part_No']).strip().lower(): item for item in current_inventory}  # BUG: case mismatch
-        # ✅ Loop only through inventory items that exist in PFEP
+        inventory_dict = {str(item['Part_No']).strip().upper(): item for item in current_inventory}
         for part_no, inventory_item in inventory_dict.items():
             pfep_item = pfep_dict.get(part_no)
             if not pfep_item:
                 continue
-            # Extract values safely
-            current_qty = float(inventory_item.get('Current_QTY', 0))
-            stock_value = float(inventory_item.get('Stock_Value', 0))
-            rm_qty = float(pfep_item.get('RM_IN_QTY', 0))
-            unit_price = float(pfep_item.get('Unit_Price', 0))
-            rm_days = pfep_item.get('RM_IN_DAYS', '')
+            try:
+                # Extract values safely
+                current_qty = float(inventory_item.get('Current_QTY', 0))
+                stock_value = float(inventory_item.get('Stock_Value', 0))
+                rm_qty = float(pfep_item.get('RM_IN_QTY', 0))
+                unit_price = float(pfep_item.get('Unit_Price', 0)) or 1.0  # Avoid division by zero
+                rm_days = pfep_item.get('RM_IN_DAYS', '')
+                # Short/Excess Inventory calculation (FIX: multiplication, not division)
+                short_excess_qty = current_qty - rm_qty
+                value = short_excess_qty * unit_price
 
-            # Short/Excess Inventory calculation
-            short_excess_qty = current_qty - rm_qty
-            value = short_excess_qty / unit_price  # BUG: division instead of multiplication
-
-            # Status (with tolerance logic applied to % difference)
-            if rm_qty > 0:
-                variance_pct = ((current_qty - rm_qty) / rm_qty) * 100
-            else:
-                variance_pct = 0
-            if abs(variance_pct) <= tolerance:
-                status = 'Within Norms'
-            elif variance_pct > tolerance:
-                status = 'Excess Inventory'
-            else:
-                status = 'Short Inventory'
-            # ✅ Build final cleaned result
-            result = {
-                'PART NO': part_no,
-                'PART DESCRIPTION': pfep_item.get('Description', ''),
-                'Current Inventory-QTY': current_qty,
-                'Inventory Norms - QTY': rm_qty,
-                'Current Inventory - VALUE': stock_value,
-                'SHORT/EXCESS INVENTORY': short_excess_qty,
-                'INVENTORY REMARK STATUS': status,
-                'Status': status,  # ✅ Add this line
-                'VALUE(Unit Price* Short/Excess Inventory)': value,
-                'UNIT PRICE': unit_price,
-                'RM IN DAYS': rm_days,
-                'Vendor Name': pfep_item.get('Vendor_Name', 'Unknown'),
-                'Vendor_Code': pfep_item.get('Vendor_Code', ''),
-                'City': pfep_item.get('City', ''),
-                'State': pfep_item.get('State', '')
-            }
-            results.append(result)
+                # Status logic
+                if rm_qty > 0:
+                    variance_pct = ((current_qty - rm_qty) / rm_qty) * 100
+                else:
+                    variance_pct = 0
+                if abs(variance_pct) <= tolerance:
+                    status = 'Within Norms'
+                elif variance_pct > tolerance:
+                    status = 'Excess Inventory'
+                else:
+                    status = 'Short Inventory'
+                # Build result
+                result = {
+                    'PART NO': part_no,
+                    'PART DESCRIPTION': pfep_item.get('Description', ''),
+                    'Current Inventory-QTY': current_qty,
+                    'Inventory Norms - QTY': rm_qty,
+                    'Current Inventory - VALUE': stock_value,
+                    'SHORT/EXCESS INVENTORY': short_excess_qty,
+                    'INVENTORY REMARK STATUS': status,
+                    'Status': status,
+                    'VALUE(Unit Price* Short/Excess Inventory)': value,
+                    'UNIT PRICE': unit_price,
+                    'RM IN DAYS': rm_days,
+                    'Vendor Name': pfep_item.get('Vendor_Name', 'Unknown'),
+                    'Vendor_Code': pfep_item.get('Vendor_Code', ''),
+                    'City': pfep_item.get('City', ''),
+                    'State': pfep_item.get('State', '')
+                }
+                results.append(result)
+            except Exception as e:
+                 st.warning(f"⚠️ Error analyzing part {part_no}: {e}")
+                 continue
+         # Show user if analysis result is empty
+        if not results:
+            st.error("❌ No analysis results were generated. Please check your data for mismatches, missing prices, or zero quantities.")
         return results
 
     def get_vendor_summary(self, processed_data):
