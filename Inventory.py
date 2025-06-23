@@ -1250,66 +1250,63 @@ class InventoryManagementSystem:
             color_continuous_scale='RdYlGn'
         )
         st.plotly_chart(fig, use_container_width=True)
-
-def create_enhanced_top_parts_chart(self, processed_data, status_filter, color, key, top_n=10):
-    """Enhanced top parts chart with better visualization"""
-    filtered_data = [
-        item for item in processed_data 
+ def create_enhanced_top_parts_chart(self, processed_data, status_filter, color, key, top_n=10):
+     """Enhanced top parts chart with better visualization"""
+     filtered_data = [
+         item for item in processed_data 
         if item.get('Status') == status_filter or item.get('INVENTORY REMARK STATUS') == status_filter
-    ]
+     ]
+     if not filtered_data:
+         st.info(f"No {status_filter} parts found.")
+         return
+     # Sort by stock value
+     top_parts = sorted(
+         filtered_data,
+         key=lambda x: x.get('Stock_Value', 0),
+         reverse=True
+     )[:top_n]
     
-    if not filtered_data:
-        st.info(f"No {status_filter} parts found.")
-        return
+     # Create enhanced chart
+     labels = [f"{item['PART NO']}<br>{item.get('PART DESCRIPTION', '')[:30]}..." for item in top_parts]
+     values = [item.get('Stock_Value', 0) for item in top_parts]
+     variance_values = [item.get('VALUE(Unit Price* Short/Excess Inventory)', 0) for item in top_parts]
     
-    # Sort by stock value
-    top_parts = sorted(
-        filtered_data,
-        key=lambda x: x.get('Stock_Value', 0),
-        reverse=True
-    )[:top_n]
+     fig = go.Figure()
     
-    # Create enhanced chart
-    labels = [f"{item['PART NO']}<br>{item.get('PART DESCRIPTION', '')[:30]}..." for item in top_parts]
-    values = [item.get('Stock_Value', 0) for item in top_parts]
-    variance_values = [item.get('VALUE(Unit Price* Short/Excess Inventory)', 0) for item in top_parts]
+     # Add stock value bars
+     fig.add_trace(go.Bar(
+         name='Stock Value',
+         x=labels,
+         y=values,
+         marker_color=color,
+         text=[f"₹{v:,.0f}" for v in values],
+         textposition='auto',
+     ))
     
-    fig = go.Figure()
+     # Add variance line
+     fig.add_trace(go.Scatter(
+         name='Variance Impact',
+         x=labels,
+         y=variance_values,
+         mode='lines+markers',
+         line=dict(color='red', width=2),
+         marker=dict(size=8),
+         yaxis='y2'
+     ))
     
-    # Add stock value bars
-    fig.add_trace(go.Bar(
-        name='Stock Value',
-        x=labels,
-        y=values,
-        marker_color=color,
-        text=[f"₹{v:,.0f}" for v in values],
-        textposition='auto',
-    ))
+     fig.update_layout(
+         title=f"Top {top_n} {status_filter} Parts Analysis",
+         xaxis_title="Parts",
+         yaxis_title="Stock Value (₹)",
+         yaxis2=dict(
+             title="Variance Impact (₹)",
+             overlaying='y',
+             side='right'
+         ),
+         hovermode='x unified'
+     )
     
-    # Add variance line
-    fig.add_trace(go.Scatter(
-        name='Variance Impact',
-        x=labels,
-        y=variance_values,
-        mode='lines+markers',
-        line=dict(color='red', width=2),
-        marker=dict(size=8),
-        yaxis='y2'
-    ))
-    
-    fig.update_layout(
-        title=f"Top {top_n} {status_filter} Parts Analysis",
-        xaxis_title="Parts",
-        yaxis_title="Stock Value (₹)",
-        yaxis2=dict(
-            title="Variance Impact (₹)",
-            overlaying='y',
-            side='right'
-        ),
-        hovermode='x unified'
-    )
-    
-    st.plotly_chart(fig, use_container_width=True, key=key)
+     st.plotly_chart(fig, use_container_width=True, key=key)
 
 def display_advanced_filtering_options(self, analysis_results):
     """Advanced filtering options for better data exploration"""
@@ -2146,37 +2143,6 @@ def main(self):
     else:
         # Show analysis results
         self.display_analysis_results()
-        
-        # Option to analyze new file
-        if st.sidebar.button("🔄 Analyze New File", type="secondary"):
-            st.session_state.analysis_complete = False
-            st.rerun()
-
-# Alternative approach - if main should be a standalone function:
-# Remove 'self' parameter from the main method definition and change it to:
-def main():
-    """Main execution method for the inventory analyzer"""
-    st.set_page_config(
-        page_title="Advanced Inventory Analysis Dashboard",
-        page_icon="📊",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
-    
-    # Initialize session state
-    if 'analysis_complete' not in st.session_state:
-        st.session_state.analysis_complete = False
-    
-    # Create analyzer instance here
-    analyzer = InventoryAnalyzer()  # Replace with your actual class name
-    
-    # Main application logic
-    if not st.session_state.analysis_complete:
-        # Show file upload and analysis interface
-        analyzer.display_file_upload_interface()
-    else:
-        # Show analysis results
-        analyzer.display_analysis_results()
         
         # Option to analyze new file
         if st.sidebar.button("🔄 Analyze New File", type="secondary"):
