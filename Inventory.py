@@ -1258,7 +1258,7 @@ class InventoryManagementSystem:
             color_continuous_scale='RdYlGn'
         )
         st.plotly_chart(fig, use_container_width=True)
-        
+    
     def create_enhanced_top_parts_chart(self, processed_data, status_filter, color, key, top_n=10):
         """Enhanced top parts chart with better visualization"""
         filtered_data = [
@@ -1312,9 +1312,13 @@ class InventoryManagementSystem:
                 value=(int(df['Current Inventory-QTY'].min()), int(df['Current Inventory-QTY'].max()))
             )
             st.session_state.qty_filter = (min_qty, max_qty)
-        # Multi-select filters
-        if 'Vendor' in df.columns or 'Vendor Name' in df.columns:
-            vendor_col = 'Vendor' if 'Vendor' in df.columns else 'Vendor Name'
+        # Multi-select filters (FIXED: properly define vendor_col)
+        vendor_col = None
+        if 'Vendor' in df.columns:
+            vendor_col = 'Vendor'
+        elif 'Vendor Name' in df.columns:
+            vendor_col = 'Vendor Name'
+        if vendor_col and vendor_col in df.columns:
             selected_vendors = st.sidebar.multiselect(
                 "Select Vendors",
                 options=sorted(df[vendor_col].unique()),
@@ -1334,7 +1338,7 @@ class InventoryManagementSystem:
     def apply_advanced_filters(self, df):
         """Apply advanced filters to dataframe"""
         filtered_df = df.copy()
-        # Apply value filter
+        # Apply value filted
         if hasattr(st.session_state, 'value_filter') and 'Stock_Value' in df.columns:
             min_val, max_val = st.session_state.value_filter
             filtered_df = filtered_df[
@@ -1348,10 +1352,14 @@ class InventoryManagementSystem:
                 (filtered_df['Current Inventory-QTY'] >= min_qty) & 
                 (filtered_df['Current Inventory-QTY'] <= max_qty)
             ]
-        # Apply vendor filter
+        # Apply vendor filter (FIXED: properly handle vendor column)
         if hasattr(st.session_state, 'vendor_filter'):
-            vendor_col = 'Vendor' if 'Vendor' in df.columns else 'Vendor Name'
-            if vendor_col in df.columns:
+            vendor_col = None
+            if 'Vendor' in df.columns:
+                vendor_col = 'Vendor'
+            elif 'Vendor Name' in df.columns:
+                vendor_col = 'Vendor Name'
+            if vendor_col and vendor_col in df.columns:
                 filtered_df = filtered_df[filtered_df[vendor_col].isin(st.session_state.vendor_filter)]
         return filtered_df
         
@@ -1373,7 +1381,7 @@ class InventoryManagementSystem:
                 'message': f"{len(critical_short)} high-value parts are critically short. Immediate procurement required.",
                 'action': 'Review procurement pipeline and expedite orders'
             })
-        # Excess inventory opportunities
+        # Excess inventory opportunitie
         excess_high = df[
             (df['Status'] == 'Excess Inventory') & 
             (df['Stock_Value'] > 50000)
@@ -1386,9 +1394,13 @@ class InventoryManagementSystem:
                 'message': f"₹{excess_high['Stock_Value'].sum():,.0f} tied up in excess inventory.",
                 'action': 'Consider liquidation or redistribution strategies'
             })
-        # Vendor performance issues
-        vendor_col = 'Vendor' if 'Vendor' in df.columns else 'Vendor Name'
-        if vendor_col in df.columns:
+        # Vendor performance issues (FIXED: properly handle vendor column)
+        vendor_col = None
+        if 'Vendor' in df.columns:
+            vendor_col = 'Vendor'
+        elif 'Vendor Name' in df.columns:
+            vendor_col = 'Vendor Name'
+        if vendor_col and vendor_col in df.columns:
             vendor_performance = df.groupby(vendor_col).agg({
                 'Status': lambda x: (x == 'Within Norms').mean()
             }).reset_index()
