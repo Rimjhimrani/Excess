@@ -1848,18 +1848,18 @@ class InventoryManagementSystem:
             format="₹%.0f"
         )
         # Status filter
-       status_options = df['Status'].unique().tolist()
-       selected_statuses = st.sidebar.multiselect(
-           "Filter by Status",
-           options=status_options,
-           default=status_options
-       )
-       # Category filter (if available)
-       category_col = None
-       if 'Category' in df.columns:
-           category_col = 'Category'
-       elif 'PART CATEGORY' in df.columns:
-           category_col = 'PART CATEGORY'
+        status_options = df['Status'].unique().tolist()
+        selected_statuses = st.sidebar.multiselect(
+            "Filter by Status",
+            options=status_options,
+            default=status_options
+        )
+        # Category filter (if available)
+        category_col = None
+        if 'Category' in df.columns:
+            category_col = 'Category'
+        elif 'PART CATEGORY' in df.columns:
+            category_col = 'PART CATEGORY'
         selected_categories = None
         if category_col:
             categories = df[category_col].unique().tolist()
