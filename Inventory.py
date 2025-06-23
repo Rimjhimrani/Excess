@@ -1201,6 +1201,7 @@ class InventoryManagementSystem:
             st.warning("Vendor information not available in analysis data.")
             return
         vendor_col = 'Vendor' if 'Vendor' in df.columns else 'Vendor Name'
+        value_col = 'Current Inventory - VALUE'  # ✅ Correct column name
         # Calculate vendor metrics
         vendor_summary = {}
         for vendor in df[vendor_col].unique():
@@ -1211,8 +1212,8 @@ class InventoryManagementSystem:
                 'short_parts': len(vendor_data[vendor_data['Status'] == 'Short Inventory']),
                 'excess_parts': len(vendor_data[vendor_data['Status'] == 'Excess Inventory']),
                 'normal_parts': len(vendor_data[vendor_data['Status'] == 'Within Norms']),
-                'short_value': vendor_data[vendor_data['Status'] == 'Short Inventory']['Stock_Value'].sum(),
-                'excess_value': vendor_data[vendor_data['Status'] == 'Excess Inventory']['Stock_Value'].sum(),
+                'short_value': vendor_data[vendor_data['Status'] == 'Short Inventory']['value_col'].sum(),
+                'excess_value': vendor_data[vendor_data['Status'] == 'Excess Inventory']['value_col'].sum(),
             }
         # Create enhanced vendor dataframe
         vendor_df = pd.DataFrame([
