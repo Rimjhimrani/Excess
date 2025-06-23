@@ -1176,7 +1176,7 @@ class InventoryManagementSystem:
         df = pd.DataFrame(analysis_results)
     if 'Vendor' not in df.columns and 'Vendor Name' not in df.columns:
         st.warning("Vendor information not available in analysis data.")
-        return
+    return
     
     vendor_col = 'Vendor' if 'Vendor' in df.columns else 'Vendor Name'
     
