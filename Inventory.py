@@ -1064,7 +1064,7 @@ class InventoryManagementSystem:
                     return
             if analysis_results:
                 self.persistence.save_data_to_session_state('persistent_analysis_results', analysis_results)
-                st.session_state.last_analysis_tolerance = toleranc
+                st.session_state.last_analysis_tolerance = tolerance
                 st.success("✅ Analysis completed successfully!")
                 st.rerun()
             else:
