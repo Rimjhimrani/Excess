@@ -190,10 +190,6 @@ class InventoryAnalyzer:
             }
             results.append(result)
         return results
-        
-    def run(self):
-        st.title("Inventory Analyzer")
-        st.write("This is a test run for InventoryAnalyzer.")
 
     def get_vendor_summary(self, processed_data):
         """Summarize inventory by vendor using actual Stock_Value field from the file."""
@@ -967,6 +963,24 @@ class InventoryManagementSystem:
                     st.session_state.persistent_inventory_locked = True
                     st.success(f"✅ Sample inventory data loaded and locked: {len(sample_data)} parts")
                     st.rerun()
+    def run(self):
+        st.title("📊 Inventory Analyzer")
+        st.markdown(
+            "<p style='font-size:18px; font-style:italic;'>Designed and Developed by Agilomatrix</p>",
+            unsafe_allow_html=True
+        )
+        st.markdown("---")
+
+        # Authenticate user
+        self.authenticate_user()
+
+        # Show UI based on role
+        if st.session_state.user_role == "Admin":
+            self.admin_data_management()
+        elif st.session_state.user_role == "User":
+            self.user_inventory_upload()
+        else:
+            st.info("👋 Please select your role and authenticate to access the system.")
     
     def display_validation_results(self, validation_result):
         """Display inventory validation results"""
@@ -2178,8 +2192,6 @@ def main():
             st.session_state.analysis_complete = False
             st.rerun()
 
-# Then keep the if __name__ == "__main__": block as:
-# Usage example and initialization
 if __name__ == "__main__":
-    analyzer = InventoryAnalyzer()
-    analyzer.main()
+    app = InventoryManagementSystem()
+    app.run()  # This runs the full dashboard
