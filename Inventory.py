@@ -1573,7 +1573,7 @@ class InventoryManagementSystem:
                 # Summary sheet
                 summary_data = {
                     'Status': df['Status'].value_counts().index.tolist(),
-                    'Count': df['Status'].value_counts().values.tolist()
+                    'Count': df['Status'].value_counts().values.tolist(),
                     'Total Value': [df[df['Status'] == status]['Stock_Value'].sum() 
                                     for status in df['Status'].value_counts().index]
                 }
