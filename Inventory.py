@@ -1197,14 +1197,15 @@ class InventoryManagementSystem:
         """Enhanced vendor summary with better analytics"""
         st.header("🏢 Vendor Performance Analysis")
         df = pd.DataFrame(analysis_results)
+        vendor_col = None
         # Define vendor column only if one exists
         if 'Vendor' in df.columns:
             vendor_col = 'Vendor'
         elif 'Vendor Name' in df.columns:
             vendor_col = 'Vendor Name'
-        else:
+        if vendor_col is None:
             st.warning("Vendor information not available in analysis data.")
-            return  # ✅ EARLY EXIT
+            return  # Early exit if no vendor column found
         value_col = 'Current Inventory - VALUE'
         vendor_summary = {}
         for vendor in df[vendor_col].dropna().unique():
@@ -1231,6 +1232,9 @@ class InventoryManagementSystem:
             }
             for vendor, data in vendor_summary.items()
         ])
+        if vendor_df.empty:
+            st.warning("No vendor data available for analysis.")
+            return
         def color_performance(val):
             if isinstance(val, (int, float)):
                 if val >= 80:
