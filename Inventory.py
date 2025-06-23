@@ -1949,46 +1949,46 @@ class InventoryManagementSystem:
                  filtered_df = filtered_df[filtered_df['VENDOR'].isin(st.session_state.filter_vendors)]
          return filtered_df
 
-     def generate_analysis_summary(self, analysis_results):
-         """Generate a comprehensive analysis summary"""
-         df = pd.DataFrame(analysis_results)
-         summary = {
-             'total_parts': len(df),
-             'total_value': df['Stock_Value'].sum(),
-             'within_norms': (df['Status'] == 'Within Norms').sum(),
-             'excess_inventory': (df['Status'] == 'Excess Inventory').sum(),
-             'short_inventory': (df['Status'] == 'Short Inventory').sum(),
-             'efficiency_rate': (df['Status'] == 'Within Norms').mean() * 100,
-             'excess_value': df[df['Status'] == 'Excess Inventory']['Stock_Value'].sum(),
-             'shortage_impact': abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum()),
-             'critical_items': len(df[df['Stock_Value'] > st.session_state.get('critical_threshold', 100000)]),
-             'avg_stock_value': df['Stock_Value'].mean()
-         }
-         return summary
+    def generate_analysis_summary(self, analysis_results):
+        """Generate a comprehensive analysis summary"""
+        df = pd.DataFrame(analysis_results)
+        summary = {
+            'total_parts': len(df),
+            'total_value': df['Stock_Value'].sum(),
+            'within_norms': (df['Status'] == 'Within Norms').sum(),
+            'excess_inventory': (df['Status'] == 'Excess Inventory').sum(),
+            'short_inventory': (df['Status'] == 'Short Inventory').sum(),
+            'efficiency_rate': (df['Status'] == 'Within Norms').mean() * 100,
+            'excess_value': df[df['Status'] == 'Excess Inventory']['Stock_Value'].sum(),
+            'shortage_impact': abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum()),
+            'critical_items': len(df[df['Stock_Value'] > st.session_state.get('critical_threshold', 100000)]),
+            'avg_stock_value': df['Stock_Value'].mean()
+        }
+        return summary
         
-     def main(self):
-         """Main execution method for the inventory analyzer"""
-         st.set_page_config(
-             page_title="Advanced Inventory Analysis Dashboard",
-             page_icon="📊",
-             layout="wide",
-             initial_sidebar_state="expanded"
-         )
-         # Initialize session state
-         if 'analysis_complete' not in st.session_state:
-             st.session_state.analysis_complete = False
-         # Main application logic
-         if not st.session_state.analysis_complete:
-             # Show file upload and analysis interface
-             self.display_file_upload_interface()
-         else:
-             # Show analysis results
-             self.display_analysis_results()
+    def main(self):
+        """Main execution method for the inventory analyzer"""
+        st.set_page_config(
+            page_title="Advanced Inventory Analysis Dashboard",
+            page_icon="📊",
+            layout="wide",
+            initial_sidebar_state="expanded"
+        )
+        # Initialize session state
+        if 'analysis_complete' not in st.session_state:
+            st.session_state.analysis_complete = False
+        # Main application logic
+        if not st.session_state.analysis_complete:
+            # Show file upload and analysis interface
+            self.display_file_upload_interface()
+        else:
+            # Show analysis results
+            self.display_analysis_results()
         
-         # Option to analyze new file
-         if st.sidebar.button("🔄 Analyze New File", type="secondary"):
-             st.session_state.analysis_complete = False
-             st.rerun()
+        # Option to analyze new file
+        if st.sidebar.button("🔄 Analyze New File", type="secondary"):
+            st.session_state.analysis_complete = False
+            st.rerun()
 
 if __name__ == "__main__":
     app = InventoryManagementSystem()
