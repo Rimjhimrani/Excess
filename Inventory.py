@@ -2150,5 +2150,8 @@ def main(self):
 
 # Usage example and initialization
 if __name__ == "__main__":
-    analyzer = InventoryAnalyzer()
-    analyzer.run()
+    try:
+        analyzer = InventoryAnalyzer()
+        analyzer.run()
+    except Exception as e:
+        print(f"Error: {e}")
