@@ -1222,7 +1222,7 @@ class InventoryManagementSystem:
                 'Total Parts': data['total_parts'],
                 'Short Inventory': data['short_parts'],
                 'Excess Inventory': data['excess_parts'],
-                'Within Norms': data['normal_parts'],\
+                'Within Norms': data['normal_parts'],
                 'Total Value (₹)': f"₹{data['total_value']:,.0f}",
                 'Performance Score': round((data['normal_parts'] / data['total_parts']) * 100, 1) if data['total_parts'] > 0 else 0
             }
