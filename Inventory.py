@@ -652,11 +652,7 @@ class InventoryManagementSystem:
 
         missing_parts = pfep_parts - inventory_parts
         extra_parts = inventory_parts - pfep_parts
-
-        if missing_parts:
-            warnings.append(f"Parts missing in inventory: {len(missing_parts)} parts")
-        if extra_parts:
-            warnings.append(f"Extra parts in inventory not in PFEP: {len(extra_parts)} parts")
+        
         # Check for parts with zero quantity
         zero_qty_parts = inventory_df[inventory_df['Current_QTY'] == 0]['Part_No'].tolist()
         if zero_qty_parts:
