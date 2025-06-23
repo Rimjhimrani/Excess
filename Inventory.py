@@ -581,13 +581,13 @@ class InventoryManagementSystem:
             return []
         # 🔁 Add all possible column mappings
         column_mappings = {
-            'part_no': ['part_no', 'part_number', 'material', 'material_code', 'item_code', 'code'],
-            'description': ['description', 'item_description', 'part_description', 'desc'],
-            'current_qty': ['current_qty', 'qty', 'quantity', 'stock_qty', 'available_qty'],
-            'stock_value': ['stock_value', 'value', 'total_value', 'inventory_value', 'stock value', 'Stock Value'],
+            'part_no': ['part_no', 'part_number', 'material', 'material_code', 'item_code', 'code', 'part no', 'Part No'],
+            'description': ['description', 'item_description', 'part_description', 'desc','Part Description'],
+            'current_qty': ['current_qty', 'qty', 'quantity', 'stock_qty', 'available_qty', 'Current_QTY'],
+            'stock_value': ['stock_value', 'value', 'total_value', 'inventory_value', 'Stock Value', 'Stock_Value'],
             'uom': ['uom', 'unit', 'unit_of_measure'],
             'location': ['location', 'store', 'warehouse', 'site'],
-            'vendor_code': ['vendor_code', 'vendor_id', 'supplier_code', 'supplier_id', 'vendor id', 'Vendor Code', 'vendor code'],
+            'vendor_code': ['vendor_code', 'vendor id', 'supplier_code', 'Vendor Code'],
             'batch': ['batch', 'batch_number', 'lot', 'lot_number']
         }
         df_columns_lower = {col.lower().strip(): col for col in df.columns if col is not None}
