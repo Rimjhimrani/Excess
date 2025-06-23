@@ -2146,13 +2146,6 @@ def main(self):
             st.session_state.analysis_complete = False
             st.rerun()
 
-# Usage example and initialization
-if __name__ == "__main__":
-    # You need to create an instance of your class first
-    # Replace 'YourClassName' with the actual name of your class
-    analyzer = InventoryAnalyzer()  # Create an instance of your inventory analyzer class
-    analyzer.main()  # Call the main method on the instance
-
 # Alternative approach - if main should be a standalone function:
 # Remove 'self' parameter from the main method definition and change it to:
 def main():
