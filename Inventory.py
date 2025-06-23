@@ -971,23 +971,23 @@ class InventoryManagementSystem:
                     st.success(f"✅ Sample inventory data loaded and locked: {len(sample_data)} parts")
                     st.rerun()
     def run(self):
-        st.set_page_config(page_title="Inventory Analyzer", layout="wide")
         st.title("📊 Inventory Analyzer")
-        st.markdown("<p style='font-size:16px'>Built by Agilomatrix</p>", unsafe_allow_html=True)
+        st.markdown(
+            "<p style='font-size:18px; font-style:italic;'>Designed and Developed by Agilomatrix</p>",
+            unsafe_allow_html=True
+        )
         st.markdown("---")
-        if 'user_role' not in st.session_state:
-            st.session_state.user_role = None
-        role = st.sidebar.selectbox("Select Role", ["Admin", "User"])
-        if st.sidebar.button("Login"):
-            st.session_state.user_role = role
-        if st.session_state.user_role:
-            st.success(f"Logged in as: {st.session_state.user_role}")
-            if st.session_state.user_role == "Admin":
-                self.admin_data_management()
-            elif st.session_state.user_role == "User":
-                self.user_inventory_upload()
+
+        # Authenticate user
+        self.authenticate_user()
+
+        # Show UI based on role
+        if st.session_state.user_role == "Admin":
+            self.admin_data_management()
+        elif st.session_state.user_role == "User":
+            self.user_inventory_upload()
         else:
-            st.info("Please select your role and click Login.")
+            st.info("👋 Please select your role and authenticate to access the system.")
     
     def display_validation_results(self, validation_result):
         """Display inventory validation results"""
