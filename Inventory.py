@@ -1207,6 +1207,7 @@ class InventoryManagementSystem:
             return  # ✅ EARLY EXIT
         value_col = 'Current Inventory - VALUE'
         vendor_summary = {}
+    
         for vendor in df[vendor_col].dropna().unique():
             vendor_data = df[df[vendor_col] == vendor]
             vendor_summary[vendor] = {
@@ -1215,8 +1216,8 @@ class InventoryManagementSystem:
                 'short_parts': len(vendor_data[vendor_data['Status'] == 'Short Inventory']),
                 'excess_parts': len(vendor_data[vendor_data['Status'] == 'Excess Inventory']),
                 'normal_parts': len(vendor_data[vendor_data['Status'] == 'Within Norms']),
-                'short_value': vendor_data[vendor_data['Status'] == 'Short Inventory'][value_col].sum(),
-                'excess_value': vendor_data[vendor_data['Status'] == 'Excess Inventory'][value_col].sum(),
+                'short_value': vendor_data[vendor_data['Status'] == 'Short Inventory'][value_col].sum() if value_col in vendor_data.columns else 0,
+                'excess_value': vendor_data[vendor_data['Status'] == 'Excess Inventory'][value_col].sum() if value_col in vendor_data.columns else 0,
             }
         vendor_df = pd.DataFrame([
             {
@@ -1231,6 +1232,29 @@ class InventoryManagementSystem:
             }
             for vendor, data in vendor_summary.items()
         ])
+        def color_performance(val):
+            if isinstance(val, (int, float)):
+                if val >= 80:
+                    return 'background-color: #4CAF50; color: white'
+                elif val >= 60:
+                    return 'background-color: #FF9800; color: white'
+                else:
+                    return 'background-color: #F44336; color: white'
+            return ''
+        st.dataframe(
+            vendor_df.style.applymap(color_performance, subset=['Performance Score']),
+            use_container_width=True,
+            hide_index=True
+        )
+        fig = px.bar(
+            vendor_df.head(10),
+            x='Vendor',
+            y='Performance Score',
+            title="Top 10 Vendor Performance Scores",
+            color='Performance Score',
+            color_continuous_scale='RdYlGn'
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
     def color_performance(val):
         if isinstance(val, (int, float)):
