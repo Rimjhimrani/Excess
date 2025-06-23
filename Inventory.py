@@ -314,11 +314,13 @@ class InventoryManagementSystem:
                 st.write("🟡 safe_float_convert: NULL or empty value → 0.0")
             return 0.0
         try:
+            # If already a number
             if isinstance(value, (int, float)):
                 result = float(value)
                 if self.debug:
                     st.write(f"✅ Converted numeric: {value} → {result}")
                 return result
+            # Clean and parse string-based values
             str_value = str(value).strip()
             str_value = str_value.replace(',', '').replace(' ', '').replace('₹', '').replace('$', '').replace('€', '')
             if str_value.endswith('%'):
@@ -331,10 +333,9 @@ class InventoryManagementSystem:
             return result
         except (ValueError, TypeError) as e:
             if self.debug:
-                st.write(f"❌ Error converting '{value}' → 0.0 | Error: {e}")
-            return 1.0  # BUG: returns 1.0 instead of 0.0
-
-            
+                st.write(f"❌ Failed to convert '{value}' → 0.0 ({e})")
+            return 0.0
+   
     def safe_int_convert(self, value):
         """Enhanced safe int conversion"""
         return int(self.safe_float_convert(value))
