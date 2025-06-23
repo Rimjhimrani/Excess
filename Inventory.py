@@ -1484,58 +1484,58 @@ class InventoryManagementSystem:
                 # Seasonal analysis placeholder
                 st.info("📊 **Seasonal Analysis**: Historical data integration required for advanced forecasting")
 
-        def display_executive_dashboard(self, analysis_results):
-            """Executive level dashboard with KPIs"""
-            st.header("👔 Executive Dashboard")
-            df = pd.DataFrame(analysis_results)
-            # Key metrics ro
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                total_value = df['Stock_Value'].sum()
-                st.metric(
-                    "Total Inventory Value",
-                    f"₹{total_value:,.0f}",
-                    delta=f"Analyzed: {len(df)} parts"
-                )
-            with col2:
-                efficiency = (df['Status'] == 'Within Norms').mean() * 100
-                st.metric(
-                    "Inventory Efficiency",
-                    f"{efficiency:.1f}%",
-                    delta=f"{'Good' if efficiency > 70 else 'Needs Improvement'}"
-                )
-            with col3:
-                excess_value = df[df['Status'] == 'Excess Inventory']['Stock_Value'].sum()
-                st.metric(
-                    "Excess Inventory",
-                    f"₹{excess_value:,.0f}",
-                    delta=f"{(df['Status'] == 'Excess Inventory').sum()} parts"
-                )
-            with col4:
-                short_impact = abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum())
-                st.metric(
-                    "Shortage Impact",
-                    f"₹{short_impact:,.0f}",
-                    delta=f"{(df['Status'] == 'Short Inventory').sum()} parts"
-                )
-            # Risk matrix
-            st.subheader("🎯 Risk Assessment Matrix")
-            # Create risk categories
-            df['Risk_Level'] = 'Low'
-            df.loc[(df['Stock_Value'] > 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'High'
-            df.loc[(df['Stock_Value'] > 50000) & (df['Stock_Value'] <= 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'Medium'
-    
-            risk_matrix = df.groupby(['Risk_Level', 'Status']).agg({
-                'Stock_Value': 'sum',
-                'PART NO': 'count'
-            }).reset_index()
-            fig = px.sunburst(
-                risk_matrix,
-                path=['Risk_Level', 'Status'],
-                values='Stock_Value',
-                title="Risk Assessment by Value Impact"
+    def display_executive_dashboard(self, analysis_results):
+        """Executive level dashboard with KPIs"""
+        st.header("👔 Executive Dashboard")
+        df = pd.DataFrame(analysis_results)
+        # Key metrics ro
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            total_value = df['Stock_Value'].sum()
+            st.metric(
+                "Total Inventory Value",
+                f"₹{total_value:,.0f}",
+                delta=f"Analyzed: {len(df)} parts"
             )
-            st.plotly_chart(fig, use_container_width=True)
+        with col2:
+            efficiency = (df['Status'] == 'Within Norms').mean() * 100
+            st.metric(
+                "Inventory Efficiency",
+                f"{efficiency:.1f}%",
+                delta=f"{'Good' if efficiency > 70 else 'Needs Improvement'}"
+            )
+        with col3:
+            excess_value = df[df['Status'] == 'Excess Inventory']['Stock_Value'].sum()
+            st.metric(
+                "Excess Inventory",
+                f"₹{excess_value:,.0f}",
+                delta=f"{(df['Status'] == 'Excess Inventory').sum()} parts"
+            )
+        with col4:
+            short_impact = abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum())
+            st.metric(
+                "Shortage Impact",
+                f"₹{short_impact:,.0f}",
+                delta=f"{(df['Status'] == 'Short Inventory').sum()} parts"
+            )
+        # Risk matrix
+        st.subheader("🎯 Risk Assessment Matrix")
+        # Create risk categories
+        df['Risk_Level'] = 'Low'
+        df.loc[(df['Stock_Value'] > 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'High'
+        df.loc[(df['Stock_Value'] > 50000) & (df['Stock_Value'] <= 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'Medium'
+    
+        risk_matrix = df.groupby(['Risk_Level', 'Status']).agg({
+            'Stock_Value': 'sum',
+            'PART NO': 'count'
+        }).reset_index()
+        fig = px.sunburst(
+            risk_matrix,
+            path=['Risk_Level', 'Status'],
+            values='Stock_Value',
+            title="Risk Assessment by Value Impact"
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
@@ -1925,70 +1925,70 @@ class InventoryManagementSystem:
         st.session_state.filter_vendors = selected_vendors
         st.session_state.critical_threshold = critical_threshold
 
-   def apply_advanced_filters(self, df):
-       """Apply advanced filters to the dataframe"""
-       filtered_df = df.copy()
-       # Apply value range filter
-       if hasattr(st.session_state, 'filter_value_range'):
-           min_val, max_val = st.session_state.filter_value_range
-           filtered_df = filtered_df[
-               (filtered_df['Stock_Value'] >= min_val) & 
-               (filtered_df['Stock_Value'] <= max_val)
-           ]
-        # Apply status filter
-       if hasattr(st.session_state, 'filter_statuses') and st.session_state.filter_statuses:
-           filtered_df = filtered_df[filtered_df['Status'].isin(st.session_state.filter_statuses)]
-        # Apply category filter
-       if hasattr(st.session_state, 'filter_categories') and st.session_state.filter_categories:
-           category_col = 'Category' if 'Category' in filtered_df.columns else 'PART CATEGORY'
-           if category_col in filtered_df.columns:
-               filtered_df = filtered_df[filtered_df[category_col].isin(st.session_state.filter_categories)]
-        # Apply vendor filter
-       if hasattr(st.session_state, 'filter_vendors') and st.session_state.filter_vendors:
-           if 'VENDOR' in filtered_df.columns:
-               filtered_df = filtered_df[filtered_df['VENDOR'].isin(st.session_state.filter_vendors)]
-        return filtered_df
+    def apply_advanced_filters(self, df):
+        """Apply advanced filters to the dataframe"""
+        filtered_df = df.copy()
+        # Apply value range filter
+        if hasattr(st.session_state, 'filter_value_range'):
+            min_val, max_val = st.session_state.filter_value_range
+            filtered_df = filtered_df[
+                (filtered_df['Stock_Value'] >= min_val) & 
+                (filtered_df['Stock_Value'] <= max_val)
+            ]
+         # Apply status filter
+         if hasattr(st.session_state, 'filter_statuses') and st.session_state.filter_statuses:
+             filtered_df = filtered_df[filtered_df['Status'].isin(st.session_state.filter_statuses)]
+         # Apply category filter
+         if hasattr(st.session_state, 'filter_categories') and st.session_state.filter_categories:
+             category_col = 'Category' if 'Category' in filtered_df.columns else 'PART CATEGORY'
+             if category_col in filtered_df.columns:
+                 filtered_df = filtered_df[filtered_df[category_col].isin(st.session_state.filter_categories)]
+         # Apply vendor filter
+         if hasattr(st.session_state, 'filter_vendors') and st.session_state.filter_vendors:
+             if 'VENDOR' in filtered_df.columns:
+                 filtered_df = filtered_df[filtered_df['VENDOR'].isin(st.session_state.filter_vendors)]
+         return filtered_df
 
-    def generate_analysis_summary(self, analysis_results):
-        """Generate a comprehensive analysis summary"""
-        df = pd.DataFrame(analysis_results)
-        summary = {
-            'total_parts': len(df),
-            'total_value': df['Stock_Value'].sum(),
-            'within_norms': (df['Status'] == 'Within Norms').sum(),
-            'excess_inventory': (df['Status'] == 'Excess Inventory').sum(),
-            'short_inventory': (df['Status'] == 'Short Inventory').sum(),
-            'efficiency_rate': (df['Status'] == 'Within Norms').mean() * 100,
-            'excess_value': df[df['Status'] == 'Excess Inventory']['Stock_Value'].sum(),
-            'shortage_impact': abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum()),
-            'critical_items': len(df[df['Stock_Value'] > st.session_state.get('critical_threshold', 100000)]),
-            'avg_stock_value': df['Stock_Value'].mean()
-        }
-        return summary
+     def generate_analysis_summary(self, analysis_results):
+         """Generate a comprehensive analysis summary"""
+         df = pd.DataFrame(analysis_results)
+         summary = {
+             'total_parts': len(df),
+             'total_value': df['Stock_Value'].sum(),
+             'within_norms': (df['Status'] == 'Within Norms').sum(),
+             'excess_inventory': (df['Status'] == 'Excess Inventory').sum(),
+             'short_inventory': (df['Status'] == 'Short Inventory').sum(),
+             'efficiency_rate': (df['Status'] == 'Within Norms').mean() * 100,
+             'excess_value': df[df['Status'] == 'Excess Inventory']['Stock_Value'].sum(),
+             'shortage_impact': abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum()),
+             'critical_items': len(df[df['Stock_Value'] > st.session_state.get('critical_threshold', 100000)]),
+             'avg_stock_value': df['Stock_Value'].mean()
+         }
+         return summary
         
-    def main(self):
-        """Main execution method for the inventory analyzer"""
-        st.set_page_config(
-            page_title="Advanced Inventory Analysis Dashboard",
-            page_icon="📊",
-            layout="wide",
-            initial_sidebar_state="expanded"
-        )
-        # Initialize session state
-        if 'analysis_complete' not in st.session_state:
-            st.session_state.analysis_complete = False
-        # Main application logic
-        if not st.session_state.analysis_complete:
-            # Show file upload and analysis interface
-            self.display_file_upload_interface()
-        else:
-            # Show analysis results
-            self.display_analysis_results()
+     def main(self):
+         """Main execution method for the inventory analyzer"""
+         st.set_page_config(
+             page_title="Advanced Inventory Analysis Dashboard",
+             page_icon="📊",
+             layout="wide",
+             initial_sidebar_state="expanded"
+         )
+         # Initialize session state
+         if 'analysis_complete' not in st.session_state:
+             st.session_state.analysis_complete = False
+         # Main application logic
+         if not st.session_state.analysis_complete:
+             # Show file upload and analysis interface
+             self.display_file_upload_interface()
+         else:
+             # Show analysis results
+             self.display_analysis_results()
         
-        # Option to analyze new file
-        if st.sidebar.button("🔄 Analyze New File", type="secondary"):
-            st.session_state.analysis_complete = False
-            st.rerun()
+         # Option to analyze new file
+         if st.sidebar.button("🔄 Analyze New File", type="secondary"):
+             st.session_state.analysis_complete = False
+             st.rerun()
 
 if __name__ == "__main__":
     app = InventoryManagementSystem()
