@@ -128,6 +128,7 @@ class InventoryAnalyzer:
     """Enhanced inventory analysis with comprehensive reporting"""
     
     def __init__(self):
+        self.persistence = self
         self.status_colors = {
             'Within Norms': '#4CAF50',    # Green
             'Excess Inventory': '#2196F3', # Blue
@@ -2178,5 +2179,7 @@ def main():
             st.rerun()
 
 # Then keep the if __name__ == "__main__": block as:
+# Usage example and initialization
 if __name__ == "__main__":
-    main()
+    analyzer = InventoryAnalyzer()
+    analyzer.main()
