@@ -128,6 +128,7 @@ class InventoryAnalyzer:
     """Enhanced inventory analysis with comprehensive reporting"""
     
     def __init__(self):
+        self.debug = False
         self.persistence = self
         self.status_colors = {
             'Within Norms': '#4CAF50',    # Green
