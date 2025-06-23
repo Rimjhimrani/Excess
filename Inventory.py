@@ -1029,40 +1029,54 @@ class InventoryManagementSystem:
     def display_analysis_interface(self):
         """Main analysis interface for users"""
         st.subheader("📈 Inventory Analysis Results")
-        # Get data
-        pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
-        inventory_data = self.persistence.load_data_from_session_state('persistent_inventory_data')
-    
+        # Get PFEP and Inventory data
+        try:
+            pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
+            inventory_data = self.persistence.load_data_from_session_state('persistent_inventory_data')
+        except Exception as e:
+            st.error("❌ Error loading PFEP or Inventory data.")
+            st.code(str(e))
+            return
         if not pfep_data or not inventory_data:
             st.error("❌ Required data not available. Please upload PFEP and Inventory data first.")
             return
         # Get tolerance from admin settings
         tolerance = st.session_state.get('admin_tolerance', 30)
         st.info(f"📐 Analysis Tolerance: ±{tolerance}% (Set by Admin)")
-    
+
         # Check if analysis needs to be performed or updated
         analysis_data = self.persistence.load_data_from_session_state('persistent_analysis_results')
         last_tolerance = st.session_state.get('last_analysis_tolerance', None)
-    
-        # Auto re-analyze if tolerance changed
+
+        # Auto re-analyze if tolerance changed or no data exists
         if not analysis_data or last_tolerance != tolerance:
             st.info(f"🔄 Re-analyzing with ±{tolerance}% tolerance...")
             with st.spinner("Analyzing inventory..."):
-                analysis_results = self.analyzer.analyze_inventory(
-                    pfep_data, 
-                    inventory_data, 
+                try:
+                    analysis_results = self.analyzer.analyze_inventory(
+                    pfep_data,
+                    inventory_data,
                     tolerance=tolerance
                 )
+                except Exception as e:
+                    st.error("❌ Error during inventory analysis")
+                    st.code(str(e))
+                    return
             if analysis_results:
                 self.persistence.save_data_to_session_state('persistent_analysis_results', analysis_results)
-                st.session_state.last_analysis_tolerance = tolerance
+                st.session_state.last_analysis_tolerance = toleranc
                 st.success("✅ Analysis completed successfully!")
                 st.rerun()
             else:
-                st.error("❌ Analysis failed. Please check your data.")
+                st.error("❌ Analysis failed. No results generated.")
                 return
-        # Display results
-        self.display_analysis_results()
+        # Try to display the results
+        try:
+            self.display_analysis_results()
+        except Exception as e:
+            st.error("❌ Unexpected error during analysis results display")
+            st.code(str(e))
+            return
     def display_comprehensive_analysis(self, analysis_results):
         """Display comprehensive analysis results with enhanced features"""
         st.success(f"✅ Analysis Complete: {len(analysis_results)} parts analyzed")
