@@ -1280,82 +1280,71 @@ class InventoryManagementSystem:
             textposition='auto',
         ))
         st.plotly_chart(fig, use_container_width=True)
-
-def display_advanced_filtering_options(self, analysis_results):
-    """Advanced filtering options for better data exploration"""
-    st.sidebar.header("🔍 Advanced Filters")
-    
-    df = pd.DataFrame(analysis_results)
-    
-    # Value range filter
-    if 'Stock_Value' in df.columns:
-        min_value, max_value = st.sidebar.slider(
-            "Stock Value Range (₹)",
-            min_value=float(df['Stock_Value'].min()),
-            max_value=float(df['Stock_Value'].max()),
-            value=(float(df['Stock_Value'].min()), float(df['Stock_Value'].max())),
-            format="₹%.0f"
+    def display_advanced_filtering_options(self, analysis_results):
+        """Advanced filtering options for better data exploration"""
+        st.sidebar.header("🔍 Advanced Filters")
+        df = pd.DataFrame(analysis_results)
+        # Value range filter
+        if 'Stock_Value' in df.columns:
+            min_value, max_value = st.sidebar.slider(
+                "Stock Value Range (₹)",
+                min_value=float(df['Stock_Value'].min()),
+                max_value=float(df['Stock_Value'].max()),
+                value=(float(df['Stock_Value'].min()), float(df['Stock_Value'].max())),
+                format="₹%.0f"
+            )
+            st.session_state.value_filter = (min_value, max_value)
+        # Quantity range filter
+        if 'Current Inventory-QTY' in df.columns:
+            min_qty, max_qty = st.sidebar.slider(
+                "Quantity Range",
+                min_value=int(df['Current Inventory-QTY'].min()),
+                max_value=int(df['Current Inventory-QTY'].max()),
+                value=(int(df['Current Inventory-QTY'].min()), int(df['Current Inventory-QTY'].max()))
+            )
+            st.session_state.qty_filter = (min_qty, max_qty)
+        # Multi-select filters
+        if 'Vendor' in df.columns or 'Vendor Name' in df.columns:
+            vendor_col = 'Vendor' if 'Vendor' in df.columns else 'Vendor Name'
+            selected_vendors = st.sidebar.multiselect(
+                "Select Vendors",
+                options=sorted(df[vendor_col].unique()),
+                default=sorted(df[vendor_col].unique())
+            )
+            st.session_state.vendor_filter = selected_vendors
+        # Critical parts filter
+        critical_threshold = st.sidebar.number_input(
+            "Critical Value Threshold (₹)",
+            min_value=0,
+            value=100000,
+            step=10000
         )
-        st.session_state.value_filter = (min_value, max_value)
-    
-    # Quantity range filter
-    if 'Current Inventory-QTY' in df.columns:
-        min_qty, max_qty = st.sidebar.slider(
-            "Quantity Range",
-            min_value=int(df['Current Inventory-QTY'].min()),
-            max_value=int(df['Current Inventory-QTY'].max()),
-            value=(int(df['Current Inventory-QTY'].min()), int(df['Current Inventory-QTY'].max()))
-        )
-        st.session_state.qty_filter = (min_qty, max_qty)
-    
-    # Multi-select filters
-    if 'Vendor' in df.columns or 'Vendor Name' in df.columns:
-        vendor_col = 'Vendor' if 'Vendor' in df.columns else 'Vendor Name'
-        selected_vendors = st.sidebar.multiselect(
-            "Select Vendors",
-            options=sorted(df[vendor_col].unique()),
-            default=sorted(df[vendor_col].unique())
-        )
-        st.session_state.vendor_filter = selected_vendors
-    
-    # Critical parts filter
-    critical_threshold = st.sidebar.number_input(
-        "Critical Value Threshold (₹)",
-        min_value=0,
-        value=100000,
-        step=10000
-    )
-    st.session_state.critical_threshold = critical_threshold
-    
-    return True
-
-def apply_advanced_filters(self, df):
-    """Apply advanced filters to dataframe"""
-    filtered_df = df.copy()
-    
-    # Apply value filter
-    if hasattr(st.session_state, 'value_filter') and 'Stock_Value' in df.columns:
-        min_val, max_val = st.session_state.value_filter
-        filtered_df = filtered_df[
-            (filtered_df['Stock_Value'] >= min_val) & 
-            (filtered_df['Stock_Value'] <= max_val)
-        ]
-    
-    # Apply quantity filter
-    if hasattr(st.session_state, 'qty_filter') and 'Current Inventory-QTY' in df.columns:
-        min_qty, max_qty = st.session_state.qty_filter
-        filtered_df = filtered_df[
-            (filtered_df['Current Inventory-QTY'] >= min_qty) & 
-            (filtered_df['Current Inventory-QTY'] <= max_qty)
-        ]
-    
-    # Apply vendor filter
-    if hasattr(st.session_state, 'vendor_filter'):
-        vendor_col = 'Vendor' if 'Vendor' in df.columns else 'Vendor Name'
-        if vendor_col in df.columns:
-            filtered_df = filtered_df[filtered_df[vendor_col].isin(st.session_state.vendor_filter)]
-    
-    return filtered_df
+        st.session_state.critical_threshold = critical_threshold
+        return True
+    def apply_advanced_filters(self, df):
+        """Apply advanced filters to dataframe"""
+        filtered_df = df.copy()
+        # Apply value filter
+        if hasattr(st.session_state, 'value_filter') and 'Stock_Value' in df.columns:
+            min_val, max_val = st.session_state.value_filter
+            filtered_df = filtered_df[
+                (filtered_df['Stock_Value'] >= min_val) & 
+                (filtered_df['Stock_Value'] <= max_val)
+            ]
+        # Apply quantity filter
+        if hasattr(st.session_state, 'qty_filter') and 'Current Inventory-QTY' in df.columns:
+            min_qty, max_qty = st.session_state.qty_filter
+            filtered_df = filtered_df[
+                (filtered_df['Current Inventory-QTY'] >= min_qty) & 
+                (filtered_df['Current Inventory-QTY'] <= max_qty)
+            ]
+        # Apply vendor filter
+        if hasattr(st.session_state, 'vendor_filter'):
+            vendor_col = 'Vendor' if 'Vendor' in df.columns else 'Vendor Name'
+            if vendor_col in df.columns:
+                filtered_df = filtered_df[filtered_df[vendor_col].isin(st.session_state.vendor_filter)]
+        return filtered_df
+        
 
 def display_actionable_insights(self, analysis_results):
     """Display actionable insights and recommendations"""
