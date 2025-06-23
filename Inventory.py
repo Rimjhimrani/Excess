@@ -1208,12 +1208,12 @@ class InventoryManagementSystem:
             vendor_data = df[df[vendor_col] == vendor]
             vendor_summary[vendor] = {
                 'total_parts': len(vendor_data),
-                'total_value': vendor_data['Stock_Value'].sum() if 'Stock_Value' in vendor_data.columns else 0,
+                'total_value': vendor_data[value_col].sum() if value_col in vendor_data.columns else 0,
                 'short_parts': len(vendor_data[vendor_data['Status'] == 'Short Inventory']),
                 'excess_parts': len(vendor_data[vendor_data['Status'] == 'Excess Inventory']),
                 'normal_parts': len(vendor_data[vendor_data['Status'] == 'Within Norms']),
-                'short_value': vendor_data[vendor_data['Status'] == 'Short Inventory']['value_col'].sum(),
-                'excess_value': vendor_data[vendor_data['Status'] == 'Excess Inventory']['value_col'].sum(),
+                'short_value': vendor_data[vendor_data['Status'] == 'Short Inventory'][value_col].sum(),
+                'excess_value': vendor_data[vendor_data['Status'] == 'Excess Inventory'][value_col].sum(),
             }
         # Create enhanced vendor dataframe
         vendor_df = pd.DataFrame([
