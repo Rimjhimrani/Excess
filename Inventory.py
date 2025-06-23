@@ -536,11 +536,11 @@ class InventoryManagementSystem:
             return []
         # Column mapping with extended support
         column_mappings = {
-            'part_no': ['part_no', 'part_number', 'material', 'material_code', 'item_code', 'code', 'part no', 'partno'],
-            'description': ['description', 'item_description', 'part_description', 'desc', 'part description', 'material_description', 'item desc'],
+            'part_no': ['part_no', 'part_number', 'material', 'material_code', 'item_code', 'code', 'part no', 'partno','Part No'],
+            'description': ['description', 'item_description', 'part_description', 'desc', 'part description', 'material_description', 'item desc','Part Description'],
             'rm_qty': ['rm_in_qty', 'rm_qty', 'required_qty', 'norm_qty', 'target_qty', 'rm', 'ri_in_qty', 'rm in qty'],
             'rm_days': ['rm_in_days', 'rm days', 'inventory days', 'rmindays'],
-            'unit_price': ['unit_price', 'price', 'unit cost', 'unit rate', 'unitprice'],
+            'unit_price': ['unit_price', 'price', 'unit cost', 'unit rate', 'unitprice','Unit Price'],
             'vendor_code': ['vendor_code', 'vendor_id', 'supplier_code', 'supplier_id', 'vendor id', 'Vendor Code', 'vendor code'],
             'vendor_name': ['vendor_name', 'vendor', 'supplier_name', 'supplier', 'Vendor Name', 'vendor name'],
             'city': ['city', 'location', 'place'],
