@@ -1963,11 +1963,17 @@ class InventoryManagementSystem:
         if not analysis_results:
             st.error("❌ No analysis results available.")
             return
+        # Debug: show sample keys to catch missing columns
+        st.code(f"Sample columns: {list(analysis_results[0].keys())}" if analysis_results else "No data structure found.")
+
         # Display advanced filtering options
         self.display_advanced_filtering_options(analysis_results)
     
         # Apply filters to data
         df = pd.DataFrame(analysis_results)
+        if 'Stock_Value' not in df.columns:
+            st.warning("⚠️ 'Stock_Value' column missing from results. Some features may not work.")
+
         filtered_df = self.apply_advanced_filters(df)
         filtered_results = filtered_df.to_dict('records')
     
