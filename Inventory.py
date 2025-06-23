@@ -1207,7 +1207,6 @@ class InventoryManagementSystem:
             return  # ✅ EARLY EXIT
         value_col = 'Current Inventory - VALUE'
         vendor_summary = {}
-    
         for vendor in df[vendor_col].dropna().unique():
             vendor_data = df[df[vendor_col] == vendor]
             vendor_summary[vendor] = {
@@ -1242,7 +1241,7 @@ class InventoryManagementSystem:
                     return 'background-color: #F44336; color: white'
             return ''
         st.dataframe(
-            vendor_df.style.applymap(color_performance, subset=['Performance Score']),
+            vendor_df.style.map(color_performance, subset=['Performance Score']),
             use_container_width=True,
             hide_index=True
         )
@@ -1255,32 +1254,6 @@ class InventoryManagementSystem:
             color_continuous_scale='RdYlGn'
         )
         st.plotly_chart(fig, use_container_width=True)
-
-    def color_performance(val):
-        if isinstance(val, (int, float)):
-            if val >= 80:
-                return 'background-color: #4CAF50; color: white'
-            elif val >= 60:
-                return 'background-color: #FF9800; color: white'
-            else:
-                return 'background-color: #F44336; color: white'
-        return ''
-
-    st.dataframe(
-        vendor_df.style.applymap(color_performance, subset=['Performance Score']),
-        use_container_width=True,
-        hide_index=True
-    )
-
-    fig = px.bar(
-        vendor_df.head(10),
-        x='Vendor',
-        y='Performance Score',
-        title="Top 10 Vendor Performance Scores",
-        color='Performance Score',
-        color_continuous_scale='RdYlGn'
-    )
-    st.plotly_chart(fig, use_container_width=True)
         
     def create_enhanced_top_parts_chart(self, processed_data, status_filter, color, key, top_n=10):
         """Enhanced top parts chart with better visualization"""
