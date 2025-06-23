@@ -1174,70 +1174,63 @@ class InventoryManagementSystem:
         """Enhanced vendor summary with better analytics"""
         st.header("🏢 Vendor Performance Analysis")
         df = pd.DataFrame(analysis_results)
-    if 'Vendor' not in df.columns and 'Vendor Name' not in df.columns:
-        st.warning("Vendor information not available in analysis data.")
-    return
-    
-    vendor_col = 'Vendor' if 'Vendor' in df.columns else 'Vendor Name'
-    
-    # Calculate vendor metrics
-    vendor_summary = {}
-    for vendor in df[vendor_col].unique():
-        vendor_data = df[df[vendor_col] == vendor]
-        
-        vendor_summary[vendor] = {
-            'total_parts': len(vendor_data),
-            'total_value': vendor_data['Stock_Value'].sum() if 'Stock_Value' in vendor_data.columns else 0,
-            'short_parts': len(vendor_data[vendor_data['Status'] == 'Short Inventory']),
-            'excess_parts': len(vendor_data[vendor_data['Status'] == 'Excess Inventory']),
-            'normal_parts': len(vendor_data[vendor_data['Status'] == 'Within Norms']),
-            'short_value': vendor_data[vendor_data['Status'] == 'Short Inventory']['Stock_Value'].sum(),
-            'excess_value': vendor_data[vendor_data['Status'] == 'Excess Inventory']['Stock_Value'].sum(),
-        }
-    
-    # Create enhanced vendor dataframe
-    vendor_df = pd.DataFrame([
-        {
-            'Vendor': vendor,
-            'Total Parts': data['total_parts'],
-            'Short Inventory': data['short_parts'],
-            'Excess Inventory': data['excess_parts'],
-            'Within Norms': data['normal_parts'],
-            'Total Value (₹)': f"₹{data['total_value']:,.0f}",
-            'Performance Score': round((data['normal_parts'] / data['total_parts']) * 100, 1) if data['total_parts'] > 0 else 0
-        }
-        for vendor, data in vendor_summary.items()
-    ])
-    
-    # Add color coding for performance
-    def color_performance(val):
-        if isinstance(val, str) and val.endswith('%'):
-            score = float(val.replace('%', ''))
-            if score >= 80:
-                return 'background-color: #4CAF50; color: white'
-            elif score >= 60:
-                return 'background-color: #FF9800; color: white'
-            else:
-                return 'background-color: #F44336; color: white'
-        return ''
-    
-    # Display vendor table with styling
-    st.dataframe(
-        vendor_df.style.applymap(color_performance, subset=['Performance Score']),
-        use_container_width=True,
-        hide_index=True
-    )
-    
-    # Vendor performance chart
-    fig = px.bar(
-        vendor_df.head(10),
-        x='Vendor',
-        y='Performance Score',
-        title="Top 10 Vendor Performance Scores",
-        color='Performance Score',
-        color_continuous_scale='RdYlGn'
-    )
-    st.plotly_chart(fig, use_container_width=True)
+        if 'Vendor' not in df.columns and 'Vendor Name' not in df.columns:
+            st.warning("Vendor information not available in analysis data.")
+            return
+        vendor_col = 'Vendor' if 'Vendor' in df.columns else 'Vendor Name'
+        # Calculate vendor metrics
+        vendor_summary = {}
+        for vendor in df[vendor_col].unique():
+            vendor_data = df[df[vendor_col] == vendor]
+            vendor_summary[vendor] = {
+                'total_parts': len(vendor_data),
+                'total_value': vendor_data['Stock_Value'].sum() if 'Stock_Value' in vendor_data.columns else 0,
+                'short_parts': len(vendor_data[vendor_data['Status'] == 'Short Inventory']),
+                'excess_parts': len(vendor_data[vendor_data['Status'] == 'Excess Inventory']),
+                'normal_parts': len(vendor_data[vendor_data['Status'] == 'Within Norms']),
+                'short_value': vendor_data[vendor_data['Status'] == 'Short Inventory']['Stock_Value'].sum(),
+                'excess_value': vendor_data[vendor_data['Status'] == 'Excess Inventory']['Stock_Value'].sum(),
+            }
+        # Create enhanced vendor dataframe
+        vendor_df = pd.DataFrame([
+            {
+                'Vendor': vendor,
+                'Total Parts': data['total_parts'],
+                'Short Inventory': data['short_parts'],
+                'Excess Inventory': data['excess_parts'],
+                'Within Norms': data['normal_parts'],\
+                'Total Value (₹)': f"₹{data['total_value']:,.0f}",
+                'Performance Score': round((data['normal_parts'] / data['total_parts']) * 100, 1) if data['total_parts'] > 0 else 0
+            }
+            for vendor, data in vendor_summary.items()
+        ])
+        # Add color coding for performance
+        def color_performance(val):
+            if isinstance(val, str) and val.endswith('%'):
+                score = float(val.replace('%', ''))
+                if score >= 80:
+                    return 'background-color: #4CAF50; color: white'
+                elif score >= 60:
+                    return 'background-color: #FF9800; color: white'
+                else:
+                    return 'background-color: #F44336; color: white'
+            return ''
+        # Display vendor table with styling
+        st.dataframe(
+            vendor_df.style.applymap(color_performance, subset=['Performance Score']),
+            use_container_width=True,
+            hide_index=True
+        )
+        # Vendor performance chart
+        fig = px.bar(
+            vendor_df.head(10),
+            x='Vendor',
+            y='Performance Score',
+            title="Top 10 Vendor Performance Scores",
+            color='Performance Score',
+            color_continuous_scale='RdYlGn'
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
 def create_enhanced_top_parts_chart(self, processed_data, status_filter, color, key, top_n=10):
     """Enhanced top parts chart with better visualization"""
