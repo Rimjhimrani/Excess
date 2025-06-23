@@ -12,6 +12,7 @@ import io
 import re
 from typing import Union, Any, Optional, List, Dict
 from decimal import Decimal, InvalidOperation
+from collections import Counter
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
