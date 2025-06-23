@@ -1062,139 +1062,123 @@ class InventoryManagementSystem:
                 return
         # Display results
         self.display_analysis_results()
-
-def display_comprehensive_analysis(self, analysis_results):
-    """Display comprehensive analysis results with enhanced features"""
-    st.success(f"✅ Analysis Complete: {len(analysis_results)} parts analyzed")
+    def display_comprehensive_analysis(self, analysis_results):
+        """Display comprehensive analysis results with enhanced features"""
+        st.success(f"✅ Analysis Complete: {len(analysis_results)} parts analyzed")
+        # Summary metrics with better styling
+        self.display_enhanced_summary_metrics(analysis_results)\
+        # Enhanced charts and visualizations
+        self.display_enhanced_analysis_charts(analysis_results)
     
-    # Summary metrics with better styling
-    self.display_enhanced_summary_metrics(analysis_results)
+        # Improved detailed data tables
+        self.display_enhanced_detailed_tables(analysis_results)
     
-    # Enhanced charts and visualizations
-    self.display_enhanced_analysis_charts(analysis_results)
-    
-    # Improved detailed data tables
-    self.display_enhanced_detailed_tables(analysis_results)
-    
-    # Advanced export options
-    self.display_enhanced_export_options(analysis_results)
-
-def display_enhanced_summary_metrics(self, analysis_results):
-    """Enhanced summary metrics dashboard"""
-    st.header("📊 Executive Summary Dashboard")
-    
-    # Add custom CSS for better styling
-    st.markdown("""
-    <style>
-    .metric-card {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1rem;
-        border-radius: 10px;
-        margin: 0.5rem 0;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    .status-normal { background: linear-gradient(135deg, #4CAF50, #45a049); }
-    .status-excess { background: linear-gradient(135deg, #2196F3, #1976D2); }
-    .status-short { background: linear-gradient(135deg, #F44336, #D32F2F); }
-    .status-total { background: linear-gradient(135deg, #FF9800, #F57C00); }
-    
-    .metric-card .metric-value { color: white; font-weight: bold; }
-    .metric-card .metric-label { color: #f0f0f0; }
-    
-    .highlight-box {
-        background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-        padding: 1rem;
-        border-radius: 8px;
-        color: white;
-        margin: 1rem 0;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    df = pd.DataFrame(analysis_results)
-    
-    # Calculate enhanced metrics
-    total_parts = len(analysis_results)
-    total_stock_value = df['Stock_Value'].sum() if 'Stock_Value' in df.columns else 0
-    
-    # Status distribution
-    status_counts = Counter(df['Status'] if 'Status' in df.columns else df.get('INVENTORY REMARK STATUS', []))
-    
-    # Calculate financial impact
-    short_impact = sum(item.get('VALUE(Unit Price* Short/Excess Inventory)', 0) 
-                      for item in analysis_results 
-                      if item.get('Status') == 'Short Inventory')
-    
-    excess_impact = sum(item.get('VALUE(Unit Price* Short/Excess Inventory)', 0) 
-                       for item in analysis_results 
-                       if item.get('Status') == 'Excess Inventory')
-    
-    # Display key performance indicators
-    st.markdown('<div class="highlight-box">', unsafe_allow_html=True)
-    st.markdown(f"""
-    ### 🎯 Key Performance Indicators
-    - **Total Parts Analyzed**: {total_parts:,}
-    - **Total Inventory Value**: ₹{total_stock_value:,.0f}
-    - **Short Inventory Impact**: ₹{abs(short_impact):,.0f}
-    - **Excess Inventory Impact**: ₹{excess_impact:,.0f}
-    - **Net Financial Impact**: ₹{abs(short_impact) + excess_impact:,.0f}
-    """)
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Enhanced metric cards with your original structure
-    col1, col2, col3, col4 = st.columns(4)
-    
-    # Calculate values for each status
-    summary_data = {}
-    for status in status_counts:
-        status_data = df[df['Status'] == status] if 'Status' in df.columns else df[df['INVENTORY REMARK STATUS'] == status]
-        summary_data[status] = {
-            'count': status_counts[status],
-            'value': status_data['Stock_Value'].sum() if 'Stock_Value' in status_data.columns else 0
+        # Advanced export options
+        self.display_enhanced_export_options(analysis_results)
+    def display_enhanced_summary_metrics(self, analysis_results):
+        """Enhanced summary metrics dashboard"""
+        st.header("📊 Executive Summary Dashboard")
+        # Add custom CSS for better styling
+        st.markdown("""
+        <style>
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 1rem;
+            border-radius: 10px;
+            margin: 0.5rem 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+        .status-normal { background: linear-gradient(135deg, #4CAF50, #45a049); }
+        .status-excess { background: linear-gradient(135deg, #2196F3, #1976D2); }
+        .status-short { background: linear-gradient(135deg, #F44336, #D32F2F); }
+        .status-total { background: linear-gradient(135deg, #FF9800, #F57C00); }
     
-    with col1:
-        st.markdown('<div class="metric-card status-normal">', unsafe_allow_html=True)
-        st.metric(
-            label="🟢 Within Norms",
-            value=f"{summary_data.get('Within Norms', {'count': 0})['count']} parts",
-            delta=f"₹{summary_data.get('Within Norms', {'value': 0})['value']:,.0f}"
-        )
+        .metric-card .metric-value { color: white; font-weight: bold; }
+        .metric-card .metric-label { color: #f0f0f0; }
+    
+        .highlight-box {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            padding: 1rem;
+            border-radius: 8px;
+            color: white;
+            margin: 1rem 0;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        df = pd.DataFrame(analysis_results)
+        # Calculate enhanced metrics
+        total_parts = len(analysis_results)
+        total_stock_value = df['Stock_Value'].sum() if 'Stock_Value' in df.columns else 0
+    
+        # Status distribution
+        status_counts = Counter(df['Status'] if 'Status' in df.columns else df.get('INVENTORY REMARK STATUS', []))
+    
+        # Calculate financial impact
+        short_impact = sum(item.get('VALUE(Unit Price* Short/Excess Inventory)', 0) 
+                           for item in analysis_results 
+                           if item.get('Status') == 'Short Inventory')
+        excess_impact = sum(item.get('VALUE(Unit Price* Short/Excess Inventory)', 0) 
+                            for item in analysis_results 
+                            if item.get('Status') == 'Excess Inventory')
+        # Display key performance indicator
+        st.markdown('<div class="highlight-box">', unsafe_allow_html=True)
+        st.markdown(f"""
+        ### 🎯 Key Performance Indicators
+        - **Total Parts Analyzed**: {total_parts:,}
+        - **Total Inventory Value**: ₹{total_stock_value:,.0f}
+        - **Short Inventory Impact**: ₹{abs(short_impact):,.0f}
+        - **Excess Inventory Impact**: ₹{excess_impact:,.0f}
+        - **Net Financial Impact**: ₹{abs(short_impact) + excess_impact:,.0f}
+        """)
         st.markdown('</div>', unsafe_allow_html=True)
     
-    with col2:
-        st.markdown('<div class="metric-card status-excess">', unsafe_allow_html=True)
-        st.metric(
-            label="🔵 Excess Inventory",
-            value=f"{summary_data.get('Excess Inventory', {'count': 0})['count']} parts",
-            delta=f"₹{summary_data.get('Excess Inventory', {'value': 0})['value']:,.0f}"
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Enhanced metric cards with your original structure
+        col1, col2, col3, col4 = st.columns(4)
     
-    with col3:
-        st.markdown('<div class="metric-card status-short">', unsafe_allow_html=True)
-        st.metric(
-            label="🔴 Short Inventory",
-            value=f"{summary_data.get('Short Inventory', {'count': 0})['count']} parts",
-            delta=f"₹{summary_data.get('Short Inventory', {'value': 0})['value']:,.0f}"
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown('<div class="metric-card status-total">', unsafe_allow_html=True)
-        st.metric(
-            label="📊 Total Value",
-            value=f"{total_parts} parts",
-            delta=f"₹{total_stock_value:,.0f}"
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
-
-def display_enhanced_vendor_summary(self, analysis_results):
-    """Enhanced vendor summary with better analytics"""
-    st.header("🏢 Vendor Performance Analysis")
-    
-    df = pd.DataFrame(analysis_results)
-    
+       # Calculate values for each status
+       summary_data = {}
+       for status in status_counts:
+           status_data = df[df['Status'] == status] if 'Status' in df.columns else df[df['INVENTORY REMARK STATUS'] == status]
+           summary_data[status] = {
+               'count': status_counts[status],
+               'value': status_data['Stock_Value'].sum() if 'Stock_Value' in status_data.columns else 0
+           }
+        with col1:
+            st.markdown('<div class="metric-card status-normal">', unsafe_allow_html=True)
+            st.metric(
+                label="🟢 Within Norms",
+                value=f"{summary_data.get('Within Norms', {'count': 0})['count']} parts",
+                delta=f"₹{summary_data.get('Within Norms', {'value': 0})['value']:,.0f}"
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+        with col2:
+            st.markdown('<div class="metric-card status-excess">', unsafe_allow_html=True)
+            st.metric(
+                label="🔵 Excess Inventory",
+                value=f"{summary_data.get('Excess Inventory', {'count': 0})['count']} parts",
+                delta=f"₹{summary_data.get('Excess Inventory', {'value': 0})['value']:,.0f}"
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+        with col3:
+            st.markdown('<div class="metric-card status-short">', unsafe_allow_html=True)
+            st.metric(
+                label="🔴 Short Inventory",
+                value=f"{summary_data.get('Short Inventory', {'count': 0})['count']} parts",
+                delta=f"₹{summary_data.get('Short Inventory', {'value': 0})['value']:,.0f}"
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+        with col4:
+            st.markdown('<div class="metric-card status-total">', unsafe_allow_html=True)
+            st.metric(
+                label="📊 Total Value",
+                value=f"{total_parts} parts",
+                delta=f"₹{total_stock_value:,.0f}"
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+    def display_enhanced_vendor_summary(self, analysis_results):
+        """Enhanced vendor summary with better analytics"""
+        st.header("🏢 Vendor Performance Analysis")
+        df = pd.DataFrame(analysis_results)
     if 'Vendor' not in df.columns and 'Vendor Name' not in df.columns:
         st.warning("Vendor information not available in analysis data.")
         return
