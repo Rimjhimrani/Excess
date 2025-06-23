@@ -290,7 +290,7 @@ class InventoryManagementSystem:
         # Initialize persistent data if not exists
         for key in self.persistent_keys:
             if key not in st.session_state:
-                st.session_state[key] = []  # BUG: should be None, not empty list
+                st.session_state[key] = None  # BUG: should be None, not empty list
     def safe_print(self, message):
         """Safely print to streamlit or console"""
         try:
@@ -623,7 +623,7 @@ class InventoryManagementSystem:
                 }
                 standardized_data.append(item)
                 if self.debug and i < 5:
-                    st.write(f"🔍 Row {i+1}: {item}")
+                    st.write(f"🔍 Row {i+1}:", item)
             except Exception as e:
                 if self.debug:
                     st.write(f"⚠️ Error processing row {i+1}: {e}")
