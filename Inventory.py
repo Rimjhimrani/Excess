@@ -123,32 +123,7 @@ class DataPersistence:
         if key in st.session_state and isinstance(st.session_state[key], dict):
             return st.session_state[key].get('timestamp')
         return None
-def main():
-    """Main execution method for the inventory analyzer"""
-    st.set_page_config(
-        page_title="Advanced Inventory Analysis Dashboard",
-        page_icon="📊",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
-    
-    # Initialize session state
-    if 'analysis_complete' not in st.session_state:
-        st.session_state.analysis_complete = False
-    
-    st.header("🏭 Advanced Inventory Analysis Dashboard")
-    st.write("Upload your inventory file to begin analysis...")
-    
-    # Simple file uploader for now
-    uploaded_file = st.file_uploader("Choose a CSV or Excel file", type=['csv', 'xlsx'])
-    
-    if uploaded_file is not None:
-        st.success("File uploaded successfully!")
-        st.info("Analysis functionality will be implemented here.")
 
-# Usage example and initialization
-if __name__ == "__main__":
-    main()
 class InventoryAnalyzer:
     """Enhanced inventory analysis with comprehensive reporting"""
     
