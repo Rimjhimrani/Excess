@@ -311,304 +311,33 @@ class InventoryManagementSystem:
             st.warning(message)
         except NameError:
             print(f"WARNING: {message}")
-    def _handle_error(self, value: Any, error: Exception, conversion_type: str = "unknown"):
-        """Handle conversion errors based on strict mode setting."""
-        self._update_stats(conversion_type, False)
-        self._log_debug(f"❌ Failed to convert '{value}' ({type(value).__name__}): {error}")
-        
-        if self.strict_mode:
-            raise ValueError(f"Cannot convert '{value}' to float: {error}")
-        return self.default_value
-    
-    def _convert_roman_to_int(self, roman: str) -> int:
-        """Convert Roman numerals to integers."""
-        roman = roman.upper()
-        total = 0
-        prev_value = 0
-        
-        for char in reversed(roman):
-            value = self.roman_values.get(char, 0)
-            if value < prev_value:
-                total -= value
-            else:
-                total += value
-            prev_value = value
-        
-        return total
-    
-    def _clean_numeric_string(self, value: str) -> str:
-        """Clean and normalize a numeric string."""
-        # Remove whitespace
-        value = value.strip()
-        
-        # Handle empty strings
-        if not value:
-            return "0"
-        
-        # Remove currency symbols but keep track of them
-        original_value = value
-        for symbol in self.currency_symbols:
-            if symbol in value:
-                value = value.replace(symbol, '')
-                self._log_debug(f"💱 Removed currency symbol '{symbol}' from '{original_value}'")
-        
-        # Remove thousands separators (commas)
-        value = value.replace(',', '')
-        
-        # Remove spaces
-        value = value.replace(' ', '')
-        
-        return value
-    
-    def convert_percentage(self, value: str) -> float:
-        """Convert percentage string to decimal."""
-        match = self.patterns['percentage'].match(value.strip())
-        if match:
-            numeric_part = float(match.group(1))
-            result = numeric_part / 100
-            self._log_debug(f"📊 Converted percentage '{value}' → {result}")
-            self._update_stats('percentage', True)
-            return result
-        raise ValueError(f"Invalid percentage format: {value}")
-    
-    def convert_fraction(self, value: str) -> float:
-        """Convert fraction string to decimal."""
-        # Try mixed fraction first (e.g., "2 1/3")
-        match = self.patterns['mixed_fraction'].match(value.strip())
-        if match:
-            whole = int(match.group(1))
-            numerator = int(match.group(2))
-            denominator = int(match.group(3))
-            if denominator == 0:
-                raise ValueError("Division by zero in fraction")
-            result = whole + (numerator / denominator)
-            self._log_debug(f"🧮 Converted mixed fraction '{value}' → {result}")
-            self._update_stats('mixed_fraction', True)
-            return result
-        
-        # Try simple fraction (e.g., "3/4")
-        match = self.patterns['fraction'].match(value.strip())
-        if match:
-            numerator = int(match.group(1))
-            denominator = int(match.group(2))
-            if denominator == 0:
-                raise ValueError("Division by zero in fraction")
-            result = numerator / denominator
-            self._log_debug(f"🧮 Converted fraction '{value}' → {result}")
-            self._update_stats('fraction', True)
-            return result
-        
-        raise ValueError(f"Invalid fraction format: {value}")
-    
-    def convert_scientific(self, value: str) -> float:
-        """Convert scientific notation to float."""
-        if self.patterns['scientific'].match(value.strip()):
-            result = float(value)
-            self._log_debug(f"🔬 Converted scientific notation '{value}' → {result}")
-            self._update_stats('scientific', True)
-            return result
-        raise ValueError(f"Invalid scientific notation: {value}")
-    
-    def convert_parenthetical(self, value: str) -> float:
-        """Convert parenthetical negative numbers (accounting format)."""
-        match = self.patterns['parenthetical'].match(value.strip())
-        if match:
-            result = -float(match.group(1))
-            self._log_debug(f"📈 Converted parenthetical '{value}' → {result}")
-            self._update_stats('parenthetical', True)
-            return result
-        raise ValueError(f"Invalid parenthetical format: {value}")
-    
-    def convert_with_units(self, value: str) -> float:
-        """Convert numbers with units (e.g., '100kg', '50%')."""
-        match = self.patterns['with_units'].match(value.strip())
-        if match:
-            result = float(match.group(1))
-            self._log_debug(f"📏 Converted with units '{value}' → {result}")
-            self._update_stats('with_units', True)
-            return result
-        raise ValueError(f"Invalid format with units: {value}")
-    
-    def convert_roman(self, value: str) -> float:
-        """Convert Roman numerals to float."""
-        if self.patterns['roman'].match(value.strip()):
-            result = float(self._convert_roman_to_int(value))
-            self._log_debug(f"🏛️ Converted Roman numeral '{value}' → {result}")
-            self._update_stats('roman', True)
-            return result
-        raise ValueError(f"Invalid Roman numeral: {value}")
     
     def safe_float_convert(self, value: Any) -> float:
-        """
-        Main conversion method that handles various input types and formats.
-        
-        Args:
-            value: The value to convert to float
-            
-        Returns:
-            float: The converted value or default_value if conversion fails
-        """
-        # Handle None, NaN, and empty values
+        """Safely convert value to float"""
         if value is None or pd.isna(value) or value == '':
-            self._log_debug(f"🟡 NULL/empty value → {self.default_value}")
-            self._update_stats('null_empty', True)
-            return self.default_value
+            return 0.0
         
-        # Handle already numeric types
-        if isinstance(value, (int, float, np.integer, np.floating)):
-            if np.isnan(value) or np.isinf(value):
-                self._log_debug(f"🟡 NaN/Inf value → {self.default_value}")
-                self._update_stats('nan_inf', True)
-                return self.default_value
-            result = float(value)
-            self._log_debug(f"✅ Numeric type {type(value).__name__}: {value} → {result}")
-            self._update_stats('numeric', True)
-            return result
+        if isinstance(value, (int, float)):
+            return float(value)
         
-        # Handle Decimal type
-        if isinstance(value, Decimal):
-            try:
-                result = float(value)
-                self._log_debug(f"✅ Decimal: {value} → {result}")
-                self._update_stats('decimal', True)
-                return result
-            except (ValueError, OverflowError) as e:
-                return self._handle_error(value, e, 'decimal')
-        
-        # Handle boolean
-        if isinstance(value, bool):
-            result = float(value)
-            self._log_debug(f"✅ Boolean: {value} → {result}")
-            self._update_stats('boolean', True)
-            return result
-        
-        # Convert to string for processing
-        str_value = str(value).strip()
-        
-        if not str_value:
-            self._log_debug(f"🟡 Empty string → {self.default_value}")
-            self._update_stats('empty_string', True)
-            return self.default_value
-        
-        # Try different conversion strategies
-        conversion_strategies = [
-            ('scientific', self.convert_scientific),
-            ('percentage', self.convert_percentage),
-            ('fraction', self.convert_fraction),
-            ('parenthetical', self.convert_parenthetical),
-            ('roman', self.convert_roman),
-            ('with_units', self.convert_with_units)
-        ]
-        
-        # Try each strategy
-        for strategy_name, strategy_func in conversion_strategies:
-            try:
-                return strategy_func(str_value)
-            except ValueError:
-                continue
-        
-        # Try basic string cleaning and conversion
         try:
-            cleaned_value = self._clean_numeric_string(str_value)
+            # Clean string values
+            if isinstance(value, str):
+                value = value.strip()
+                # Remove currency symbols and commas
+                value = re.sub(r'[₹$€£,]', '', value)
+                # Handle percentage
+                if '%' in value:
+                    return float(value.replace('%', '')) / 100
             
-            # Handle special cases
-            if cleaned_value.lower() in ['inf', 'infinity', '+inf', '+infinity']:
-                result = float('inf')
-                self._log_debug(f"♾️ Infinity: '{str_value}' → {result}")
-                self._update_stats('infinity', True)
-                return result
-            elif cleaned_value.lower() in ['-inf', '-infinity']:
-                result = float('-inf')
-                self._log_debug(f"♾️ Negative infinity: '{str_value}' → {result}")
-                self._update_stats('neg_infinity', True)
-                return result
-            elif cleaned_value.lower() in ['nan', 'null', 'none']:
-                self._log_debug(f"🟡 NaN-like string: '{str_value}' → {self.default_value}")
-                self._update_stats('nan_string', True)
-                return self.default_value
-            
-            # Final attempt at conversion
-            result = float(cleaned_value)
-            self._log_debug(f"✅ String conversion: '{str_value}' → {result}")
-            self._update_stats('string', True)
-            return result
-            
-        except (ValueError, TypeError, OverflowError) as e:
-            return self._handle_error(value, e, 'string')
+            return float(value)
+        except (ValueError, TypeError):
+            return 0.0
     
     def safe_int_convert(self, value: Any) -> int:
         """Convert value to integer using safe float conversion."""
         float_result = self.safe_float_convert(value)
         return int(float_result)
-    
-    def convert_list(self, values: List[Any]) -> List[float]:
-        """Convert a list of values to floats."""
-        return [self.safe_float_convert(v) for v in values]
-    
-    def convert_dict(self, data: Dict[str, Any]) -> Dict[str, float]:
-        """Convert dictionary values to floats."""
-        return {k: self.safe_float_convert(v) for k, v in data.items()}
-    
-    def convert_series(self, series: pd.Series) -> pd.Series:
-        """Convert pandas Series to float using safe conversion."""
-        return series.apply(self.safe_float_convert)
-    
-    def convert_dataframe_column(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
-        """Convert a specific column in DataFrame to float."""
-        df_copy = df.copy()
-        df_copy[column] = self.convert_series(df_copy[column])
-        return df_copy
-    
-    def convert_dataframe(self, df: pd.DataFrame, columns: Optional[List[str]] = None) -> pd.DataFrame:
-        """Convert specified columns (or all columns) in DataFrame to float."""
-        df_copy = df.copy()
-        target_columns = columns if columns else df.columns.tolist()
-        
-        for col in target_columns:
-            if col in df_copy.columns:
-                df_copy[col] = self.convert_series(df_copy[col])
-        
-        return df_copy
-    
-    def get_stats(self) -> Dict:
-        """Get conversion statistics."""
-        elapsed_time = datetime.now() - self.stats['start_time']
-        return {
-            **self.stats,
-            'elapsed_time': str(elapsed_time),
-            'success_rate': (self.stats['successful_conversions'] / 
-                           max(self.stats['total_conversions'], 1)) * 100
-        }
-    
-    def reset_stats(self):
-        """Reset conversion statistics."""
-        self.stats = {
-            'total_conversions': 0,
-            'successful_conversions': 0,
-            'failed_conversions': 0,
-            'conversion_types': {},
-            'start_time': datetime.now()
-        }
-    
-    def benchmark(self, test_values: List[Any], iterations: int = 1000) -> Dict:
-        """Benchmark the converter performance."""
-        import time
-        
-        start_time = time.time()
-        for _ in range(iterations):
-            for value in test_values:
-                self.safe_float_convert(value)
-        end_time = time.time()
-        
-        total_conversions = len(test_values) * iterations
-        elapsed_time = end_time - start_time
-        
-        return {
-            'total_conversions': total_conversions,
-            'elapsed_time': elapsed_time,
-            'conversions_per_second': total_conversions / elapsed_time,
-            'average_time_per_conversion': elapsed_time / total_conversions
-        }
             
     def create_top_parts_chart(self, data, status_type, color, key):
         """Display top 10 parts by absolute value of short/excess inventory impact (₹)."""
