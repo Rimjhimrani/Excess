@@ -320,17 +320,22 @@ class InventoryManagementSystem:
                 if self.debug:
                     st.write(f"✅ Converted numeric: {value} → {result}")
                 return result
+            
             # Clean and parse string-based values
             str_value = str(value).strip()
             str_value = str_value.replace(',', '').replace(' ', '').replace('₹', '').replace('$', '').replace('€', '')
+            
             if str_value.endswith('%'):
                 str_value = str_value[:-1]
+            
             if str_value.startswith('(') and str_value.endswith(')'):
                 str_value = '-' + str_value[1:-1]
+            
             result = float(str_value)
             if self.debug:
                 st.write(f"✅ Parsed '{value}' → {result}")
             return result
+            
         except (ValueError, TypeError) as e:
             if self.debug:
                 st.write(f"❌ Failed to convert '{value}' → 0.0 ({e})")
