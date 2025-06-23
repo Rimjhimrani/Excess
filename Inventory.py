@@ -2147,7 +2147,43 @@ def main(self):
             st.rerun()
 
 # Usage example and initialization
+if __name__ == "__main__":
+    # You need to create an instance of your class first
+    # Replace 'YourClassName' with the actual name of your class
+    analyzer = InventoryAnalyzer()  # Create an instance of your inventory analyzer class
+    analyzer.main()  # Call the main method on the instance
 
-# Usage example and initialization
+# Alternative approach - if main should be a standalone function:
+# Remove 'self' parameter from the main method definition and change it to:
+def main():
+    """Main execution method for the inventory analyzer"""
+    st.set_page_config(
+        page_title="Advanced Inventory Analysis Dashboard",
+        page_icon="📊",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
+    # Initialize session state
+    if 'analysis_complete' not in st.session_state:
+        st.session_state.analysis_complete = False
+    
+    # Create analyzer instance here
+    analyzer = InventoryAnalyzer()  # Replace with your actual class name
+    
+    # Main application logic
+    if not st.session_state.analysis_complete:
+        # Show file upload and analysis interface
+        analyzer.display_file_upload_interface()
+    else:
+        # Show analysis results
+        analyzer.display_analysis_results()
+        
+        # Option to analyze new file
+        if st.sidebar.button("🔄 Analyze New File", type="secondary"):
+            st.session_state.analysis_complete = False
+            st.rerun()
+
+# Then keep the if __name__ == "__main__": block as:
 if __name__ == "__main__":
     main()
