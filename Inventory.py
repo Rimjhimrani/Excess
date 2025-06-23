@@ -1996,6 +1996,49 @@ class InventoryManagementSystem:
     
         st.markdown("---")
         self.display_help_and_documentation()
+    def display_enhanced_analysis_charts(self, analysis_results):
+        """Display enhanced visual summaries like top parts, shortages, and excess inventory"""
+        st.subheader("📊 Enhanced Inventory Charts")
+        df = pd.DataFrame(analysis_results)
+        # ✅ 1. Top 10 Parts by Value
+        if 'Current Inventory - VALUE' in df.columns and 'PART NO' in df.columns:
+            top_parts = df.sort_values(by='Current Inventory - VALUE', ascending=False).head(10)
+            fig1 = px.bar(
+                top_parts,
+                x='PART NO',
+                y='Current Inventory - VALUE',
+                title="Top 10 Parts by Inventory Value",
+                text='PART DESCRIPTION',
+                color='Current Inventory - VALUE',
+                color_continuous_scale='Blues'
+            )
+            st.plotly_chart(fig1, use_container_width=True)
+        # ✅ 2. Inventory Status Breakdown (Pie)
+        if 'Status' in df.columns:
+            status_counts = df['Status'].value_counts().reset_index()
+            status_counts.columns = ['Status', 'Count']
+            fig2 = px.pie(
+                status_counts,
+                names='Status',
+                values='Count',
+                title='Inventory Status Distribution',
+                hole=0.4,
+                color_discrete_sequence=px.colors.qualitative.Set2
+            )
+            st.plotly_chart(fig2, use_container_width=True)
+        # ✅ 3. Vendor vs Value (optional) vendor_col = 'Vendor' if 'Vendor' in df.columns else 'Vendor Name'
+        if vendor_col in df.columns:
+            vendor_values = df.groupby(vendor_col)['Current Inventory - VALUE'].sum().sort_values(ascending=False).head(10)
+            fig3 = px.bar(
+                vendor_values,
+                x=vendor_values.index,
+                y=vendor_values.values,
+                title='Top 10 Vendors by Inventory Value',
+                labels={'x': vendor_col, 'y': 'Total Value (₹)'},
+                color=vendor_values.values,
+                color_continuous_scale='Viridis'
+            )
+            st.plotly_chart(fig3, use_container_width=True)
                 
 if __name__ == "__main__":
     app = InventoryManagementSystem()
