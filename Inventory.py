@@ -1262,7 +1262,7 @@ class InventoryManagementSystem:
             st.plotly_chart(fig, use_container_width=True)
     
     def create_enhanced_top_parts_chart(self, processed_data, status_filter, color, key, top_n=10):
-         """Enhanced top parts chart with better visualization"""
+        """Enhanced top parts chart with better visualization"""
         filtered_data = [
             item for item in processed_data 
             if item.get('Status') == status_filter or item.get('INVENTORY REMARK STATUS') == status_filter
