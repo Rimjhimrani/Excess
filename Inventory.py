@@ -217,7 +217,7 @@ class InventoryAnalyzer:
             status = item.get('INVENTORY REMARK STATUS', 'Unknown')
             stock_value = item.get('Stock Value') or item.get('Current Inventory - VALUE') or 0
             try:
-                stock_value = float(Current Inventory - VALUE)
+                stock_value = float(stock_value)
             except (ValueError, TypeError):
                 stock_value = 0.0
             summary[vendor]['total_parts'] += 1
