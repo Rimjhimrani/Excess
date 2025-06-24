@@ -158,7 +158,7 @@ class InventoryAnalyzer:
                 current_qty = float(inventory_item.get('Current_QTY', 0))
                 stock_value = float(inventory_item.get('Stock_Value', 0))
                 rm_qty = float(pfep_item.get('RM_IN_QTY', 0))
-                unit_price = float(pfep_item.get('Unit_Price', 0)) or 1.0  # Avoid division by zero
+                unit_price = float(pfep_item.get('unit_price', 0)) or 1.0  # Avoid division by zero
                 rm_days = pfep_item.get('RM_IN_DAYS', '')
                 # Short/Excess Inventory calculation (FIX: multiplication, not division)
                 short_excess_qty = current_qty - rm_qty
