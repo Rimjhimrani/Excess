@@ -1166,20 +1166,6 @@ class InventoryManagementSystem:
             st.error("❌ Unexpected error during analysis results display")
             st.code(str(e))
             return
-            
-    def display_comprehensive_analysis(self, analysis_results):
-        """Display comprehensive analysis results with enhanced features"""
-        st.success(f"✅ Analysis Complete: {len(analysis_results)} parts analyzed")
-        # Summary metrics with better styling
-        self.display_enhanced_summary_metrics(analysis_results)
-        # Enhanced charts and visualizations
-        self.display_enhanced_analysis_charts(analysis_results)
-    
-        # Improved detailed data tables
-        self.display_enhanced_detailed_tables(analysis_results)
-    
-        # Advanced export options
-        self.display_enhanced_export_options(analysis_results)
         
     def display_enhanced_summary_metrics(self, analysis_results):
         """Enhanced summary metrics dashboard"""
