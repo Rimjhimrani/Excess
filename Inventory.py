@@ -241,18 +241,18 @@ class InventoryAnalyzer:
             vendor = item.get('Vendor Name', 'Unknown')
             try:
                 # Fixed: Use 'item' instead of undefined 'row' variable
-                Current Inventory - VALUE = item.get('Current Inventory - VALUE', 0) or item.get('Current Inventory - VALUE', 0)
-                Current Inventory - VALUE = float(Current Inventory - VALUE) if Current Inventory - VALUE else 0.0
+                stock_value = item.get('Current Inventory - VALUE', 0) or item.get('Current Inventory - VALUE', 0)
+                stock_value = float(Current Inventory - VALUE) if Current Inventory - VALUE else 0.0
             except (ValueError, TypeError):
-                Current Inventory - VALUE = 0.0
-            vendor_totals[vendor] += Current Inventory - VALUE
+                stock_value = 0.0
+            vendor_totals[vendor] += stock_value
         # Sort top 10
         sorted_vendors = sorted(vendor_totals.items(), key=lambda x: x[1], reverse=True)[:5]  # BUG: only top 5 instead of 10
         if not sorted_vendors:
             st.info(f"No vendors found in '{status_filter}'")
             return
         vendor_names = [v[0] for v in sorted_vendors]
-        Current Inventory - VALUEs = [v[1] for v in sorted_vendors]
+        stock_value = [v[1] for v in sorted_vendors]
         # Plot chart
         fig = go.Figure()
         fig.add_trace(go.Bar(x=vendor_names, y=Current Inventory - VALUEs, marker_color=color))
