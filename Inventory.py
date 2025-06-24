@@ -156,7 +156,7 @@ class InventoryAnalyzer:
             try:
                 # Extract values safely
                 current_qty = float(inventory_item.get('Current_QTY', 0))
-                stock_value = float(inventory_item.get('Stock_Value', 0))
+                stock_value = float(inventory_item.get('Current Inventory - VALUE', 0))
                 rm_qty = float(pfep_item.get('RM_IN_QTY', 0))
                 unit_price = float(pfep_item.get('unit_price', 0)) or 1.0  # Avoid division by zero
                 rm_days = pfep_item.get('RM_IN_DAYS', '')
@@ -535,7 +535,7 @@ class InventoryManagementSystem:
             'Part_No': row[0],
             'Description': row[1],
             'Current_QTY': self.safe_float_convert(row[2]),
-            'Stock_Value': self.safe_float_convert(row[3])
+            'Current Inventory - VALUE': self.safe_float_convert(row[3])
         } for row in current_sample]
     
     def standardize_pfep_data(self, df):
@@ -708,7 +708,7 @@ class InventoryManagementSystem:
                 item = {
                     'Part_No': part_no,
                     'Current_QTY': self.safe_float_convert(row[mapped_columns['current_qty']]),
-                    'Stock_Value': self.safe_float_convert(row.get(mapped_columns.get('stock_value', ''), 0)),
+                    'Current Inventory - VALUE': self.safe_float_convert(row.get(mapped_columns.get('stock_value', ''), 0)),
                     'Description': str(row.get(mapped_columns.get('description', ''), '')).strip(),
                     'UOM': str(row.get(mapped_columns.get('uom', ''), '')).strip(),
                     'Location': str(row.get(mapped_columns.get('location', ''), '')).strip(),
@@ -1586,12 +1586,12 @@ class InventoryManagementSystem:
 
         top_parts = sorted(
             filtered_data,
-            key=lambda x: x.get('Stock_Value', 0),
+            key=lambda x: x.get('Current Inventory - VALUE', 0),
             reverse=True
         )[:top_n]
 
         labels = [f"{item['PART NO']}<br>{item.get('PART DESCRIPTION', '')[:30]}..." for item in top_parts]
-        values = [item.get('Stock_Value', 0) for item in top_parts]
+        values = [item.get('Current Inventory - VALUE', 0) for item in top_parts]
         variance_values = [item.get('VALUE(Unit Price* Short/Excess Inventory)', 0) for item in top_parts]
 
         fig = go.Figure()
@@ -1609,7 +1609,7 @@ class InventoryManagementSystem:
         """Apply advanced filters to dataframe"""
         filtered_df = df.copy()
         # Apply value filted
-        if hasattr(st.session_state, 'value_filter') and 'Stock_Value' in df.columns:
+        if hasattr(st.session_state, 'value_filter') and 'Current Inventory - VALUE' in df.columns:
             min_val, max_val = st.session_state.value_filter
             filtered_df = filtered_df[
                 (filtered_df['Current Inventory - VALUE'] >= min_val) & 
@@ -1686,9 +1686,9 @@ class InventoryManagementSystem:
                 fig = px.scatter(
                     top_value_parts,
                     x='Current Inventory-QTY',
-                    y='Stock_Value',
+                    y='Current Inventory - VALUE',
                     color='Status',
-                    size='Stock_Value',
+                    size='Current Inventory - VALUE',
                     hover_data=['PART NO', 'PART DESCRIPTION'],
                     title="Top 20 Parts by Value - Quantity vs Value Analysis"
                 )
@@ -1704,7 +1704,7 @@ class InventoryManagementSystem:
                     st.warning(f"📋 **Reorder Alert**: {len(reorder_candidates)} parts may need reordering soon")
                     # Display reorder table
                     reorder_display = reorder_candidates[['PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 
-                                                'MIN QTY REQUIRED', 'Stock_Value']].copy()
+                                                'MIN QTY REQUIRED', 'Current Inventory - VALUE']].copy()
                     reorder_display['Days to Reorder'] = np.random.randint(5, 30, len(reorder_display))  # Simulated
                     st.dataframe(reorder_display, use_container_width=True)
                 # Seasonal analysis placeholder
@@ -1731,7 +1731,7 @@ class InventoryManagementSystem:
                 delta=f"{'Good' if efficiency > 70 else 'Needs Improvement'}"
             )
         with col3:
-            excess_value = df[df['Status'] == 'Excess Inventory']['Stock_Value'].sum()
+            excess_value = df[df['Status'] == 'Excess Inventory']['Current Inventory - VALUE'].sum()
             st.metric(
                 "Excess Inventory",
                 f"₹{excess_value:,.0f}",
@@ -1752,13 +1752,13 @@ class InventoryManagementSystem:
         df.loc[(df['Current Inventory - VALUE'] > 50000) & (df['Current Inventory - VALUE'] <= 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'Medium'
     
         risk_matrix = df.groupby(['Risk_Level', 'Status']).agg({
-            'Stock_Value': 'sum',
+            'Current Inventory - VALUE': 'sum',
             'PART NO': 'count'
         }).reset_index()
         fig = px.sunburst(
             risk_matrix,
             path=['Risk_Level', 'Status'],
-            values='Stock_Value',
+            values='Current Inventory - VALUE',
             title="Risk Assessment by Value Impact"
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -1799,7 +1799,7 @@ class InventoryManagementSystem:
                 summary_data = {
                     'Status': df['Status'].value_counts().index.tolist(),
                     'Count': df['Status'].value_counts().values.tolist(),
-                    'Total Value': [df[df['Status'] == status]['Stock_Value'].sum() 
+                    'Total Value': [df[df['Status'] == status]['Current Inventory - VALUE'].sum() 
                                     for status in df['Status'].value_counts().index]
                 }
                 pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
@@ -1863,7 +1863,7 @@ class InventoryManagementSystem:
                     (df['Status'] == 'Excess Inventory').sum(),
                     (df['Status'] == 'Short Inventory').sum(),
                     f"{(df['Status'] == 'Within Norms').mean() * 100:.1f}%",
-                    f"₹{df[df['Status'] == 'Excess Inventory']['Stock_Value'].sum():,.0f}",
+                    f"₹{df[df['Status'] == 'Excess Inventory']['Current Inventory - VALUE'].sum():,.0f}",
                     f"₹{abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum()):,.0f}"
                 ]
             }
@@ -1952,7 +1952,7 @@ class InventoryManagementSystem:
             critical_shortages = df[
                 (df['Status'] == 'Short Inventory') & 
                 (df['Current Inventory - VALUE'] > 50000)
-            ].sort_values('Stock_Value', ascending=False)
+            ].sort_values('Current Inventory - VALUE', ascending=False)
             if not critical_shortages.empty:
                 st.error(f"🔴 **URGENT**: {len(critical_shortages)} high-value parts critically short!")
                 for idx, part in critical_shortages.head(5).iterrows():
@@ -1961,7 +1961,7 @@ class InventoryManagementSystem:
                         with col1:
                             st.write(f"**{part['PART NO']}** - {part['PART DESCRIPTION'][:50]}...")
                         with col2:
-                            st.write(f"Value: ₹{part['Stock_Value']:,.0f}")
+                            st.write(f"Value: ₹{part['Current Inventory - VALUE']:,.0f}")
                         with col3:
                             shortage = part['MIN QTY REQUIRED'] - part['Current Inventory-QTY']
                             st.write(f"Need: {shortage} units")
@@ -1969,14 +1969,14 @@ class InventoryManagementSystem:
             excess_items = df[
                 (df['Status'] == 'Excess Inventory') & 
                 (df['Current Inventory - VALUE'] > 100000)
-            ].sort_values('Stock_Value', ascending=False)
+            ].sort_values('Current Inventory - VALUE', ascending=False)
             if not excess_items.empty:
                 st.warning(f"🟡 **Consider**: {len(excess_items)} high-value excess items for reallocation")
                 
         with tab2:
             st.subheader("💰 Cost Optimization Opportunities")
             # Calculate potential savings
-            excess_value = df[df['Status'] == 'Excess Inventory']['Stock_Value'].sum()
+            excess_value = df[df['Status'] == 'Excess Inventory']['Current Inventory - VALUE'].sum()
             potential_savings = excess_value * 0.1  # Assume 10% carrying cost
         
             col1, col2 = st.columns(2)
@@ -1997,12 +1997,12 @@ class InventoryManagementSystem:
                 )
             # Top optimization candidates
             st.subheader("🎯 Top Optimization Candidates")
-            optimization_candidates = df[df['Status'] == 'Excess Inventory'].nlargest(10, 'Stock_Value')
+            optimization_candidates = df[df['Status'] == 'Excess Inventory'].nlargest(10, 'Current Inventory - VALUE')
             if not optimization_candidates.empty:
                 opt_display = optimization_candidates[['PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 
-                                                       'MIN QTY REQUIRED', 'Stock_Value']].copy()
+                                                       'MIN QTY REQUIRED', 'Current Inventory - VALUE']].copy()
                 opt_display['Excess Qty'] = opt_display['Current Inventory-QTY'] - opt_display['MIN QTY REQUIRED']
-                opt_display['Optimization Potential'] = opt_display['Excess Qty'] * (opt_display['Stock_Value'] / opt_display['Current Inventory-QTY'])
+                opt_display['Optimization Potential'] = opt_display['Excess Qty'] * (opt_display['Current Inventory - VALUE'] / opt_display['Current Inventory-QTY'])
                 st.dataframe(opt_display, use_container_width=True)
                 
         with tab3:
@@ -2011,7 +2011,7 @@ class InventoryManagementSystem:
             if 'VENDOR' in df.columns:
                 vendor_performance = df.groupby('VENDOR').agg({
                     'Status': lambda x: (x == 'Within Norms').mean() * 100,
-                    'Stock_Value': 'sum',
+                    'Current Inventory - VALUE': 'sum',
                     'PART NO': 'count'
                 }).round(2)
                 vendor_performance.columns = ['Performance %', 'Total Value', 'Part Count']
@@ -2023,7 +2023,7 @@ class InventoryManagementSystem:
                 category_col = 'Category' if 'Category' in df.columns else 'PART CATEGORY'
                 category_performance = df.groupby(category_col).agg({
                     'Status': lambda x: (x == 'Within Norms').mean() * 100,
-                    'Stock_Value': 'sum'
+                    'Current Inventory - VALUE': 'sum'
                 }).round(2)
                 category_performance.columns = ['Performance %', 'Total Value']
                 fig = px.scatter(
@@ -2063,7 +2063,7 @@ class InventoryManagementSystem:
         st.sidebar.header("🔍 Advanced Filters")
         df = pd.DataFrame(analysis_results)
         # Value range filter with proper handling of edge cases
-        if 'Stock_Value' in df.columns and not df['Current Inventory - VALUE'].empty:
+        if 'Current Inventory - VALUE' in df.columns and not df['Current Inventory - VALUE'].empty:
             min_value = float(df['Current Inventory - VALUE'].min())
             max_value = float(df['Current Inventory - VALUE'].max())
         # Handle case where min and max are the same
@@ -2169,7 +2169,7 @@ class InventoryManagementSystem:
         try:
             # Apply value range filter
             if (hasattr(st.session_state, 'filter_value_range') and 
-                'Stock_Value' in filtered_df.columns):
+                'Current Inventory - VALUE' in filtered_df.columns):
                     min_val, max_val = st.session_state.filter_value_range
                     filtered_df = filtered_df[
                         (filtered_df['Current Inventory - VALUE'] >= min_val) & 
@@ -2223,7 +2223,7 @@ class InventoryManagementSystem:
             'excess_inventory': (df['Status'] == 'Excess Inventory').sum(),
             'short_inventory': (df['Status'] == 'Short Inventory').sum(),
             'efficiency_rate': (df['Status'] == 'Within Norms').mean() * 100,
-            'excess_value': df[df['Status'] == 'Excess Inventory']['Stock_Value'].sum(),
+            'excess_value': df[df['Status'] == 'Excess Inventory']['Current Inventory - VALUE'].sum(),
             'shortage_impact': abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum()),
             'critical_items': len(df[df['Current Inventory - VALUE'] > st.session_state.get('critical_threshold', 100000)]),
             'avg_stock_value': df['Current Inventory - VALUE'].mean()
@@ -2268,8 +2268,8 @@ class InventoryManagementSystem:
     
         # Apply filters to data
         df = pd.DataFrame(analysis_results)
-        if 'Stock_Value' not in df.columns:
-            st.warning("⚠️ 'Stock_Value' column missing from results. Some features may not work.")
+        if 'Current Inventory - VALUE' not in df.columns:
+            st.warning("⚠️ 'Current Inventory - VALUE' column missing from results. Some features may not work.")
 
         filtered_df = self.apply_advanced_filters(df)
         filtered_results = filtered_df.to_dict('records')
