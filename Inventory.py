@@ -1197,12 +1197,14 @@ class InventoryManagementSystem:
         """Enhanced vendor summary with better analytics"""
         st.header("🏢 Vendor Performance Analysis")
         df = pd.DataFrame(analysis_results)
-        vendor_col = None
         # Define vendor column only if one exists
+        vendor_col = None
         if 'Vendor' in df.columns:
             vendor_col = 'Vendor'
         elif 'Vendor Name' in df.columns:
             vendor_col = 'Vendor Name'
+        elif 'VENDOR' in df.columns:
+            vendor_col = 'VENDOR'
         if vendor_col is None:
             st.warning("Vendor information not available in analysis data.")
             return  # Early exit if no vendor column found
@@ -1219,45 +1221,45 @@ class InventoryManagementSystem:
                 'short_value': vendor_data[vendor_data['Status'] == 'Short Inventory'][value_col].sum() if value_col in vendor_data.columns else 0,
                 'excess_value': vendor_data[vendor_data['Status'] == 'Excess Inventory'][value_col].sum() if value_col in vendor_data.columns else 0,
             }
-        vendor_df = pd.DataFrame([
-            {
-                'Vendor': vendor,
-                'Total Parts': data['total_parts'],
-                'Short Inventory': data['short_parts'],
-                'Excess Inventory': data['excess_parts'],
-                'Within Norms': data['normal_parts'],
-                'Total Value (₹)': f"₹{data['total_value']:,.0f}",
-                'Performance Score': round((data['normal_parts'] / data['total_parts']) * 100, 1)
-                if data['total_parts'] > 0 else 0
-            }
-            for vendor, data in vendor_summary.items()
-        ])
-        if vendor_df.empty:
-            st.warning("No vendor data available for analysis.")
-            return
-        def color_performance(val):
-            if isinstance(val, (int, float)):
-                if val >= 80:
-                    return 'background-color: #4CAF50; color: white'
-                elif val >= 60:
-                    return 'background-color: #FF9800; color: white'
-                else:
-                    return 'background-color: #F44336; color: white'
-            return ''
-        st.dataframe(
-            vendor_df.style.map(color_performance, subset=['Performance Score']),
-            use_container_width=True,
-            hide_index=True
-        )
-        fig = px.bar(
-            vendor_df.head(10),
-            x='Vendor',
-            y='Performance Score',
-            title="Top 10 Vendor Performance Scores",
-            color='Performance Score',
-            color_continuous_scale='RdYlGn'
-        )
-        st.plotly_chart(fig, use_container_width=True)
+            vendor_df = pd.DataFrame([
+                {
+                    'Vendor': vendor,
+                    'Total Parts': data['total_parts'],
+                    'Short Inventory': data['short_parts'],
+                    'Excess Inventory': data['excess_parts'],
+                    'Within Norms': data['normal_parts'],
+                    'Total Value (₹)': f"₹{data['total_value']:,.0f}",
+                    'Performance Score': round((data['normal_parts'] / data['total_parts']) * 100, 1)
+                    if data['total_parts'] > 0 else 0
+                }
+                for vendor, data in vendor_summary.items()
+            ])
+            if vendor_df.empty:
+                st.warning("No vendor data available for analysis.")
+                return
+            def color_performance(val):
+                if isinstance(val, (int, float)):
+                    if val >= 80:
+                        return 'background-color: #4CAF50; color: white'
+                    elif val >= 60:
+                        return 'background-color: #FF9800; color: white'
+                    else:
+                        return 'background-color: #F44336; color: white'
+                return ''
+            st.dataframe(
+                vendor_df.style.map(color_performance, subset=['Performance Score']),
+                use_container_width=True,
+                hide_index=True
+            )
+            fig = px.bar(
+                vendor_df.head(10),
+                x='Vendor',
+                y='Performance Score',
+                title="Top 10 Vendor Performance Scores",
+                color='Performance Score',
+                color_continuous_scale='RdYlGn'
+            )
+            st.plotly_chart(fig, use_container_width=True)
     
     def create_enhanced_top_parts_chart(self, processed_data, status_filter, color, key, top_n=10):
         """Enhanced top parts chart with better visualization"""
@@ -2042,8 +2044,15 @@ class InventoryManagementSystem:
                 color_discrete_sequence=px.colors.qualitative.Set2
             )
             st.plotly_chart(fig2, use_container_width=True)
-        # ✅ 3. Vendor vs Value (optional) vendor_col = 'Vendor' if 'Vendor' in df.columns else 'Vendor Name'
-        if vendor_col in df.columns:
+        # ✅ 3. Vendor vs Value (Fixed vendor_col definition
+        vendor_col = None
+        if 'Vendor' in df.columns:
+            vendor_col = 'Vendor'
+        elif 'Vendor Name' in df.columns:
+            vendor_col = 'Vendor Name'
+        elif 'VENDOR' in df.columns:
+            vendor_col = 'VENDOR'
+        if vendor_col and vendor_col in df.columns:
             vendor_values = df.groupby(vendor_col)['Current Inventory - VALUE'].sum().sort_values(ascending=False).head(10)
             fig3 = px.bar(
                 vendor_values,
