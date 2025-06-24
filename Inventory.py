@@ -181,7 +181,7 @@ class InventoryAnalyzer:
                     'PART DESCRIPTION': pfep_item.get('Description', ''),
                     'Current Inventory-QTY': current_qty,
                     'Inventory Norms - QTY': rm_qty,
-                    'Stock_Value': stock_value,
+                    'Current Inventory - VALUE': stock_value,
                     'SHORT/EXCESS INVENTORY': short_excess_qty,
                     'INVENTORY REMARK STATUS': status,
                     'Status': status,
