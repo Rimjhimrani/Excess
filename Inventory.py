@@ -242,7 +242,7 @@ class InventoryAnalyzer:
             try:
                 # Fixed: Use 'item' instead of undefined 'row' variable
                 stock_value = item.get('Current Inventory - VALUE', 0) or item.get('Current Inventory - VALUE', 0)
-                stock_value = float(Current Inventory - VALUE) if Current Inventory - VALUE else 0.0
+                stock_value = float('Current Inventory - VALUE') if Current Inventory - VALUE else 0.0
             except (ValueError, TypeError):
                 stock_value = 0.0
             vendor_totals[vendor] += stock_value
