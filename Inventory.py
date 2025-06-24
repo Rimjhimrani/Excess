@@ -1260,6 +1260,7 @@ class InventoryManagementSystem:
                 color_continuous_scale='RdYlGn'
             )
             st.plotly_chart(fig, use_container_width=True)
+            
     def display_enhanced_detailed_tables(self, analysis_results):
         """Display enhanced detailed tables with filtering and sorting"""
         st.subheader("📋 Detailed Analysis Tables")
@@ -1360,6 +1361,107 @@ class InventoryManagementSystem:
                     st.dataframe(normal_items, use_container_width=True, height=400)
             else:
                 st.warning("⚠️ No items are currently within normal inventory levels!")
+    def _get_value_column(self, df):
+        """Helper method to identify the main value column"""
+        value_columns = ['Stock_Value', 'Current Inventory - VALUE', 'Current Inventory-VALUE']
+        for col in value_columns:
+            if col in df.columns:
+                return col
+        return None
+    def _get_key_display_columns(self, df):
+        """Helper method to select key columns for display"""
+        # Define priority columns to show
+        priority_columns = [
+            'PART NO', 'PART DESCRIPTION', 'Status', 
+            'Current Inventory-QTY', 'MIN QTY REQUIRED', 'MAX QTY REQUIRED',
+            'Stock_Value', 'Current Inventory - VALUE', 'Current Inventory-VALUE',
+            'VENDOR', 'Vendor', 'Vendor Name',
+            'VALUE(Unit Price* Short/Excess Inventory)'
+        ]
+        # Select columns that exist in the dataframe
+        available_columns = []
+        for col in priority_columns:
+            if col in df.columns:
+                available_columns.append(col)
+        # Add any remaining important columns not in priority list
+        for col in df.columns:
+            if col not in available_columns and len(available_columns) < 10:
+                available_columns.append(col)
+        return available_columns[:10]  # Limit to 10 columns for readability
+    def _get_column_formatters(self):
+        """Helper method to format columns appropriately"""
+        return {
+            'Stock_Value': '₹{:,.0f}',
+            'Current Inventory - VALUE': '₹{:,.0f}',
+            'Current Inventory-VALUE': '₹{:,.0f}',
+            'VALUE(Unit Price* Short/Excess Inventory)': '₹{:,.0f}',
+            'Current Inventory-QTY': '{:,.0f}',
+            'MIN QTY REQUIRED': '{:,.0f}',
+            'MAX QTY REQUIRED': '{:,.0f}'
+        }
+        def display_overview_metrics(self, analysis_results):
+            """Display key overview metrics"""
+            st.header("📊 Inventory Overview")
+            df = pd.DataFrame(analysis_results)
+            # Create metrics columns
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                total_parts = len(df)
+                st.metric("Total Parts", f"{total_parts:,}")
+            with col2:
+                value_col = self._get_value_column(df)
+                if value_col:
+                    total_value = df[value_col].sum()
+                    st.metric("Total Value", f"₹{total_value:,.0f}")
+                else:
+                    st.metric("Total Value", "N/A")
+            with col3:
+                if 'Status' in df.columns:
+                    within_norms = (df['Status'] == 'Within Norms').sum()
+                    efficiency = (within_norms / total_parts * 100) if total_parts > 0 else 0
+                    st.metric("Efficiency", f"{efficiency:.1f}%", delta=f"{within_norms} parts")
+                else:
+                    st.metric("Efficiency", "N/A")
+            with col4:
+                if 'Status' in df.columns:
+                    issues = len(df[df['Status'] != 'Within Norms'])
+                    st.metric("Issues", f"{issues:,}", delta="Needs attention" if issues > 0 else "All good")
+                else:
+                    st.metric("Issues", "N/A")
+        def display_top_parts_analysis(self, analysis_results):
+            """Display top parts analysis by different criteria"""
+            st.subheader("🏆 Top Parts Analysis")
+            df = pd.DataFrame(analysis_results)
+            value_col = self._get_value_column(df)
+            if not value_col:
+                st.warning("⚠️ No value column found for top parts analysis.")
+                return
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("💰 Highest Value Parts")
+                top_value = df.nlargest(10, value_col)
+                if not top_value.empty:
+                    display_cols = ['PART NO', 'PART DESCRIPTION', value_col, 'Status']
+                    available_cols = [col for col in display_cols if col in top_value.columns]
+                    st.dataframe(
+                        top_value[available_cols].style.format(self._get_column_formatters()),
+                        use_container_width=True
+                    )
+            with col2:
+                st.subheader("⚠️ Most Critical Issues")
+                if 'Status' in df.columns:
+                    critical_issues = df[df['Status'] != 'Within Norms'].nlargest(10, value_col)
+                    if not critical_issues.empty:
+                        display_cols = ['PART NO', 'PART DESCRIPTION', value_col, 'Status']
+                        available_cols = [col for col in display_cols if col in critical_issues.columns]
+                        st.dataframe(
+                            critical_issues[available_cols].style.format(self._get_column_formatters()),
+                            use_container_width=True
+                        )
+                    else:
+                        st.success("✅ No critical issues found!")
+                else:
+                    st.info("ℹ️ Status information not available.")
 
     def create_enhanced_top_parts_chart(self, processed_data, status_filter, color, key, top_n=10):
         """Enhanced top parts chart with better visualization"""
