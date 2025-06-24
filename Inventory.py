@@ -215,7 +215,7 @@ class InventoryAnalyzer:
         for item in processed_data:
             vendor = item.get('Vendor Name', 'Unknown')
             status = item.get('INVENTORY REMARK STATUS', 'Unknown')
-            Current Inventory - VALUE = item.get('Current Inventory - VALUE') or item.get('Current Inventory - VALUE') or 0
+            stock_value = item.get('Current Inventory - VALUE') or item.get('Current Inventory - VALUE') or 0
             try:
                 Current Inventory - VALUE = float(Current Inventory - VALUE)
             except (ValueError, TypeError):
