@@ -335,11 +335,13 @@ class InventoryManagementSystem:
                 # Handle percentage
                 if '%' in value:
                     return float(value.replace('%', '')) / 100
-            
             return float(value)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as e:
+            # Debug problematic values
+            if hasattr(self, 'debug') and self.debug:
+                st.warning(f"⚠️ Could not convert '{value}' to float: {e}")
             return 0.0
-    
+            
     def safe_int_convert(self, value: Any) -> int:
         """Convert value to integer using safe float conversion."""
         float_result = self.safe_float_convert(value)
@@ -540,45 +542,131 @@ class InventoryManagementSystem:
         """Enhanced PFEP data standardization with added Unit_Price and RM_IN_DAYS support"""
         if df is None or df.empty:
             return []
-        # Column mapping with extended support
+        # Debug: Show original column names
+        if self.debug:
+            st.write("🔍 DEBUG: Original Excel columns:")
+            for i, col in enumerate(df.columns):
+                st.write(f"  {i}: '{col}' (type: {type(col)})")
+        # Comprehensive column mapping with more variations
         column_mappings = {
-            'part_no': ['part_no', 'part_number', 'material', 'material_code', 'item_code', 'code', 'part no', 'partno','Part No'],
-            'description': ['description', 'item_description', 'part_description', 'desc', 'part description', 'material_description', 'item desc','Part Description'],
-            'rm_qty': ['rm_in_qty', 'rm_qty', 'required_qty', 'norm_qty', 'target_qty', 'rm', 'ri_in_qty', 'rm in qty'],
-            'rm_days': ['rm_in_days', 'rm days', 'inventory days', 'rmindays'],
-            'unit_price': ['unit_price', 'price', 'unit cost', 'unit rate', 'unitprice','Unit Price'],
-            'vendor_code': ['vendor_code', 'vendor_id', 'supplier_code', 'supplier_id', 'vendor id', 'Vendor Code', 'vendor code'],
-            'vendor_name': ['vendor_name', 'vendor', 'supplier_name', 'supplier', 'Vendor Name', 'vendor name'],
-            'city': ['city', 'location', 'place'],
-            'state': ['state', 'region', 'province']
+            'part_no': [
+                'part_no', 'part_number', 'material', 'material_code', 'item_code', 
+                'code', 'part no', 'partno', 'Part No', 'Part_No', 'PART_NO',
+                'Material', 'Material Code', 'Item Code'
+            ],
+            'description': [
+                'description', 'item_description', 'part_description', 'desc', 
+                'part description', 'material_description', 'item desc', 'Part Description',
+                'Description', 'DESCRIPTION', 'Material Description'
+            ],
+            'rm_qty': [
+                'rm_in_qty', 'rm_qty', 'required_qty', 'norm_qty', 'target_qty', 
+                'rm', 'ri_in_qty', 'rm in qty', 'RM_IN_QTY', 'RM_QTY', 'RM IN QTY',
+                'Required Qty', 'Norm Qty', 'Target Qty'
+            ],
+            'rm_days': [
+                'rm_in_days', 'rm days', 'inventory days', 'rmindays', 'RM_IN_DAYS',
+                'RM IN DAYS', 'RM Days', 'Inventory Days'
+            ],
+            'unit_price': [
+                'unit_price', 'price', 'unit cost', 'unit rate', 'unitprice', 'Unit Price',
+                'UNIT_PRICE', 'UNIT PRICE', 'Price', 'PRICE', 'Unit Cost', 'UNIT_COST',
+                'unit_cost', 'Unit Rate', 'UNIT_RATE', 'unit_rate', 'rate', 'Rate', 'RATE',
+                'cost', 'Cost', 'COST', 'Unit_Price'
+            ],
+            'vendor_code': [
+                'vendor_code', 'vendor_id', 'supplier_code', 'supplier_id', 'vendor id', 
+                'Vendor Code', 'vendor code', 'VENDOR_CODE', 'VENDOR CODE', 'Vendor_Code',
+                'Supplier Code', 'SUPPLIER_CODE'
+            ],
+            'vendor_name': [
+                'vendor_name', 'vendor', 'supplier_name', 'supplier', 'Vendor Name', 
+                'vendor name', 'VENDOR_NAME', 'VENDOR NAME', 'Vendor_Name',
+                'Supplier Name', 'SUPPLIER_NAME', 'Supplier'
+            ],
+            'city': ['city', 'location', 'place', 'City', 'CITY', 'Location', 'LOCATION'],
+            'state': ['state', 'region', 'province', 'State', 'STATE', 'Region', 'REGION']
         }
-        # Normalize and map columns
-        df_columns = [col.lower().strip() for col in df.columns]
+        # Create case-insensitive column lookup
+        df_columns_lookup = {}
+        for col in df.columns:
+            if col is not None:
+                # Clean column name (remove extra spaces, special characters)
+                clean_col = str(col).strip()
+                df_columns_lookup[clean_col.lower()] = clean_col
+        if self.debug:
+            st.write("🔍 DEBUG: Cleaned column lookup:")
+            for k, v in df_columns_lookup.items():
+                st.write(f"  '{k}' -> '{v}'")
+        # Map columns using case-insensitive matching
         mapped_columns = {}
         for key, variations in column_mappings.items():
+            found = False
             for variation in variations:
-                if variation in df_columns:
-                    original_col = df.columns[df_columns.index(variation)]
-                    mapped_columns[key] = original_col
+                variation_lower = variation.lower().strip()
+                if variation_lower in df_columns_lookup:
+                    mapped_columns[key] = df_columns_lookup[variation_lower]
+                    if self.debug:
+                        st.write(f"✅ Mapped {key} -> '{mapped_columns[key]}' (from variation: '{variation}')")
+                    found = True
                     break
+            if not found and self.debug:
+                st.write(f"❌ No mapping found for {key}")
         # Check for required columns
-        if 'part_no' not in mapped_columns or 'rm_qty' not in mapped_columns:
-            st.error("❌ Required columns not found. Please ensure your file has Part Number and RM Quantity columns.")
+        if 'part_no' not in mapped_columns:
+            st.error("❌ Part Number column not found. Please ensure your file has a Part Number column.")
             return []
+        if 'rm_qty' not in mapped_columns:
+            st.error("❌ RM Quantity column not found. Please ensure your file has an RM/Required Quantity column.")
+            return []
+        # Warning for missing unit price
+        if 'unit_price' not in mapped_columns:
+            st.warning("⚠️ Unit Price column not found. Using default value of 100 for all parts.")
+            st.info("💡 Expected Unit Price column names: Unit Price, Price, Unit Cost, Rate, etc.")
+        if self.debug:
+            st.write("🔍 DEBUG: Final column mappings:")
+            for k, v in mapped_columns.items():
+                st.write(f"  {k} -> '{v}'")
+        # Standardize data
         standardized_data = []
-        for _, row in df.iterrows():
-            item = {
-                'Part_No': str(row[mapped_columns['part_no']]).strip(),
-                'Description': str(row.get(mapped_columns.get('description', ''), '')).strip(),
-                'RM_IN_QTY': self.safe_float_convert(row[mapped_columns['rm_qty']]),
-                'RM_IN_DAYS': self.safe_float_convert(row.get(mapped_columns.get('rm_days', ''), 0)),
-                'Unit_Price': self.safe_float_convert(row.get(mapped_columns.get('unit_price', ''), 0)),
-                'Vendor_Code': str(row.get(mapped_columns.get('vendor_code', ''), '')).strip(),
-                'Vendor_Name': str(row.get(mapped_columns.get('vendor_name', ''), 'Unknown')).strip(),
-                'City': str(row.get(mapped_columns.get('city', ''), '')).strip(),
-                'State': str(row.get(mapped_columns.get('state', ''), '')).strip()
-            }
-            standardized_data.append(item)
+        for idx, row in df.iterrows():
+            try:
+                # Extract unit price with detailed debugging
+                unit_price_value = 100.0  # Default value
+                if 'unit_price' in mapped_columns:
+                    raw_price = row[mapped_columns['unit_price']]
+                    unit_price_value = self.safe_float_convert(raw_price)
+                    if self.debug and idx < 3:  # Debug first 3 rows
+                        st.write(f"🔍 Row {idx+1} Unit Price: '{raw_price}' -> {unit_price_value}")
+                item = {
+                    'Part_No': str(row[mapped_columns['part_no']]).strip(),
+                    'Description': str(row.get(mapped_columns.get('description', ''), '')).strip(),
+                    'RM_IN_QTY': self.safe_float_convert(row[mapped_columns['rm_qty']]),
+                    'RM_IN_DAYS': self.safe_float_convert(row.get(mapped_columns.get('rm_days', ''), 7)),  # Default 7 days
+                    'unit_price': unit_price_value,  # Fixed: use lowercase to match analyzer expectation
+                    'Vendor_Code': str(row.get(mapped_columns.get('vendor_code', ''), '')).strip(),
+                    'Vendor_Name': str(row.get(mapped_columns.get('vendor_name', ''), 'Unknown')).strip(),
+                    'City': str(row.get(mapped_columns.get('city', ''), '')).strip(),
+                    'State': str(row.get(mapped_columns.get('state', ''), '')).strip()
+                }
+                # Skip rows with empty part numbers
+                if not item['Part_No'] or item['Part_No'].lower() in ['nan', 'none', '']:
+                    continue
+                standardized_data.append(item)
+            except Exception as e:
+                if self.debug:
+                    st.warning(f"⚠️ Error processing row {idx+1}: {e}")
+                continue
+        # Summary of data processing
+        st.success(f"✅ Processed {len(standardized_data)} PFEP records")
+        # Show unit price statistics
+        if standardized_data:
+            prices = [item['unit_price'] for item in standardized_data if item['unit_price'] > 0]
+            if prices:
+                avg_price = sum(prices) / len(prices)
+                st.info(f"💰 Unit Price Summary: {len(prices)} parts with prices, Average: ₹{avg_price:.2f}")
+            else:
+                st.warning("⚠️ No valid unit prices found in the data")
         return standardized_data
     
     def standardize_current_inventory(self, df):
