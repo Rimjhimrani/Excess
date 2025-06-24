@@ -162,7 +162,7 @@ class InventoryAnalyzer:
                 rm_days = pfep_item.get('RM_IN_DAYS', '')
                 # Short/Excess Inventory calculation (FIX: multiplication, not division)
                 short_excess_qty = current_qty - rm_qty
-                value = short_excess_qty * unit_price
+                value = unit_price * short_excess_qty 
 
                 # Status logic
                 if rm_qty > 0:
