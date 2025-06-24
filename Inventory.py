@@ -156,7 +156,7 @@ class InventoryAnalyzer:
             try:
                 # Extract values safely
                 current_qty = float(inventory_item.get('Current_QTY', 0))
-                Current Inventory - VALUE = float(inventory_item.get('Current Inventory - VALUE', 0))
+                stock_value = float(inventory_item.get('Current Inventory - VALUE', 0))
                 rm_qty = float(pfep_item.get('RM_IN_QTY', 0))
                 unit_price = float(pfep_item.get('Unit_Price', 0)) or 1.0  # Avoid division by zero
                 rm_days = pfep_item.get('RM_IN_DAYS', '')
@@ -181,7 +181,7 @@ class InventoryAnalyzer:
                     'PART DESCRIPTION': pfep_item.get('Description', ''),
                     'Current Inventory-QTY': current_qty,
                     'Inventory Norms - QTY': rm_qty,
-                    'Current Inventory - VALUE': Current Inventory - VALUE,
+                    'Current Inventory - VALUE': stock_value,
                     'SHORT/EXCESS INVENTORY': short_excess_qty,
                     'INVENTORY REMARK STATUS': status,
                     'Status': status,
