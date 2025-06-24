@@ -1126,7 +1126,7 @@ class InventoryManagementSystem:
         df = pd.DataFrame(analysis_results)
         # Calculate enhanced metrics
         total_parts = len(analysis_results)
-        total_stock_value = df['Stock_Value'].sum() if 'Stock_Value' in df.columns else 0
+        total_stock_value = df['Current Inventory - VALUE'].sum() if 'Stock_Value' in df.columns else 0
     
         # Status distribution
         status_counts = Counter(df['Status'] if 'Status' in df.columns else df.get('INVENTORY REMARK STATUS', []))
@@ -1501,8 +1501,8 @@ class InventoryManagementSystem:
         if hasattr(st.session_state, 'value_filter') and 'Stock_Value' in df.columns:
             min_val, max_val = st.session_state.value_filter
             filtered_df = filtered_df[
-                (filtered_df['Stock_Value'] >= min_val) & 
-                (filtered_df['Stock_Value'] <= max_val)
+                (filtered_df['Current Inventory - VALUE'] >= min_val) & 
+                (filtered_df['Current Inventory - VALUE'] <= max_val)
             ]
         # Apply quantity filter
         if hasattr(st.session_state, 'qty_filter') and 'Current Inventory-QTY' in df.columns:
@@ -1558,7 +1558,7 @@ class InventoryManagementSystem:
                 st.plotly_chart(fig, use_container_width=True)
             with tab2:
                 # Value distribution analysis
-                value_ranges = pd.cut(df['Stock_Value'], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
+                value_ranges = pd.cut(df['Current Inventory - VALUE'], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
                 value_status = pd.crosstab(value_ranges, df['Status'])
                 fig = px.bar(
                     value_status,
@@ -1606,7 +1606,7 @@ class InventoryManagementSystem:
         # Key metrics ro
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            total_value = df['Stock_Value'].sum()
+            total_value = df['Current Inventory - VALUE'].sum()
             st.metric(
                 "Total Inventory Value",
                 f"₹{total_value:,.0f}",
@@ -1637,8 +1637,8 @@ class InventoryManagementSystem:
         st.subheader("🎯 Risk Assessment Matrix")
         # Create risk categories
         df['Risk_Level'] = 'Low'
-        df.loc[(df['Stock_Value'] > 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'High'
-        df.loc[(df['Stock_Value'] > 50000) & (df['Stock_Value'] <= 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'Medium'
+        df.loc[(df['Current Inventory - VALUE'] > 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'High'
+        df.loc[(df['Current Inventory - VALUE'] > 50000) & (df['Current Inventory - VALUE'] <= 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'Medium'
     
         risk_matrix = df.groupby(['Risk_Level', 'Status']).agg({
             'Stock_Value': 'sum',
@@ -1693,7 +1693,7 @@ class InventoryManagementSystem:
                 }
                 pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
                 # Critical items sheet
-                critical_items = df[df['Stock_Value'] > 100000]
+                critical_items = df[df['Current Inventory - VALUE'] > 100000]
                 critical_items.to_excel(writer, sheet_name='Critical Items', index=False)
                 # Download button
                 st.download_button(
@@ -1712,7 +1712,7 @@ class InventoryManagementSystem:
             # Filter critical items
             critical_items = df[
                 (df['Status'] != 'Within Norms') & 
-                (df['Stock_Value'] > st.session_state.get('critical_threshold', 100000))
+                (df['Current Inventory - VALUE'] > st.session_state.get('critical_threshold', 100000))
             ]
             if critical_items.empty:
                 st.warning("No critical items found based on current criteria.")
@@ -1746,7 +1746,7 @@ class InventoryManagementSystem:
                 ],
                 'Value': [
                     len(df),
-                    f"₹{df['Stock_Value'].sum():,.0f}",
+                    f"₹{df['Current Inventory - VALUE'].sum():,.0f}",
                     (df['Status'] == 'Within Norms').sum(),
                     (df['Status'] == 'Excess Inventory').sum(),
                     (df['Status'] == 'Short Inventory').sum(),
@@ -1838,7 +1838,7 @@ class InventoryManagementSystem:
             # Critical shortages
             critical_shortages = df[
                 (df['Status'] == 'Short Inventory') & 
-                (df['Stock_Value'] > 50000)
+                (df['Current Inventory - VALUE'] > 50000)
             ].sort_values('Stock_Value', ascending=False)
             if not critical_shortages.empty:
                 st.error(f"🔴 **URGENT**: {len(critical_shortages)} high-value parts critically short!")
@@ -1855,7 +1855,7 @@ class InventoryManagementSystem:
             # Excess inventory actions
             excess_items = df[
                 (df['Status'] == 'Excess Inventory') & 
-                (df['Stock_Value'] > 100000)
+                (df['Current Inventory - VALUE'] > 100000)
             ].sort_values('Stock_Value', ascending=False)
             if not excess_items.empty:
                 st.warning(f"🟡 **Consider**: {len(excess_items)} high-value excess items for reallocation")
@@ -1950,9 +1950,9 @@ class InventoryManagementSystem:
         st.sidebar.header("🔍 Advanced Filters")
         df = pd.DataFrame(analysis_results)
         # Value range filter with proper handling of edge cases
-        if 'Stock_Value' in df.columns and not df['Stock_Value'].empty:
-            min_value = float(df['Stock_Value'].min())
-            max_value = float(df['Stock_Value'].max())
+        if 'Stock_Value' in df.columns and not df['Current Inventory - VALUE'].empty:
+            min_value = float(df['Current Inventory - VALUE'].min())
+            max_value = float(df['Current Inventory - VALUE'].max())
         # Handle case where min and max are the same
             if min_value == max_value:
                 if min_value == 0:
@@ -1965,7 +1965,7 @@ class InventoryManagementSystem:
                     range_buffer = max_value * 0.1 if max_value > 0 else 1000
                     min_value = max_value - range_buffer
                     max_value = max_value + range_buffer
-                    st.sidebar.info(f"ℹ️ All stock values are {df['Stock_Value'].iloc[0]:,.0f}. Adjusted range for filtering.")
+                    st.sidebar.info(f"ℹ️ All stock values are {df['Current Inventory - VALUE'].iloc[0]:,.0f}. Adjusted range for filtering.")
             # Ensure min_value is always less than max_value
             if min_value >= max_value:
                 max_value = min_value + 1000
@@ -2059,8 +2059,8 @@ class InventoryManagementSystem:
                 'Stock_Value' in filtered_df.columns):
                     min_val, max_val = st.session_state.filter_value_range
                     filtered_df = filtered_df[
-                        (filtered_df['Stock_Value'] >= min_val) & 
-                        (filtered_df['Stock_Value'] <= max_val)
+                        (filtered_df['Current Inventory - VALUE'] >= min_val) & 
+                        (filtered_df['Current Inventory - VALUE'] <= max_val)
                     ]
             # Apply status filter
             if (hasattr(st.session_state, 'filter_statuses') and 
@@ -2112,8 +2112,8 @@ class InventoryManagementSystem:
             'efficiency_rate': (df['Status'] == 'Within Norms').mean() * 100,
             'excess_value': df[df['Status'] == 'Excess Inventory']['Stock_Value'].sum(),
             'shortage_impact': abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum()),
-            'critical_items': len(df[df['Stock_Value'] > st.session_state.get('critical_threshold', 100000)]),
-            'avg_stock_value': df['Stock_Value'].mean()
+            'critical_items': len(df[df['Current Inventory - VALUE'] > st.session_state.get('critical_threshold', 100000)]),
+            'avg_stock_value': df['Current Inventory - VALUE'].mean()
         }
         return summary
         
