@@ -1260,6 +1260,33 @@ class InventoryManagementSystem:
                 color_continuous_scale='RdYlGn'
             )
             st.plotly_chart(fig, use_container_width=True)
+    def get_value_column(self, df):
+        """Helper method to get the correct value column name"""
+        possible_value_columns = [
+            'Current Inventory - VALUE',
+            'Stock_Value', 
+            'Stock Value',
+            'Current Inventory-VALUE',
+            'Inventory Value',
+            'Value'
+        ]
+        for col in possible_value_columns:
+            if col in df.columns:
+                return col
+        return None
+    def get_quantity_column(self, df):
+        """Helper method to get the correct quantity column name"""
+        possible_qty_columns = [
+            'Current Inventory-QTY',
+            'Current Inventory - QTY',
+            'Quantity',
+            'QTY',
+            'Stock_Quantity'
+        ]
+        for col in possible_qty_columns:
+            if col in df.columns:
+                return col
+        return None
     
     def create_enhanced_top_parts_chart(self, processed_data, status_filter, color, key, top_n=10):
         """Enhanced top parts chart with better visualization"""
@@ -1270,17 +1297,20 @@ class InventoryManagementSystem:
         if not filtered_data:
             st.info(f"No {status_filter} parts found.")
             return
-
+        # ✅ FIXED: Use flexible value column detection
+        df = pd.DataFrame(filtered_data)
+        value_col = self.get_value_column(df)
+        if value_col is None:
+            st.error("Value column not found in data")
+            return
         top_parts = sorted(
             filtered_data,
-            key=lambda x: x.get('Stock_Value', 0),
+            key=lambda x: x.get(value_col, 0),
             reverse=True
         )[:top_n]
-
         labels = [f"{item['PART NO']}<br>{item.get('PART DESCRIPTION', '')[:30]}..." for item in top_parts]
-        values = [item.get('Stock_Value', 0) for item in top_parts]
+        values = [item.get(value_col, 0) for item in top_parts]
         variance_values = [item.get('VALUE(Unit Price* Short/Excess Inventory)', 0) for item in top_parts]
-
         fig = go.Figure()
         fig.add_trace(go.Bar(
             name='Stock Value',
@@ -1295,19 +1325,22 @@ class InventoryManagementSystem:
     def apply_advanced_filters(self, df):
         """Apply advanced filters to dataframe"""
         filtered_df = df.copy()
-        # Apply value filted
-        if hasattr(st.session_state, 'value_filter') and 'Stock_Value' in df.columns:
+        # ✅ FIXED: Use flexible column detection
+        value_col = self.get_value_column(df)
+        qty_col = self.get_quantity_column(df)
+        # Apply value filter
+        if hasattr(st.session_state, 'value_filter') and value_col:
             min_val, max_val = st.session_state.value_filter
             filtered_df = filtered_df[
-                (filtered_df['Stock_Value'] >= min_val) & 
-                (filtered_df['Stock_Value'] <= max_val)
+                (filtered_df[value_col] >= min_val) & 
+                (filtered_df[value_col] <= max_val)
             ]
         # Apply quantity filter
-        if hasattr(st.session_state, 'qty_filter') and 'Current Inventory-QTY' in df.columns:
+        if hasattr(st.session_state, 'qty_filter') and qty_col:
             min_qty, max_qty = st.session_state.qty_filter
             filtered_df = filtered_df[
-                (filtered_df['Current Inventory-QTY'] >= min_qty) & 
-                (filtered_df['Current Inventory-QTY'] <= max_qty)
+                (filtered_df[qty_col] >= min_qty) & 
+                (filtered_df[qty_col] <= max_qty)
             ]
         # Apply vendor filter (FIXED: properly handle vendor column)
         if hasattr(st.session_state, 'vendor_filter'):
@@ -1316,6 +1349,8 @@ class InventoryManagementSystem:
                 vendor_col = 'Vendor'
             elif 'Vendor Name' in df.columns:
                 vendor_col = 'Vendor Name'
+            elif 'VENDOR' in df.columns:
+                vendor_col = 'VENDOR'
             if vendor_col and vendor_col in df.columns:
                 filtered_df = filtered_df[filtered_df[vendor_col].isin(st.session_state.vendor_filter)]
         return filtered_df
@@ -1324,6 +1359,12 @@ class InventoryManagementSystem:
         """Display trend analysis and forecasting"""
         st.header("📈 Trend Analysis & Forecasting")
         df = pd.DataFrame(analysis_results)
+        # ✅ FIXED: Use flexible column detection
+        value_col = self.get_value_column(df)
+        qty_col = self.get_quantity_column(df)
+        if value_col is None:
+            st.error("Value column not found in data")
+            return
         # Create trend analysis tabs
         tab1, tab2, tab3 = st.tabs(["📊 Status Trends", "💹 Value Trends", "🔮 Forecasting"])
         with tab1:
@@ -1354,57 +1395,64 @@ class InventoryManagementSystem:
                     }
                 )
                 st.plotly_chart(fig, use_container_width=True)
-            with tab2:
-                # Value distribution analysis
-                value_ranges = pd.cut(df['Stock_Value'], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
-                value_status = pd.crosstab(value_ranges, df['Status'])
-                fig = px.bar(
-                    value_status,
-                    title="Status Distribution by Value Range",
-                    color_discrete_map={
-                        'Within Norms': '#4CAF50',
-                        'Excess Inventory': '#2196F3',
-                        'Short Inventory': '#F44336'
-                    }
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                # Top value contributor
-                top_value_parts = df.nlargest(20, 'Stock_Value')
+        with tab2:
+            # Value distribution analysis
+            value_ranges = pd.cut(df[value_col], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
+            value_status = pd.crosstab(value_ranges, df['Status'])
+            fig = px.bar(
+                value_status,
+                title="Status Distribution by Value Range",
+                color_discrete_map={
+                    'Within Norms': '#4CAF50',
+                    'Excess Inventory': '#2196F3',
+                    'Short Inventory': '#F44336'
+                }
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            # Top value contributors
+            top_value_parts = df.nlargest(20, value_col)
+            if qty_col:
                 fig = px.scatter(
                     top_value_parts,
-                    x='Current Inventory-QTY',
-                    y='Stock_Value',
+                    x=qty_col,
+                    y=value_col,
                     color='Status',
-                    size='Stock_Value',
+                    size=value_col,
                     hover_data=['PART NO', 'PART DESCRIPTION'],
                     title="Top 20 Parts by Value - Quantity vs Value Analysis"
                 )
                 st.plotly_chart(fig, use_container_width=True)
-            with tab3:
-                st.subheader("🔮 Predictive Insights")
-                # Calculate reorder predictions
+        with tab3:
+            st.subheader("🔮 Predictive Insights")
+            # Calculate reorder predictions
+            if qty_col and 'MIN QTY REQUIRED' in df.columns:
                 reorder_candidates = df[
                     (df['Status'] == 'Within Norms') & 
-                    (df['Current Inventory-QTY'] <= df['MIN QTY REQUIRED'] * 1.2)
+                    (df[qty_col] <= df['MIN QTY REQUIRED'] * 1.2)
                 ]
                 if not reorder_candidates.empty:
                     st.warning(f"📋 **Reorder Alert**: {len(reorder_candidates)} parts may need reordering soon")
                     # Display reorder table
-                    reorder_display = reorder_candidates[['PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 
-                                                'MIN QTY REQUIRED', 'Stock_Value']].copy()
+                    reorder_display = reorder_candidates[['PART NO', 'PART DESCRIPTION', qty_col, 
+                                                          'MIN QTY REQUIRED', value_col]].copy()
                     reorder_display['Days to Reorder'] = np.random.randint(5, 30, len(reorder_display))  # Simulated
                     st.dataframe(reorder_display, use_container_width=True)
-                # Seasonal analysis placeholder
-                st.info("📊 **Seasonal Analysis**: Historical data integration required for advanced forecasting")
+            # Seasonal analysis placeholder
+            st.info("📊 **Seasonal Analysis**: Historical data integration required for advanced forecasting")
 
     def display_executive_dashboard(self, analysis_results):
         """Executive level dashboard with KPIs"""
         st.header("👔 Executive Dashboard")
         df = pd.DataFrame(analysis_results)
-        # Key metrics ro
+        # ✅ FIXED: Use flexible column detection
+        value_col = self.get_value_column(df)
+        if value_col is None:
+            st.error("Value column not found in data")
+            return
+        # Key metrics row
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            total_value = df['Stock_Value'].sum()
+            total_value = df[value_col].sum()
             st.metric(
                 "Total Inventory Value",
                 f"₹{total_value:,.0f}",
@@ -1418,14 +1466,17 @@ class InventoryManagementSystem:
                 delta=f"{'Good' if efficiency > 70 else 'Needs Improvement'}"
             )
         with col3:
-            excess_value = df[df['Status'] == 'Excess Inventory']['Stock_Value'].sum()
+            excess_value = df[df['Status'] == 'Excess Inventory'][value_col].sum()
             st.metric(
                 "Excess Inventory",
                 f"₹{excess_value:,.0f}",
                 delta=f"{(df['Status'] == 'Excess Inventory').sum()} parts"
             )
         with col4:
-            short_impact = abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum())
+            if 'VALUE(Unit Price* Short/Excess Inventory)' in df.columns:
+                short_impact = abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum())
+            else:
+                short_impact = df[df['Status'] == 'Short Inventory'][value_col].sum()
             st.metric(
                 "Shortage Impact",
                 f"₹{short_impact:,.0f}",
@@ -1435,17 +1486,16 @@ class InventoryManagementSystem:
         st.subheader("🎯 Risk Assessment Matrix")
         # Create risk categories
         df['Risk_Level'] = 'Low'
-        df.loc[(df['Stock_Value'] > 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'High'
-        df.loc[(df['Stock_Value'] > 50000) & (df['Stock_Value'] <= 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'Medium'
-    
+        df.loc[(df[value_col] > 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'High'
+        df.loc[(df[value_col] > 50000) & (df[value_col] <= 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'Medium'
         risk_matrix = df.groupby(['Risk_Level', 'Status']).agg({
-            'Stock_Value': 'sum',
+            value_col: 'sum',
             'PART NO': 'count'
         }).reset_index()
         fig = px.sunburst(
             risk_matrix,
             path=['Risk_Level', 'Status'],
-            values='Stock_Value',
+            values=value_col,
             title="Risk Assessment by Value Impact"
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -1476,10 +1526,14 @@ class InventoryManagementSystem:
         """Export comprehensive analysis report"""
         try:
             df = pd.DataFrame(analysis_results)
+            # ✅ FIXED: Use flexible column detection
+            value_col = self.get_value_column(df)
+            if value_col is None:
+                st.error("Value column not found in data")
+                return
             # Create Excel writer
             from io import BytesIO
             output = BytesIO()
-        
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 # Main analysis sheet
                 df.to_excel(writer, sheet_name='Full Analysis', index=False)
@@ -1487,21 +1541,21 @@ class InventoryManagementSystem:
                 summary_data = {
                     'Status': df['Status'].value_counts().index.tolist(),
                     'Count': df['Status'].value_counts().values.tolist(),
-                    'Total Value': [df[df['Status'] == status]['Stock_Value'].sum() 
+                    'Total Value': [df[df['Status'] == status][value_col].sum() 
                                     for status in df['Status'].value_counts().index]
                 }
                 pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
                 # Critical items sheet
-                critical_items = df[df['Stock_Value'] > 100000]
+                critical_items = df[df[value_col] > 100000]
                 critical_items.to_excel(writer, sheet_name='Critical Items', index=False)
-                # Download button
-                st.download_button(
-                    label="📥 Download Comprehensive Report",
-                    data=output.getvalue(),
-                    file_name=f"inventory_analysis_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-                st.success("✅ Comprehensive report prepared for download!")
+            # Download button
+            st.download_button(
+                label="📥 Download Comprehensive Report",
+                data=output.getvalue(),
+                file_name=f"inventory_analysis_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            st.success("✅ Comprehensive report prepared for download!")
         except Exception as e:
             st.error(f"❌ Export failed: {str(e)}")
 
@@ -1509,10 +1563,15 @@ class InventoryManagementSystem:
         """Export only critical items"""
         try:
             df = pd.DataFrame(analysis_results)
+            # ✅ FIXED: Use flexible column detection
+            value_col = self.get_value_column(df)
+            if value_col is None:
+                st.error("Value column not found in data")
+                return
             # Filter critical items
             critical_items = df[
                 (df['Status'] != 'Within Norms') & 
-                (df['Stock_Value'] > st.session_state.get('critical_threshold', 100000))
+                (df[value_col] > st.session_state.get('critical_threshold', 100000))
             ]
             if critical_items.empty:
                 st.warning("No critical items found based on current criteria.")
@@ -1528,11 +1587,16 @@ class InventoryManagementSystem:
             st.success(f"✅ Critical items report prepared! ({len(critical_items)} items)")
         except Exception as e:
             st.error(f"❌ Export failed: {str(e)}")
-            
+          
     def export_executive_summary(self, analysis_results):
-        """Export executive summary"""
+       """Export executive summary"""
         try:
             df = pd.DataFrame(analysis_results)
+            # ✅ FIXED: Use flexible column detection
+            value_col = self.get_value_column(df)
+            if value_col is None:
+                st.error("Value column not found in data")
+                return
             # Create executive summary data
             summary = {
                 'Metric': [
@@ -1547,13 +1611,13 @@ class InventoryManagementSystem:
                 ],
                 'Value': [
                     len(df),
-                    f"₹{df['Stock_Value'].sum():,.0f}",
+                    f"₹{df[value_col].sum():,.0f}",
                     (df['Status'] == 'Within Norms').sum(),
                     (df['Status'] == 'Excess Inventory').sum(),
                     (df['Status'] == 'Short Inventory').sum(),
                     f"{(df['Status'] == 'Within Norms').mean() * 100:.1f}%",
-                    f"₹{df[df['Status'] == 'Excess Inventory']['Stock_Value'].sum():,.0f}",
-                    f"₹{abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum()):,.0f}"
+                    f"₹{df[df['Status'] == 'Excess Inventory'][value_col].sum():,.0f}",
+                    f"₹{abs(df[df['Status'] == 'Short Inventory'].get('VALUE(Unit Price* Short/Excess Inventory)', df[df['Status'] == 'Short Inventory'][value_col]).sum()):,.0f}"
                 ]
             }
             summary_df = pd.DataFrame(summary)
@@ -1750,9 +1814,14 @@ class InventoryManagementSystem:
         """Display advanced filtering options in sidebar"""
         st.sidebar.header("🔍 Advanced Filters")
         df = pd.DataFrame(analysis_results)
+        # ✅ FIXED: Use flexible column detection
+        value_col = self.get_value_column(df)
+        if value_col is None:
+            st.sidebar.error("Value column not found in data")
+            return
         # Value range filter
-        min_value = float(df['Stock_Value'].min())
-        max_value = float(df['Stock_Value'].max())
+        min_value = float(df[value_col].min())
+        max_value = float(df[value_col].max())
         value_range = st.sidebar.slider(
             "Stock Value Range (₹)",
             min_value=min_value,
@@ -1832,17 +1901,22 @@ class InventoryManagementSystem:
     def generate_analysis_summary(self, analysis_results):
         """Generate a comprehensive analysis summary"""
         df = pd.DataFrame(analysis_results)
+        # ✅ FIXED: Use flexible column detection
+        value_col = self.get_value_column(df)
+        if value_col is None:
+            st.error("Value column not found in data")
+            return {}
         summary = {
             'total_parts': len(df),
-            'total_value': df['Current Inventory - VALUE'].sum(),
+            'total_value': df[value_col].sum(),
             'within_norms': (df['Status'] == 'Within Norms').sum(),
             'excess_inventory': (df['Status'] == 'Excess Inventory').sum(),
             'short_inventory': (df['Status'] == 'Short Inventory').sum(),
             'efficiency_rate': (df['Status'] == 'Within Norms').mean() * 100,
-            'excess_value': df[df['Status'] == 'Excess Inventory']['Stock_Value'].sum(),
-            'shortage_impact': abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum()),
-            'critical_items': len(df[df['Stock_Value'] > st.session_state.get('critical_threshold', 100000)]),
-            'avg_stock_value': df['Stock_Value'].mean()
+            'excess_value': df[df['Status'] == 'Excess Inventory'][value_col].sum(),
+            'shortage_impact': abs(df[df['Status'] == 'Short Inventory'].get('VALUE(Unit Price* Short/Excess Inventory)', df[df['Status'] == 'Short Inventory'][value_col]).sum()),
+            'critical_items': len(df[df[value_col] > st.session_state.get('critical_threshold', 100000)]),
+            'avg_stock_value': df[value_col].mean()
         }
         return summary
         
@@ -1912,16 +1986,21 @@ class InventoryManagementSystem:
         """Display enhanced visual summaries like top parts, shortages, and excess inventory"""
         st.subheader("📊 Enhanced Inventory Charts")
         df = pd.DataFrame(analysis_results)
+        # ✅ FIXED: Use flexible column detectio
+        value_col = self.get_value_column(df)
+        if value_col is None:
+            st.error("Value column not found in data")
+            return
         # ✅ 1. Top 10 Parts by Value
-        if 'Current Inventory - VALUE' in df.columns and 'PART NO' in df.columns:
-            top_parts = df.sort_values(by='Current Inventory - VALUE', ascending=False).head(10)
+        if 'PART NO' in df.columns:
+            top_parts = df.sort_values(by=value_col, ascending=False).head(10)
             fig1 = px.bar(
                 top_parts,
                 x='PART NO',
-                y='Current Inventory - VALUE',
+                y=value_col,
                 title="Top 10 Parts by Inventory Value",
-                text='PART DESCRIPTION',
-                color='Current Inventory - VALUE',
+                text='PART DESCRIPTION' if 'PART DESCRIPTION' in df.columns else None,
+                color=value_col,
                 color_continuous_scale='Blues'
             )
             st.plotly_chart(fig1, use_container_width=True)
@@ -1938,7 +2017,7 @@ class InventoryManagementSystem:
                 color_discrete_sequence=px.colors.qualitative.Set2
             )
             st.plotly_chart(fig2, use_container_width=True)
-        # ✅ 3. Vendor vs Value (Fixed vendor_col definition
+        # ✅ 3. Vendor vs Value (Fixed vendor_col definition)
         vendor_col = None
         if 'Vendor' in df.columns:
             vendor_col = 'Vendor'
@@ -1947,7 +2026,7 @@ class InventoryManagementSystem:
         elif 'VENDOR' in df.columns:
             vendor_col = 'VENDOR'
         if vendor_col and vendor_col in df.columns:
-            vendor_values = df.groupby(vendor_col)['Current Inventory - VALUE'].sum().sort_values(ascending=False).head(10)
+            vendor_values = df.groupby(vendor_col)[value_col].sum().sort_values(ascending=False).head(10)
             fig3 = px.bar(
                 vendor_values,
                 x=vendor_values.index,
