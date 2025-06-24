@@ -217,11 +217,11 @@ class InventoryAnalyzer:
             status = item.get('INVENTORY REMARK STATUS', 'Unknown')
             stock_value = item.get('Stock Value') or item.get('Current Inventory - VALUE') or 0
             try:
-                Current Inventory - VALUE = float(Current Inventory - VALUE)
+                stock_value = float(Current Inventory - VALUE)
             except (ValueError, TypeError):
-                Current Inventory - VALUE = 0.0
+                stock_value = 0.0
             summary[vendor]['total_parts'] += 1
-            summary[vendor]['total_value'] += Current Inventory - VALUE
+            summary[vendor]['total_value'] += stock_value
             if status == "Short Inventory":  # Fixed status name
                 summary[vendor]['short_parts'] += 1
             elif status == "Excess Inventory":  # Fixed status name
