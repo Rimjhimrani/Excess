@@ -1747,23 +1747,47 @@ class InventoryManagementSystem:
         """Display advanced filtering options in sidebar"""
         st.sidebar.header("🔍 Advanced Filters")
         df = pd.DataFrame(analysis_results)
-        # Value range filter
-        min_value = float(df['Stock_Value'].min())
-        max_value = float(df['Stock_Value'].max())
-        value_range = st.sidebar.slider(
-            "Stock Value Range (₹)",
-            min_value=min_value,
-            max_value=max_value,
-            value=(min_value, max_value),
-            format="₹%.0f"
-        )
+        # Value range filter with proper handling of edge cases
+        if 'Stock_Value' in df.columns and not df['Stock_Value'].empty:
+            min_value = float(df['Stock_Value'].min())
+            max_value = float(df['Stock_Value'].max())
+        # Handle case where min and max are the same
+            if min_value == max_value:
+                if min_value == 0:
+                    # If all values are 0, create a reasonable range
+                    min_value = 0.0
+                    max_value = 100000.0
+                    st.sidebar.info("ℹ️ All stock values are 0. Using default range for filtering.")
+                else:
+                    # If all values are the same non-zero value, create a small range around i
+                    range_buffer = max_value * 0.1 if max_value > 0 else 1000
+                    min_value = max_value - range_buffer
+                    max_value = max_value + range_buffer
+                    st.sidebar.info(f"ℹ️ All stock values are {df['Stock_Value'].iloc[0]:,.0f}. Adjusted range for filtering.")
+            # Ensure min_value is always less than max_value
+            if min_value >= max_value:
+                max_value = min_value + 1000
+            value_range = st.sidebar.slider(
+                "Stock Value Range (₹)",
+                min_value=min_value,
+                max_value=max_value,
+                value=(min_value, max_value),
+                format="₹%.0f"
+            )
+        else:
+            st.sidebar.warning("⚠️ Stock Value column not found or empty. Skipping value filter.")
+            value_range = (0, 100000)  # Default range
         # Status filter
-        status_options = df['Status'].unique().tolist()
-        selected_statuses = st.sidebar.multiselect(
-            "Filter by Status",
-            options=status_options,
-            default=status_options
-        )
+        if 'Status' in df.columns:
+            status_options = df['Status'].unique().tolist()
+            selected_statuses = st.sidebar.multiselect(
+                "Filter by Status",
+                options=status_options,
+                default=status_options
+            )
+        else:
+            selected_statuses = []
+            st.sidebar.warning("⚠️ Status column not found.")
         # Category filter (if available)
         category_col = None
         if 'Category' in df.columns:
@@ -1771,22 +1795,35 @@ class InventoryManagementSystem:
         elif 'PART CATEGORY' in df.columns:
             category_col = 'PART CATEGORY'
         selected_categories = None
-        if category_col:
-            categories = df[category_col].unique().tolist()
-            selected_categories = st.sidebar.multiselect(
-                f"Filter by {category_col}",
-                options=categories,
-                default=categories
-            )
-        # Vendor filter (if available)
+        if category_col and category_col in df.columns:
+            categories = df[category_col].dropna().unique().tolist()
+            if categories:
+                selected_categories = st.sidebar.multiselect(
+                    f"Filter by {category_col}",
+                    options=categories,
+                    default=categories
+                )
+            else:
+                st.sidebar.info(f"ℹ️ No valid {category_col} values found.")
+        # Vendor filter (if availablee)
+        vendor_col = None
+        if 'Vendor' in df.columns:
+            vendor_col = 'Vendor'
+        elif 'Vendor Name' in df.columns:
+            vendor_col = 'Vendor Name'
+        elif 'VENDOR' in df.columns:
+            vendor_col = 'VENDOR'
         selected_vendors = None
-        if 'VENDOR' in df.columns:
-            vendors = df['VENDOR'].unique().tolist()
-            selected_vendors = st.sidebar.multiselect(
-                "Filter by Vendor",
-                options=vendors,
-                default=vendors
-            )
+        if vendor_col and vendor_col in df.columns:
+            vendors = df[vendor_col].dropna().unique().tolist()
+            if vendors:
+                selected_vendors = st.sidebar.multiselect(
+                    f"Filter by {vendor_col}",
+                    options=vendors,
+                    default=vendors
+                )
+            else:
+                st.sidebar.info(f"ℹ️ No valid {vendor_col} values found.")
         # Critical threshold setting
         critical_threshold = st.sidebar.number_input(
             "Critical Value Threshold (₹)",
@@ -1801,30 +1838,65 @@ class InventoryManagementSystem:
         st.session_state.filter_categories = selected_categories
         st.session_state.filter_vendors = selected_vendors
         st.session_state.critical_threshold = critical_threshold
+        # Display current filter summary
+        with st.sidebar.expander("📋 Current Filters Summary"):
+            st.write(f"**Value Range:** ₹{value_range[0]:,.0f} - ₹{value_range[1]:,.0f}")
+            st.write(f"**Statuses:** {len(selected_statuses) if selected_statuses else 0} selected")
+            if selected_categories:
+                st.write(f"**Categories:** {len(selected_categories)} selected")
+            if selected_vendors:
+                st.write(f"**Vendors:** {len(selected_vendors)} selected")
+            st.write(f"**Critical Threshold:** ₹{critical_threshold:,.0f}")
 
     def apply_advanced_filters(self, df):
-        """Apply advanced filters to the dataframe"""
+        """Apply advanced filters to the dataframe with improved error handling"""
         filtered_df = df.copy()
-        # Apply value range filter
-        if hasattr(st.session_state, 'filter_value_range'):
-            min_val, max_val = st.session_state.filter_value_range
-            filtered_df = filtered_df[
-                (filtered_df['Stock_Value'] >= min_val) & 
-                (filtered_df['Stock_Value'] <= max_val)
-            ]
-        # Apply status filter
-        if hasattr(st.session_state, 'filter_statuses') and st.session_state.filter_statuses:
-            filtered_df = filtered_df[filtered_df['Status'].isin(st.session_state.filter_statuses)]
-        # Apply category filter
-        if hasattr(st.session_state, 'filter_categories') and st.session_state.filter_categories:
-            category_col = 'Category' if 'Category' in filtered_df.columns else 'PART CATEGORY'
-            if category_col in filtered_df.columns:
-                filtered_df = filtered_df[filtered_df[category_col].isin(st.session_state.filter_categories)]
-        # Apply vendor filter
-        if hasattr(st.session_state, 'filter_vendors') and st.session_state.filter_vendors:
-            if 'VENDOR' in filtered_df.columns:
-                filtered_df = filtered_df[filtered_df['VENDOR'].isin(st.session_state.filter_vendors)]
-        return filtered_df
+        try:
+            # Apply value range filter
+            if (hasattr(st.session_state, 'filter_value_range') and 
+                'Stock_Value' in filtered_df.columns):
+                    min_val, max_val = st.session_state.filter_value_range
+                    filtered_df = filtered_df[
+                        (filtered_df['Stock_Value'] >= min_val) & 
+                        (filtered_df['Stock_Value'] <= max_val)
+                    ]
+            # Apply status filter
+            if (hasattr(st.session_state, 'filter_statuses') and 
+                st.session_state.filter_statuses and 
+                'Status' in filtered_df.columns):
+                    filtered_df = filtered_df[filtered_df['Status'].isin(st.session_state.filter_statuses)]
+            # Apply category filter
+            if (hasattr(st.session_state, 'filter_categories') and 
+                st.session_state.filter_categories):
+                    category_col = None
+                    if 'Category' in filtered_df.columns:
+                        category_col = 'Category'
+                    elif 'PART CATEGORY' in filtered_df.columns:
+                        category_col = 'PART CATEGORY'
+                    if category_col:
+                        filtered_df = filtered_df[filtered_df[category_col].isin(st.session_state.filter_categories)]
+            # Apply vendor filter
+            if (hasattr(st.session_state, 'filter_vendors') and 
+                st.session_state.filter_vendors):
+                    vendor_col = None
+                    if 'Vendor' in filtered_df.columns:
+                        vendor_col = 'Vendor'
+                    elif 'Vendor Name' in filtered_df.columns:
+                        vendor_col = 'Vendor Name'
+                    elif 'VENDOR' in filtered_df.columns:
+                        vendor_col = 'VENDOR'
+                    if vendor_col:
+                        filtered_df = filtered_df[filtered_df[vendor_col].isin(st.session_state.filter_vendors)]
+            # Show filtering results
+            original_count = len(df)
+            filtered_count = len(filtered_df)
+            if original_count != filtered_count:
+                st.sidebar.success(f"✅ Filtered: {filtered_count:,} of {original_count:,} items")
+            return filtered_df
+        except Exception as e:
+            st.sidebar.error(f"❌ Filter error: {str(e)}")
+            st.sidebar.info("ℹ️ Returning unfiltered data")
+            return df
 
     def generate_analysis_summary(self, analysis_results):
         """Generate a comprehensive analysis summary"""
@@ -1906,36 +1978,58 @@ class InventoryManagementSystem:
         st.markdown("---")
         self.display_help_and_documentation()
     def display_enhanced_analysis_charts(self, analysis_results):
-        """Display enhanced visual summaries like top parts, shortages, and excess inventory"""
+        """Display enhanced visual summaries with better error handling"""
         st.subheader("📊 Enhanced Inventory Charts")
         df = pd.DataFrame(analysis_results)
-        # ✅ 1. Top 10 Parts by Value
-        if 'Current Inventory - VALUE' in df.columns and 'PART NO' in df.columns:
-            top_parts = df.sort_values(by='Current Inventory - VALUE', ascending=False).head(10)
-            fig1 = px.bar(
-                top_parts,
-                x='PART NO',
-                y='Current Inventory - VALUE',
-                title="Top 10 Parts by Inventory Value",
-                text='PART DESCRIPTION',
-                color='Current Inventory - VALUE',
-                color_continuous_scale='Blues'
-            )
-            st.plotly_chart(fig1, use_container_width=True)
+        if df.empty:
+            st.warning("⚠️ No data available for charts.")
+            return
+        # ✅ 1. Top 10 Parts by Value - Check for multiple possible value columns
+        value_col = None
+        if 'Current Inventory - VALUE' in df.columns:
+            value_col = 'Current Inventory - VALUE
+        elif 'Stock_Value' in df.columns:
+            value_col = 'Stock_Value'
+        elif 'Current Inventory-VALUE' in df.columns:
+            value_col = 'Current Inventory-VALUE'
+        if value_col and 'PART NO' in df.columns:
+            # Remove rows with zero or null values for better visualization
+            chart_data = df[df[value_col] > 0].sort_values(by=value_col, ascending=False).head(10)
+            if not chart_data.empty:
+                fig1 = px.bar(
+                    chart_data,
+                    x='PART NO',
+                    y=value_col,
+                    title="Top 10 Parts by Inventory Value",
+                    text='PART DESCRIPTION' if 'PART DESCRIPTION' in chart_data.columns else None,
+                    color=value_col,
+                    color_continuous_scale='Blues'
+                )
+                fig1.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig1, use_container_width=True)
+            else:
+                st.info("ℹ️ No valid data found for top parts chart (all values are 0).")
+        else:
+            st.warning("⚠️ Required columns for parts value chart not found.")
         # ✅ 2. Inventory Status Breakdown (Pie)
         if 'Status' in df.columns:
             status_counts = df['Status'].value_counts().reset_index()
             status_counts.columns = ['Status', 'Count']
-            fig2 = px.pie(
-                status_counts,
-                names='Status',
-                values='Count',
-                title='Inventory Status Distribution',
-                hole=0.4,
-                color_discrete_sequence=px.colors.qualitative.Set2
-            )
-            st.plotly_chart(fig2, use_container_width=True)
-        # ✅ 3. Vendor vs Value (Fixed vendor_col definition
+            if not status_counts.empty:
+                fig2 = px.pie(
+                    status_counts,
+                    names='Status',
+                    values='Count',
+                    title='Inventory Status Distribution',
+                    hole=0.4,
+                    color_discrete_sequence=px.colors.qualitative.Set2
+                )
+                st.plotly_chart(fig2, use_container_width=True)
+            else:
+                st.info("ℹ️ No status data available for pie chart.")
+        else:
+            st.warning("⚠️ Status column not found for status distribution chart.")
+        # ✅ 3. Vendor vs Value (Fixed vendor_col definition)
         vendor_col = None
         if 'Vendor' in df.columns:
             vendor_col = 'Vendor'
@@ -1943,18 +2037,30 @@ class InventoryManagementSystem:
             vendor_col = 'Vendor Name'
         elif 'VENDOR' in df.columns:
             vendor_col = 'VENDOR'
-        if vendor_col and vendor_col in df.columns:
-            vendor_values = df.groupby(vendor_col)['Current Inventory - VALUE'].sum().sort_values(ascending=False).head(10)
-            fig3 = px.bar(
-                vendor_values,
-                x=vendor_values.index,
-                y=vendor_values.values,
-                title='Top 10 Vendors by Inventory Value',
-                labels={'x': vendor_col, 'y': 'Total Value (₹)'},
-                color=vendor_values.values,
-                color_continuous_scale='Viridis'
-            )
-            st.plotly_chart(fig3, use_container_width=True)
+        if vendor_col and value_col and vendor_col in df.columns:
+            # Group by vendor and sum values, removing zero values
+            vendor_data = df[df[value_col] > 0].groupby(vendor_col)[value_col].sum().sort_values(ascending=False).head(10)
+            if not vendor_data.empty:
+                fig3 = px.bar(
+                    x=vendor_data.index,
+                    y=vendor_data.values,
+                    title='Top 10 Vendors by Inventory Value',
+                    labels={'x': vendor_col, 'y': f'Total Value (₹)'},
+                    color=vendor_data.values,
+                    color_continuous_scale='Viridis'
+                )
+                fig3.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig3, use_container_width=True)
+            else:
+                st.info("ℹ️ No valid vendor data found for chart (all values are 0).")
+        else:
+            missing_cols = []
+            if not vendor_col:
+                missing_cols.append("vendor column")
+            if not value_col:
+                missing_cols.append("value column")
+            st.warning(f"⚠️ Vendor analysis chart cannot be displayed. Missing: {', '.join(missing_cols)}")
+            
 if __name__ == "__main__":
     app = InventoryManagementSystem()
     app.run()  # This runs the full dashboard
