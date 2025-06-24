@@ -1987,7 +1987,7 @@ class InventoryManagementSystem:
         # ✅ 1. Top 10 Parts by Value - Check for multiple possible value columns
         value_col = None
         if 'Current Inventory - VALUE' in df.columns:
-            value_col = 'Current Inventory - VALUE
+            value_col = 'Current Inventory - VALUE'
         elif 'Stock_Value' in df.columns:
             value_col = 'Stock_Value'
         elif 'Current Inventory-VALUE' in df.columns:
