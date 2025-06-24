@@ -1268,7 +1268,7 @@ class InventoryManagementSystem:
             status_data = df[df['Status'] == status] if 'Status' in df.columns else df[df['INVENTORY REMARK STATUS'] == status]
             summary_data[status] = {
                 'count': status_counts[status],
-                'value': status_data['Stock_Value'].sum() if 'Stock_Value' in status_data.columns else 0
+                'value': status_data['Current Inventory - VALUE'].sum() if 'Stock_Value' in status_data.columns else 0
             }
         with col1:
             st.markdown('<div class="metric-card status-normal">', unsafe_allow_html=True)
@@ -1538,6 +1538,7 @@ class InventoryManagementSystem:
                 st.metric("Issues", f"{issues:,}", delta="Needs attention" if issues > 0 else "All good")
             else:
                 st.metric("Issues", "N/A")
+                
     def display_top_parts_analysis(self, analysis_results):
         """Display top parts analysis by different criteria"""
         st.subheader("🏆 Top Parts Analysis")
@@ -1815,6 +1816,7 @@ class InventoryManagementSystem:
                 st.success("✅ Comprehensive report prepared for download!")
         except Exception as e:
             st.error(f"❌ Export failed: {str(e)}")
+            
     def export_critical_items(self, analysis_results):
         """Export only critical items"""
         try:
@@ -1900,6 +1902,7 @@ class InventoryManagementSystem:
             st.success(f"✅ Export completed in {format_type} format!")
         except Exception as e:
             st.error(f"❌ Export failed: {str(e)}")
+            
     def display_help_and_documentation(self):
         """Display help and documentation"""
         st.header("❓ Help & Documentation")
