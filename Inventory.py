@@ -1179,6 +1179,29 @@ class InventoryManagementSystem:
     
         # Advanced export options
         self.display_enhanced_export_options(analysis_results)
+    def display_enhanced_export_options(self, analysis_results):
+        """Allow users to export the analysis results"""
+        st.subheader("📤 Export Analysis Results")
+        df = pd.DataFrame(analysis_results)
+        # Export to CSV
+        csv_buffer = io.StringIO()
+        df.to_csv(csv_buffer, index=False)
+        st.download_button(
+            label="📄 Download CSV",
+            data=csv_buffer.getvalue(),
+            file_name="inventory_analysis.csv",
+            mime="text/csv"
+        )
+        # Export to Excel
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='Analysis')
+        st.download_button(
+            label="📊 Download Excel",
+            data=excel_buffer.getvalue(),
+            file_name="inventory_analysis.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
         
     def display_enhanced_summary_metrics(self, analysis_results):
         """Enhanced summary metrics dashboard"""
