@@ -1291,51 +1291,6 @@ class InventoryManagementSystem:
             textposition='auto',
         ))
         st.plotly_chart(fig, use_container_width=True)
-    def display_advanced_filtering_options(self, analysis_results):
-        """Advanced filtering options for better data exploration"""
-        st.sidebar.header("🔍 Advanced Filters")
-        df = pd.DataFrame(analysis_results)
-        # Value range filter
-        if 'Stock_Value' in df.columns:
-            min_value, max_value = st.sidebar.slider(
-                "Stock Value Range (₹)",
-                min_value=float(df['Stock_Value'].min()),
-                max_value=float(df['Stock_Value'].max()),
-                value=(float(df['Stock_Value'].min()), float(df['Stock_Value'].max())),
-                format="₹%.0f"
-            )
-            st.session_state.value_filter = (min_value, max_value)
-        # Quantity range filter
-        if 'Current Inventory-QTY' in df.columns:
-            min_qty, max_qty = st.sidebar.slider(
-                "Quantity Range",
-                min_value=int(df['Current Inventory-QTY'].min()),
-                max_value=int(df['Current Inventory-QTY'].max()),
-                value=(int(df['Current Inventory-QTY'].min()), int(df['Current Inventory-QTY'].max()))
-            )
-            st.session_state.qty_filter = (min_qty, max_qty)
-        # Multi-select filters (FIXED: properly define vendor_col)
-        vendor_col = None
-        if 'Vendor' in df.columns:
-            vendor_col = 'Vendor'
-        elif 'Vendor Name' in df.columns:
-            vendor_col = 'Vendor Name'
-        if vendor_col and vendor_col in df.columns:
-            selected_vendors = st.sidebar.multiselect(
-                "Select Vendors",
-                options=sorted(df[vendor_col].unique()),
-                default=sorted(df[vendor_col].unique())
-            )
-            st.session_state.vendor_filter = selected_vendors
-        # Critical parts filter
-        critical_threshold = st.sidebar.number_input(
-            "Critical Value Threshold (₹)",
-            min_value=0,
-            value=100000,
-            step=10000
-        )
-        st.session_state.critical_threshold = critical_threshold
-        return True
         
     def apply_advanced_filters(self, df):
         """Apply advanced filters to dataframe"""
@@ -1364,67 +1319,6 @@ class InventoryManagementSystem:
             if vendor_col and vendor_col in df.columns:
                 filtered_df = filtered_df[filtered_df[vendor_col].isin(st.session_state.vendor_filter)]
         return filtered_df
-        
-    def display_actionable_insights(self, analysis_results):
-        """Display actionable insights and recommendations"""
-        st.header("💡 Actionable Insights & Recommendations")
-        df = pd.DataFrame(analysis_results)
-        insights = []
-        # Critical shortages
-        critical_short = df[
-            (df['Status'] == 'Short Inventory') & 
-            (df['Stock_Value'] > st.session_state.get('critical_threshold', 100000))
-        ]
-        if not critical_short.empty:
-            insights.append({
-                'type': 'critical',
-                'icon': '🚨',
-                'title': 'Critical Shortages Detected',
-                'message': f"{len(critical_short)} high-value parts are critically short. Immediate procurement required.",
-                'action': 'Review procurement pipeline and expedite orders'
-            })
-        # Excess inventory opportunitie
-        excess_high = df[
-            (df['Status'] == 'Excess Inventory') & 
-            (df['Stock_Value'] > 50000)
-        ]
-        if not excess_high.empty:
-            insights.append({
-                'type': 'opportunity',
-                'icon': '💰',
-                'title': 'Cash Flow Optimization Opportunity',
-                'message': f"₹{excess_high['Stock_Value'].sum():,.0f} tied up in excess inventory.",
-                'action': 'Consider liquidation or redistribution strategies'
-            })
-        # Vendor performance issues (FIXED: properly handle vendor column)
-        vendor_col = None
-        if 'Vendor' in df.columns:
-            vendor_col = 'Vendor'
-        elif 'Vendor Name' in df.columns:
-            vendor_col = 'Vendor Name'
-        if vendor_col and vendor_col in df.columns:
-            vendor_performance = df.groupby(vendor_col).agg({
-                'Status': lambda x: (x == 'Within Norms').mean()
-            }).reset_index()
-            poor_vendors = vendor_performance[vendor_performance['Status'] < 0.5]
-            if not poor_vendors.empty:
-                insights.append({
-                    'type': 'warning',
-                    'icon': '⚠️',
-                    'title': 'Vendor Performance Issues',
-                    'message': f"{len(poor_vendors)} vendors have <50% parts within norms.",
-                    'action': 'Schedule vendor performance reviews'
-                })
-        # Display insights
-        for insight in insights:
-            if insight['type'] == 'critical':
-                st.error(f"{insight['icon']} **{insight['title']}**: {insight['message']}")
-            elif insight['type'] == 'warning':
-                st.warning(f"{insight['icon']} **{insight['title']}**: {insight['message']}")
-            else:
-                st.info(f"{insight['icon']} **{insight['title']}**: {insight['message']}")
-            st.markdown(f"**Recommended Action**: {insight['action']}")
-            st.markdown("---")
             
     def display_trend_analysis(self, analysis_results):
         """Display trend analysis and forecasting"""
