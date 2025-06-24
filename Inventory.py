@@ -1293,7 +1293,7 @@ class InventoryManagementSystem:
         st.plotly_chart(fig, use_container_width=True)
         
     def apply_advanced_filters(self, df):
-       """Apply advanced filters to dataframe"""
+        """Apply advanced filters to dataframe"""
         filtered_df = df.copy()
         # Apply value filted
         if hasattr(st.session_state, 'value_filter') and 'Stock_Value' in df.columns:
@@ -1398,7 +1398,7 @@ class InventoryManagementSystem:
                 st.info("📊 **Seasonal Analysis**: Historical data integration required for advanced forecasting")
 
     def display_executive_dashboard(self, analysis_results):
-         """Executive level dashboard with KPIs"""
+        """Executive level dashboard with KPIs"""
         st.header("👔 Executive Dashboard")
         df = pd.DataFrame(analysis_results)
         # Key metrics ro
@@ -1450,7 +1450,7 @@ class InventoryManagementSystem:
         )
         st.plotly_chart(fig, use_container_width=True)
     def display_export_options(self, analysis_results):
-         """Enhanced export options"""
+        """Enhanced export options"""
         st.header("📥 Export & Reporting Options")
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -1527,7 +1527,7 @@ class InventoryManagementSystem:
         except Exception as e:
             st.error(f"❌ Export failed: {str(e)}")
     def export_executive_summary(self, analysis_results):
-       """Export executive summary"""
+        """Export executive summary"""
         try:
             df = pd.DataFrame(analysis_results)
             # Create executive summary data
