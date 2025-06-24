@@ -1260,7 +1260,107 @@ class InventoryManagementSystem:
                 color_continuous_scale='RdYlGn'
             )
             st.plotly_chart(fig, use_container_width=True)
-    
+    def display_enhanced_detailed_tables(self, analysis_results):
+        """Display enhanced detailed tables with filtering and sorting"""
+        st.subheader("📋 Detailed Analysis Tables")
+        df = pd.DataFrame(analysis_results)
+        if df.empty:
+            st.warning("⚠️ No data available for detailed tables.")
+            return
+        # Create tabs for different views
+        tab1, tab2, tab3, tab4 = st.tabs(["🔍 All Items", "🔴 Short Inventory", "🔵 Excess Inventory", "🟢 Within Norms"])
+        with tab1:
+            st.subheader("All Inventory Items")
+            # Add search functionality
+            search_term = st.text_input("🔍 Search parts (Part No, Description, Vendor):", key="search_all")
+            display_df = df.copy()
+            if search_term:
+                search_mask = (
+                    df['PART NO'].astype(str).str.contains(search_term, case=False, na=False) |
+                    df.get('PART DESCRIPTION', pd.Series(dtype=str)).fillna('').str.contains(search_term, case=False, na=False) |
+                    df.get('VENDOR', pd.Series(dtype=str)).fillna('').str.contains(search_term, case=False, na=False)
+                )
+                display_df = df[search_mask]
+            # Select key columns for display
+            display_columns = self._get_key_display_columns(display_df)
+            if display_columns:
+                st.dataframe(
+                    display_df[display_columns].style.format(self._get_column_formatters()),
+                    use_container_width=True,
+                    height=400
+                )
+            else:
+                st.dataframe(display_df, use_container_width=True, height=400)
+            st.info(f"📊 Showing {len(display_df)} of {len(df)} total items")
+        with tab2:
+            st.subheader("🔴 Short Inventory Items")
+            short_items = df[df['Status'] == 'Short Inventory']
+            if not short_items.empty:
+                # Sort by impact/value
+                value_col = self._get_value_column(short_items)
+                if value_col:
+                    short_items = short_items.sort_values(value_col, ascending=False)
+                st.error(f"⚠️ {len(short_items)} items are short on inventory")
+                # Add urgency classification
+                if value_col:
+                    short_items['Urgency'] = pd.cut(
+                        short_items[value_col], 
+                        bins=[0, 10000, 50000, float('inf')], 
+                        labels=['Low', 'Medium', 'High'],
+                        include_lowest=True
+                    )
+                display_columns = self._get_key_display_columns(short_items)
+                if display_columns:
+                    st.dataframe(
+                        short_items[display_columns].style.format(self._get_column_formatters()),
+                        use_container_width=True,
+                        height=400
+                    )
+                else:
+                    st.dataframe(short_items, use_container_width=True, height=400)
+            else:
+                st.success("✅ No items are currently short on inventory!")
+        with tab3:
+            st.subheader("🔵 Excess Inventory Items")
+            excess_items = df[df['Status'] == 'Excess Inventory']
+            if not excess_items.empty:
+                # Sort by value
+                value_col = self._get_value_column(excess_items)
+                if value_col:
+                    excess_items = excess_items.sort_values(value_col, ascending=False)
+                st.warning(f"📦 {len(excess_items)} items have excess inventory")
+                # Calculate potential savings
+                if value_col:
+                    total_excess_value = excess_items[value_col].sum()
+                    st.metric("Total Excess Value", f"₹{total_excess_value:,.0f}")
+                display_columns = self._get_key_display_columns(excess_items)
+                if display_columns:
+                    st.dataframe(
+                        excess_items[display_columns].style.format(self._get_column_formatters()),
+                        use_container_width=True,
+                        height=400
+                    )
+                else:
+                    st.dataframe(excess_items, use_container_width=True, height=400)
+            else:
+                st.success("✅ No items have excess inventory!")
+        with tab4:
+            st.subheader("🟢 Items Within Norms")
+            normal_items = df[df['Status'] == 'Within Norms']
+            if not normal_items.empty:
+                st.success(f"✅ {len(normal_items)} items are within normal inventory levels")
+                display_columns = self._get_key_display_columns(normal_items)
+                if display_columns:
+                    st.dataframe(
+                        normal_items[display_columns].style.format(self._get_column_formatters()),
+                        use_container_width=True,
+                        height=400
+                    )
+                else:
+                    st.dataframe(normal_items, use_container_width=True, height=400)
+            else:
+                st.warning("⚠️ No items are currently within normal inventory levels!")
+
     def create_enhanced_top_parts_chart(self, processed_data, status_filter, color, key, top_n=10):
         """Enhanced top parts chart with better visualization"""
         filtered_data = [
