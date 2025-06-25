@@ -1307,7 +1307,7 @@ class InventoryManagementSystem:
         """Enhanced vendor summary with better analytics"""
         st.header("🏢 Vendor Performance Analysis")
         df = pd.DataFrame(analysis_results)
-        # Define vendor column only if one exists
+        # Define vendor column only if one exist
         vendor_col = None
         if 'Vendor' in df.columns:
             vendor_col = 'Vendor'
@@ -1331,6 +1331,7 @@ class InventoryManagementSystem:
                 'short_value': vendor_data[vendor_data['Status'] == 'Short Inventory'][value_col].sum() if value_col in vendor_data.columns else 0,
                 'excess_value': vendor_data[vendor_data['Status'] == 'Excess Inventory'][value_col].sum() if value_col in vendor_data.columns else 0,
             }
+            # Create vendor DataFrame OUTSIDE the loop
             vendor_df = pd.DataFrame([
                 {
                     'Vendor': vendor,
@@ -1370,7 +1371,7 @@ class InventoryManagementSystem:
                 color_continuous_scale='RdYlGn'
             )
             st.plotly_chart(fig, use_container_width=True)
-            
+
     def display_enhanced_detailed_tables(self, analysis_results):
         """Display enhanced detailed tables with filtering and sorting"""
         st.subheader("📋 Detailed Analysis Tables")
