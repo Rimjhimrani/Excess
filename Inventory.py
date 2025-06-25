@@ -1182,6 +1182,7 @@ class InventoryManagementSystem:
     
         # Advanced export options
         self.display_enhanced_export_options(analysis_results)
+        
     def display_enhanced_export_options(self, analysis_results):
         """Allow users to export the analysis results"""
         st.subheader("📤 Export Analysis Results")
@@ -1267,7 +1268,7 @@ class InventoryManagementSystem:
             margin-bottom: 0.2rem;
         }
         /* Responsive adjustments */
-        @media (max-width: 700px) {
+        @media (max-width: 660px) {
             .metric-card {
                 padding: 0.6rem;
                 min-height: 100px;
