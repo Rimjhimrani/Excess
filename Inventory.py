@@ -1228,7 +1228,6 @@ class InventoryManagementSystem:
         .status-excess { background: linear-gradient(135deg, #2196F3, #1976D2); }
         .status-short { background: linear-gradient(135deg, #F44336, #D32F2F); }
         .status-total { background: linear-gradient(135deg, #FF9800, #F57C00); }
-        
         .metric-card .metric-value { 
             color: white; 
             font-weight: bold; 
@@ -1259,7 +1258,6 @@ class InventoryManagementSystem:
             gap: 0.5rem;
             margin: 1rem 0;
         }
-        
         .kpi-item {
             text-align: left;
             padding: 0.5rem 0;
@@ -1270,128 +1268,116 @@ class InventoryManagementSystem:
         }
         /* Responsive adjustments */
         @media (max-width: 768px) {
-        .metric-card {
-            padding: 0.6rem;
-            min-height: 100px;
+            .metric-card {
+                padding: 0.6rem;
+                min-height: 100px;
+            }
+            .metric-card .metric-value {
+                font-size: 1rem;
+            }
+            .highlight-box {
+                padding: 0.8rem;
+            }
         }
-        .metric-card .metric-value {
-            font-size: 1rem;
-        }
-        .highlight-box {
-            padding: 0.8rem;
-        }
-    }
-    </style>
-    """, unsafe_allow_html=True)
+        </style>
+        """, unsafe_allow_html=True)
+        df = pd.DataFrame(analysis_results)
+        # Calculate enhanced metrics with error handling
+        total_parts = len(analysis_results)
+        # Handle different possible column names
+        value_col = None
+        for col in ['Current Inventory - VALUE', 'Stock_Value', 'VALUE']:
+            if col in df.columns:
+                value_col = col
+                break
+        total_stock_value = df[value_col].sum() if value_col else 0
+        # Handle status column variations
+        status_col = 'Status' if 'Status' in df.columns else 'INVENTORY REMARK STATUS'
     
-    df = pd.DataFrame(analysis_results)
-    
-    # Calculate enhanced metrics with error handling
-    total_parts = len(analysis_results)
-    
-    # Handle different possible column names
-    value_col = None
-    for col in ['Current Inventory - VALUE', 'Stock_Value', 'VALUE']:
-        if col in df.columns:
-            value_col = col
-            break
-    
-    total_stock_value = df[value_col].sum() if value_col else 0
-    
-    # Handle status column variations
-    status_col = 'Status' if 'Status' in df.columns else 'INVENTORY REMARK STATUS'
-    
-    short_value = df[df[status_col] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum() if 'VALUE(Unit Price* Short/Excess Inventory)' in df.columns else 0
-    excess_value = df[df[status_col] == 'Excess Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum() if 'VALUE(Unit Price* Short/Excess Inventory)' in df.columns else 0
+        short_value = df[df[status_col] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum() if 'VALUE(Unit Price* Short/Excess Inventory)' in df.columns else 0
+        excess_value = df[df[status_col] == 'Excess Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum() if 'VALUE(Unit Price* Short/Excess Inventory)' in df.columns else 0
 
-    # KPI Summary Box
-    st.markdown('<div class="highlight-box">', unsafe_allow_html=True)
-    st.markdown(f"""
-    <div class="kpi-grid">
-        <div class="kpi-item">
-            <div class="kpi-label">🎯 Total Parts Analyzed</div>
-            <div>{total_parts:,}</div>
-        </div>
-        <div class="kpi-item">
-            <div class="kpi-label">💰 Total Inventory Value</div>
-            <div>₹{total_stock_value:,.0f}</div>
-        </div>
-        <div class="kpi-item">
-            <div class="kpi-label">🔴 Short Inventory Impact</div>
-            <div>₹{abs(short_value):,.0f}</div>
-        </div>
-        <div class="kpi-item">
-            <div class="kpi-label">🔵 Excess Inventory Impact</div>
-            <div>₹{excess_value:,.0f}</div>
-        </div>
-        <div class="kpi-item">
-            <div class="kpi-label">📊 Net Financial Impact</div>
-            <div>₹{abs(short_value) + excess_value:,.0f}</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # Status distribution
-    status_counts = df[status_col].value_counts()
-    
-    # Calculate values for each status
-    summary_data = {}
-    for status in status_counts.index:
-        status_data = df[df[status_col] == status]
-        summary_data[status] = {
-            'count': status_counts[status],
-            'value': status_data[value_col].sum() if value_col and value_col in status_data.columns else 0
-        }
-
-    # Enhanced metric cards with responsive columns
-    st.markdown("### Status Distribution")
-    
-    # Use container to control width
-    with st.container():
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            normal_count = summary_data.get('Within Norms', {'count': 0})['count']
-            normal_value = summary_data.get('Within Norms', {'value': 0})['value']
-            st.markdown(f"""
-            <div class="metric-card status-normal">
-                <div class="metric-label">🟢 Within Norms</div>
-                <div class="metric-value">{normal_count} parts</div>
-                <div class="metric-delta">₹{normal_value:,.0f}</div>
+        # KPI Summary Box
+        st.markdown('<div class="highlight-box">', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="kpi-grid">
+            <div class="kpi-item">
+                <div class="kpi-label">🎯 Total Parts Analyzed</div>
+                <div>{total_parts:,}</div>
             </div>
-            """, unsafe_allow_html=True)
-
-        with col2:
-            excess_count = summary_data.get('Excess Inventory', {'count': 0})['count']
-            excess_val = summary_data.get('Excess Inventory', {'value': 0})['value']
-            st.markdown(f"""
-            <div class="metric-card status-excess">
-                <div class="metric-label">🔵 Excess Inventory</div>
-                <div class="metric-value">{excess_count} parts</div>
-                <div class="metric-delta">₹{excess_val:,.0f}</div>
+            <div class="kpi-item">
+                <div class="kpi-label">💰 Total Inventory Value</div>
+                <div>₹{total_stock_value:,.0f}</div>
             </div>
-            """, unsafe_allow_html=True)
-
-        with col3:
-            short_count = summary_data.get('Short Inventory', {'count': 0})['count']
-            short_val = summary_data.get('Short Inventory', {'value': 0})['value']
-            st.markdown(f"""
-            <div class="metric-card status-short">
-                <div class="metric-label">🔴 Short Inventory</div>
-                <div class="metric-value">{short_count} parts</div>
-                <div class="metric-delta">₹{short_val:,.0f}</div>
+            <div class="kpi-item">
+                <div class="kpi-label">🔴 Short Inventory Impact</div>
+                <div>₹{abs(short_value):,.0f}</div>
             </div>
-            """, unsafe_allow_html=True)
-
-        with col4:
-            st.markdown(f"""
-            <div class="metric-card status-total">
-                <div class="metric-label">📊 Total Value</div>
-                <div class="metric-value">{total_parts} parts</div>
-                <div class="metric-delta">₹{total_stock_value:,.0f}</div>
+            <div class="kpi-item">
+                <div class="kpi-label">🔵 Excess Inventory Impact</div>
+                <div>₹{excess_value:,.0f}</div>
             </div>
-            """, unsafe_allow_html=True)
+            <div class="kpi-item">
+                <div class="kpi-label">📊 Net Financial Impact</div>
+                <div>₹{abs(short_value) + excess_value:,.0f}</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        # Status distribution
+        status_counts = df[status_col].value_counts()
+    
+        # Calculate values for each status
+        summary_data = {}
+        for status in status_counts.index:
+            status_data = df[df[status_col] == status]
+            summary_data[status] = {
+                'count': status_counts[status],
+                'value': status_data[value_col].sum() if value_col and value_col in status_data.columns else 0
+            }
+        # Enhanced metric cards with responsive columns
+        st.markdown("### Status Distribution")
+        # Use container to control widt
+        with st.container():
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                normal_count = summary_data.get('Within Norms', {'count': 0})['count']
+                normal_value = summary_data.get('Within Norms', {'value': 0})['value']
+                st.markdown(f"""
+                <div class="metric-card status-normal">
+                    <div class="metric-label">🟢 Within Norms</div>
+                    <div class="metric-value">{normal_count} parts</div>
+                    <div class="metric-delta">₹{normal_value:,.0f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with col2:
+                excess_count = summary_data.get('Excess Inventory', {'count': 0})['count']
+                excess_val = summary_data.get('Excess Inventory', {'value': 0})['value']
+                st.markdown(f"""
+                <div class="metric-card status-excess">
+                    <div class="metric-label">🔵 Excess Inventory</div>
+                    <div class="metric-value">{excess_count} parts</div>
+                    <div class="metric-delta">₹{excess_val:,.0f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with col3:
+                short_count = summary_data.get('Short Inventory', {'count': 0})['count']
+                short_val = summary_data.get('Short Inventory', {'value': 0})['value']
+                st.markdown(f"""
+                <div class="metric-card status-short">
+                    <div class="metric-label">🔴 Short Inventory</div>
+                    <div class="metric-value">{short_count} parts</div>
+                    <div class="metric-delta">₹{short_val:,.0f}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            with col4:
+                st.markdown(f"""
+                <div class="metric-card status-total">
+                    <div class="metric-label">📊 Total Value</div>
+                    <div class="metric-value">{total_parts} parts</div>
+                    <div class="metric-delta">₹{total_stock_value:,.0f}</div>
+                </div>
+                """, unsafe_allow_html=True)
             
     def display_enhanced_vendor_summary(self, analysis_results):
         """Enhanced vendor summary with better analytics"""
