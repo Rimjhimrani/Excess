@@ -1698,7 +1698,7 @@ class InventoryManagementSystem:
                 # Calculate reorder predictions
                 reorder_candidates = df[
                     (df['Status'] == 'Within Norms') & 
-                    (df['Current Inventory-QTY'] <= df['MIN QTY REQUIRED'] * 1.2)
+                    (df['Current Inventory-QTY'] <= df['Current Inventory - VALUE'] * 1.2)
                 ]
                 if not reorder_candidates.empty:
                     st.warning(f"📋 **Reorder Alert**: {len(reorder_candidates)} parts may need reordering soon")
@@ -1963,7 +1963,7 @@ class InventoryManagementSystem:
                         with col2:
                             st.write(f"Value: ₹{part['Current Inventory - VALUE']:,.0f}")
                         with col3:
-                            shortage = part['MIN QTY REQUIRED'] - part['Current Inventory-QTY']
+                            shortage = part['Current Inventory - VALUE'] - part['Current Inventory-QTY']
                             st.write(f"Need: {shortage} units")
             # Excess inventory actions
             excess_items = df[
@@ -2001,7 +2001,7 @@ class InventoryManagementSystem:
             if not optimization_candidates.empty:
                 opt_display = optimization_candidates[['PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 
                                                        'MIN QTY REQUIRED', 'Current Inventory - VALUE']].copy()
-                opt_display['Excess Qty'] = opt_display['Current Inventory-QTY'] - opt_display['MIN QTY REQUIRED']
+                opt_display['Excess Qty'] = opt_display['Current Inventory-QTY'] - opt_display['Current Inventory - VALUE']
                 opt_display['Optimization Potential'] = opt_display['Excess Qty'] * (opt_display['Current Inventory - VALUE'] / opt_display['Current Inventory-QTY'])
                 st.dataframe(opt_display, use_container_width=True)
                 
