@@ -678,7 +678,7 @@ class InventoryManagementSystem:
             'part_no': ['part_no', 'part_number', 'material', 'material_code', 'item_code', 'code', 'part no', 'Part No'],
             'description': ['description', 'item_description', 'part_description', 'desc','Part Description'],
             'current_qty': ['current_qty', 'qty', 'quantity', 'stock_qty', 'available_qty', 'Current_QTY'],
-            'stock_value': ['stock_value', 'value', 'total_value', 'inventory_value', 'Stock Value', 'Stock_Value'],
+            'stock_value': ['stock_value', 'value', 'total_value', 'inventory_value', 'Stock Value', 'Stock_Value','Current Inventory - VALUE', 'Current Inventory-VALUE'],
             'uom': ['uom', 'unit', 'unit_of_measure'],
             'location': ['location', 'store', 'warehouse', 'site'],
             'vendor_code': ['vendor_code', 'vendor id', 'supplier_code', 'Vendor Code'],
