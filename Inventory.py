@@ -1396,7 +1396,7 @@ class InventoryManagementSystem:
             display_columns = self._get_key_display_columns(display_df)
             if display_columns:
                 st.dataframe(
-                    display_df[display_columns].style.format(self._get_column_formatters()),
+                    display_df[display_columns].style.format(self._get_column_formatters(dispaly_df)),
                     use_container_width=True,
                     height=400
                 )
@@ -1423,7 +1423,7 @@ class InventoryManagementSystem:
                 display_columns = self._get_key_display_columns(short_items)
                 if display_columns:
                     st.dataframe(
-                        short_items[display_columns].style.format(self._get_column_formatters()),
+                        short_items[display_columns].style.format(self._get_column_formatters(short_items)),
                         use_container_width=True,
                         height=400
                     )
@@ -1447,7 +1447,7 @@ class InventoryManagementSystem:
                 display_columns = self._get_key_display_columns(excess_items)
                 if display_columns:
                     st.dataframe(
-                        excess_items[display_columns].style.format(self._get_column_formatters()),
+                        excess_items[display_columns].style.format(self._get_column_formatters(excess_items)),
                         use_container_width=True,
                         height=400
                     )
@@ -1463,7 +1463,7 @@ class InventoryManagementSystem:
                 display_columns = self._get_key_display_columns(normal_items)
                 if display_columns:
                     st.dataframe(
-                        normal_items[display_columns].style.format(self._get_column_formatters()),
+                        normal_items[display_columns].style.format(self._get_column_formatters(normal_items)),
                         use_container_width=True,
                         height=400
                     )
@@ -1578,7 +1578,7 @@ class InventoryManagementSystem:
                 display_cols = ['PART NO', 'PART DESCRIPTION', value_col, 'Status']
                 available_cols = [col for col in display_cols if col in top_value.columns]
                 st.dataframe(
-                    top_value[available_cols].style.format(self._get_column_formatters()),
+                    top_value[available_cols].style.format(self._get_column_formatters(top_value)),
                     use_container_width=True
                 )
         with col2:
@@ -1589,7 +1589,7 @@ class InventoryManagementSystem:
                     display_cols = ['PART NO', 'PART DESCRIPTION', value_col, 'Status']
                     available_cols = [col for col in display_cols if col in critical_issues.columns]
                     st.dataframe(
-                        critical_issues[available_cols].style.format(self._get_column_formatters()),
+                        critical_issues[available_cols].style.format(self._get_column_formatters(critical_issues)),
                         use_container_width=True
                     )
                 else:
