@@ -1482,11 +1482,26 @@ class InventoryManagementSystem:
         """Helper method to select key columns for display"""
         # Define priority columns to show
         priority_columns = [
-            'PART NO', 'PART DESCRIPTION', 'Status',
-            'Current Inventory-QTY', 'MIN QTY REQUIRED', 'MAX QTY REQUIRED',  # ← Update these column names
-            'Stock_Value', 'Current Inventory - VALUE', 'Current Inventory-VALUE',
-            'VENDOR', 'Vendor', 'Vendor Name',
-            'VALUE(Unit Price* Short/Excess Inventory)'
+            # Part identification
+            ['PART NO', 'Part No', 'PartNo', 'Part_No'],
+            ['PART DESCRIPTION', 'Part Description', 'Description', 'DESCRIPTION'],
+            ['Status', 'STATUS', 'Inventory Status'],
+            
+            # Quantity columns
+            ['Current Inventory-QTY', 'Current Inventory QTY', 'Current_Inventory_QTY', 'QTY', 'Quantity'],
+            ['MIN QTY REQUIRED', 'Min Qty Required', 'MIN_QTY_REQUIRED', 'Min Qty', 'Minimum Qty'],
+            ['MAX QTY REQUIRED', 'Max Qty Required', 'MAX_QTY_REQUIRED', 'Max Qty', 'Maximum Qty'],
+            
+            # Value columns
+            ['Stock_Value', 'Current Inventory - VALUE', 'Current Inventory-VALUE', 'Value', 'Stock Value'],
+            ['VALUE(Unit Price* Short/Excess Inventory)', 'Variance Value', 'Impact Value'],
+            
+            # Vendor columns
+            ['VENDOR', 'Vendor', 'Vendor Name', 'VENDOR NAME'],
+            
+            # Additional useful columns
+            ['Unit Price', 'UNIT PRICE', 'Price', 'Rate'],
+            ['Category', 'CATEGORY', 'Part Category', 'PART CATEGORY']
         ]
         # Select columns that exist in the dataframe
         available_columns = []
@@ -1498,17 +1513,25 @@ class InventoryManagementSystem:
             if col not in available_columns and len(available_columns) < 10:
                 available_columns.append(col)
         return available_columns[:10]  # Limit to 10 columns for readability
+        
     def _get_column_formatters(self):
-        """Helper method to format columns appropriately"""
-        return {
-            'Stock_Value': '₹{:,.0f}',
-            'Current Inventory - VALUE': '₹{:,.0f}',
-            'Current Inventory-VALUE': '₹{:,.0f}',
-            'VALUE(Unit Price* Short/Excess Inventory)': '₹{:,.0f}',
-            'Current Inventory-QTY': '{:,.0f}',
-            'MIN QTY REQUIRED': '{:,.0f}',  # ← Update this column name
-            'MAX QTY REQUIRED': '{:,.0f}'   # ← Update this column name
-        }
+        """Helper method to format columns appropriately - Safe version"""
+        formatters = {}
+        # Define formatting rules for different column patterns
+        value_patterns = ['value', 'price', 'cost', 'amount']
+        qty_patterns = ['qty', 'quantity', 'count']
+        for col in df.columns:
+            col_lower = col.lower()
+            # Format currency columns
+            if any(pattern in col_lower for pattern in value_patterns):
+                if df[col].dtype in ['float64', 'int64'] and not df[col].isna().all():
+                    formatters[col] = '₹{:,.0f}'
+            # Format quantity columns
+            elif any(pattern in col_lower for pattern in qty_patterns):
+                if df[col].dtype in ['float64', 'int64'] and not df[col].isna().all():
+                    formatters[col] = '{:,.0f}'
+        return formatters
+    
     def display_overview_metrics(self, analysis_results):
         """Display key overview metrics"""
         st.header("📊 Inventory Overview")
