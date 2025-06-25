@@ -1209,9 +1209,9 @@ class InventoryManagementSystem:
         )
         
     def display_enhanced_summary_metrics(self, analysis_results):
-        """Enhanced summary metrics dashboard - Responsive Layout"""
+        """Enhanced summary metrics dashboard - Fixed Width Issues"""
         st.header("📊 Executive Summary Dashboard")
-        # Add custom CSS for better styling and responsiveness
+        # Add CSS
         st.markdown("""
         <style>
         .metric-card {
@@ -1221,48 +1221,28 @@ class InventoryManagementSystem:
             margin: 0.2rem 0;
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
             text-align: center;
-            min-height: 55px;
             display: flex;
-            transition: transform 0.2s ease;
-            width: 100%;
-            max-width: 100%;
             flex-direction: column;
             justify-content: center;
-            box-sizing: border-box;
         }
         .status-normal { background: linear-gradient(135deg, #4CAF50, #45a049); }
         .status-excess { background: linear-gradient(135deg, #2196F3, #1976D2); }
         .status-short { background: linear-gradient(135deg, #F44336, #D32F2F); }
         .status-total { background: linear-gradient(135deg, #FF9800, #F57C00); }
-        .metric-card .metric-value { 
-            color: white; 
-            font-weight: bold; 
+        .metric-value {
+            color: white;
+            font-weight: bold;
             font-size: 0.9rem;
             margin-bottom: 0.1rem;
-            line-height: 1;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            width: 100%;
         }
-        .metric-card .metric-label { 
-            color: #f0f0f0; 
-            font-size: 0.65rem;
+        .metric-label {
+            color: #f0f0f0;
+            font-size: 0.7rem;
             margin-bottom: 0.2rem;
-            font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            width: 100%;
         }
-        .metric-card .metric-delta { 
-            color: #e0e0e0; 
+        .metric-delta {
+            color: #e0e0e0;
             font-size: 0.6rem;
-            font-weight: 500;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            width: 100%;
         }
         .highlight-box {
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
@@ -1270,191 +1250,37 @@ class InventoryManagementSystem:
             border-radius: 8px;
             color: white;
             margin: 0.6rem 0;
-            width: 100%;
-            max-width: 100%;
-            box-sizing: border-box;
-            overflow: hidden;
-        }
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 0.4rem;
-            margin: 0.6rem 0;
-            width: 100%;
-            max-width: 100%;
-            box-sizing: border-box;
-        }
-        .kpi-item {
-            text-align: center;
-            padding: 0.4rem;
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 6px;
-            backdrop-filter: blur(10px);
-            min-width: 0;
-            width: 100%;
-            max-width: 100%;
-            box-sizing: border-box;
-            overflow: hidden;
-        }
-        .kpi-label {
-            font-weight: 600;
-            margin-bottom: 0.2rem;
-            font-size: 0.7rem;
-            opacity: 0.9;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            width: 100%;
-        }
-        .kpi-value {
-           font-size: 0.9rem;
-           font-weight: bold;
-           color: #ffffff;
-           white-space: nowrap;
-           overflow: hidden;
-           text-overflow: ellipsis;
-           width: 100%;
-        }
-        /* Status cards container */
-        .status-container {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0.4rem;
-            margin: 0.6rem 0;
-            width: 100%;
-            max-width: 100%;
-            box-sizing: border-box;
-        }
-        /* Mobile responsiveness */
-        @media (max-width: 768px) {
-            .highlight-box {
-                padding: 0.5rem;
-                margin: 0.5rem 0;
-            }
-            .kpi-grid {
-                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-                gap: 0.3rem;
-            }
-            .kpi-item {
-                padding: 0.3rem;
-            }
-            .kpi-label {
-                font-size: 0.6rem;
-            }
-            .kpi-value {
-                font-size: 0.8rem;
-            }
-            .metric-card {
-                padding: 0.3rem;
-                min-height: 50px;
-            }
-            .metric-card .metric-value {
-                font-size: 0.8rem;
-            }
-            .metric-card .metric-label {
-                font-size: 0.6rem;
-            }
-            .status-container {
-                grid-template-columns: repeat(4, 1fr);
-                gap: 0.3rem;
-            }
-        }
-        @media (max-width: 480px) {
-            .kpi-grid {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 0.2rem;
-            }
-            .status-container {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 0.2rem;
-            }
-            .highlight-box {
-                padding: 0.4rem;
-            }
-            .metric-card {
-                padding: 0.2rem;
-                min-height: 45px;
-            }
-            .metric-card .metric-value {
-                font-size: 0.75rem;
-            }
-            .metric-card .metric-label {
-                font-size: 0.55rem,
-            }
-        }
-        /* Container wrapper */
-        .dashboard-container {
-           .dashboard-container {
-            width: 100%;
-            max-width: 100%;
-            margin: 0 auto;
-            padding: 0;
-            box-sizing: border-box;
-            overflow-x: hidden;
-        }
-        * Streamlit column fixes */
-        .stColumn {
-            width: 100% !important;
-            max-width: 100% !important;
-            box-sizing: border-box !important;
-        }
-        /* Additional container fixes */
-        .element-container {
-            width: 100% !important;
-            max-width: 100% !important;
         }
         </style>
         """, unsafe_allow_html=True)
-
-        st.markdown('<div class="dashboard-container">', unsafe_allow_html=True)
-
+        # DataFrame prep
         df = pd.DataFrame(analysis_results)
-        # Calculate enhanced metrics with error handling
-        total_parts = len(analysis_results)
-        # Handle different possible column names
         value_col = None
         for col in ['Current Inventory - VALUE', 'Stock_Value', 'VALUE']:
             if col in df.columns:
                 value_col = col
                 break
+        total_parts = len(df)
         total_stock_value = df[value_col].sum() if value_col else 0
-        # Handle status column variations
         status_col = 'Status' if 'Status' in df.columns else 'INVENTORY REMARK STATUS'
-    
         short_value = df[df[status_col] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum() if 'VALUE(Unit Price* Short/Excess Inventory)' in df.columns else 0
         excess_value = df[df[status_col] == 'Excess Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum() if 'VALUE(Unit Price* Short/Excess Inventory)' in df.columns else 0
 
-        # KPI Summary Box
+        # KPI Summary
         st.markdown('<div class="highlight-box">', unsafe_allow_html=True)
         st.markdown(f"""
-        <div class="kpi-grid">
-            <div class="kpi-item">
-                <div class="kpi-label">🎯 Total Parts Analyzed</div>
-                <div>{total_parts:,}</div>
-            </div>
-            <div class="kpi-item">
-                <div class="kpi-label">💰 Total Inventory Value</div>
-                <div>₹{total_stock_value:,.0f}</div>
-            </div>
-            <div class="kpi-item">
-                <div class="kpi-label">🔴 Short Inventory Impact</div>
-                <div>₹{abs(short_value):,.0f}</div>
-            </div>
-            <div class="kpi-item">
-                <div class="kpi-label">🔵 Excess Inventory Impact</div>
-                <div>₹{excess_value:,.0f}</div>
-            </div>
-            <div class="kpi-item">
-                <div class="kpi-label">📊 Net Financial Impact</div>
-                <div>₹{abs(short_value) + excess_value:,.0f}</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        ### 🎯 Key Inventory KPIs
+
+        - **Total Parts Analyzed**: {total_parts:,}
+        - **Total Inventory Value**: ₹{total_stock_value:,.0f}
+        - **Short Inventory Impact**: ₹{abs(short_value):,.0f}
+        - **Excess Inventory Impact**: ₹{excess_value:,.0f}
+        - **Net Financial Impact**: ₹{abs(short_value) + excess_value:,.0f}
+        """)
         st.markdown('</div>', unsafe_allow_html=True)
-        # Status distribution
+
+        # Status breakdown
         status_counts = df[status_col].value_counts()
-    
-        # Calculate values for each status
         summary_data = {}
         for status in status_counts.index:
             status_data = df[df[status_col] == status]
@@ -1462,49 +1288,44 @@ class InventoryManagementSystem:
                 'count': status_counts[status],
                 'value': status_data[value_col].sum() if value_col and value_col in status_data.columns else 0
             }
-        # Enhanced metric cards with responsive columns
         st.markdown("### Status Distribution")
-        # Use container to control widt
-        with st.container():
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                normal_count = summary_data.get('Within Norms', {'count': 0})['count']
-                normal_value = summary_data.get('Within Norms', {'value': 0})['value']
-                st.markdown(f"""
-                <div class="metric-card status-normal">
-                    <div class="metric-label">🟢 Within Norms</div>
-                    <div class="metric-value">{normal_count} parts</div>
-                    <div class="metric-delta">₹{normal_value:,.0f}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            with col2:
-                excess_count = summary_data.get('Excess Inventory', {'count': 0})['count']
-                excess_val = summary_data.get('Excess Inventory', {'value': 0})['value']
-                st.markdown(f"""
-                <div class="metric-card status-excess">
-                    <div class="metric-label">🔵 Excess Inventory</div>
-                    <div class="metric-value">{excess_count} parts</div>
-                    <div class="metric-delta">₹{excess_val:,.0f}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            with col3:
-                short_count = summary_data.get('Short Inventory', {'count': 0})['count']
-                short_val = summary_data.get('Short Inventory', {'value': 0})['value']
-                st.markdown(f"""
-                <div class="metric-card status-short">
-                    <div class="metric-label">🔴 Short Inventory</div>
-                    <div class="metric-value">{short_count} parts</div>
-                    <div class="metric-delta">₹{short_val:,.0f}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            with col4:
-                st.markdown(f"""
-                <div class="metric-card status-total">
-                    <div class="metric-label">📊 Total Value</div>
-                    <div class="metric-value">{total_parts} parts</div>
-                    <div class="metric-delta">₹{total_stock_value:,.0f}</div>
-                </div>
-                """, unsafe_allow_html=True)
+        cols = st.columns(4)  # Responsive width fix
+
+        with cols[0]:
+            normal = summary_data.get('Within Norms', {'count': 0, 'value': 0})
+            st.markdown(f"""
+            <div class="metric-card status-normal">
+                <div class="metric-label">🟢 Within Norms</div>
+                <div class="metric-value">{normal['count']} parts</div>
+                <div class="metric-delta">₹{normal['value']:,.0f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with cols[1]:
+            excess = summary_data.get('Excess Inventory', {'count': 0, 'value': 0})
+            st.markdown(f"""
+            <div class="metric-card status-excess">
+                <div class="metric-label">🔵 Excess Inventory</div>
+                <div class="metric-value">{excess['count']} parts</div>
+                <div class="metric-delta">₹{excess['value']:,.0f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with cols[2]:
+            short = summary_data.get('Short Inventory', {'count': 0, 'value': 0})
+            st.markdown(f"""
+            <div class="metric-card status-short">
+                <div class="metric-label">🔴 Short Inventory</div>
+                <div class="metric-value">{short['count']} parts</div>
+                <div class="metric-delta">₹{short['value']:,.0f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        with cols[3]:
+            st.markdown(f"""
+            <div class="metric-card status-total">
+                <div class="metric-label">📊 Total Inventory</div>
+                <div class="metric-value">{total_parts} parts</div>
+                <div class="metric-delta">₹{total_stock_value:,.0f}</div>
+            </div>
+            """, unsafe_allow_html=True)
             
     def display_enhanced_vendor_summary(self, analysis_results):
         """Enhanced vendor summary with better analytics"""
