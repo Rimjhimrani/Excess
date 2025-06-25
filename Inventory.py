@@ -1483,36 +1483,32 @@ class InventoryManagementSystem:
         # Define priority columns to show
         priority_columns = [
             # Part identification
-            ['PART NO', 'Part No', 'PartNo', 'Part_No'],
-            ['PART DESCRIPTION', 'Part Description', 'Description', 'DESCRIPTION'],
-            ['Status', 'STATUS', 'Inventory Status'],
-            
+            'PART NO', 'Part No', 'PartNo', 'Part_No',
+            'PART DESCRIPTION', 'Part Description', 'Description', 'DESCRIPTION',
+            'Status', 'STATUS', 'Inventory Status',
             # Quantity columns
-            ['Current Inventory-QTY', 'Current Inventory QTY', 'Current_Inventory_QTY', 'QTY', 'Quantity'],
-            ['MIN QTY REQUIRED', 'Min Qty Required', 'MIN_QTY_REQUIRED', 'Min Qty', 'Minimum Qty'],
-            ['MAX QTY REQUIRED', 'Max Qty Required', 'MAX_QTY_REQUIRED', 'Max Qty', 'Maximum Qty'],
-            
+            'Current Inventory-QTY', 'Current Inventory QTY', 'Current_Inventory_QTY', 'QTY', 'Quantity',
+            'MIN QTY REQUIRED', 'Min Qty Required', 'MIN_QTY_REQUIRED', 'Min Qty', 'Minimum Qty',
+            'MAX QTY REQUIRED', 'Max Qty Required', 'MAX_QTY_REQUIRED', 'Max Qty', 'Maximum Qty',
             # Value columns
-            ['Stock_Value', 'Current Inventory - VALUE', 'Current Inventory-VALUE', 'Value', 'Stock Value'],
-            ['VALUE(Unit Price* Short/Excess Inventory)', 'Variance Value', 'Impact Value'],
-            
+            'Stock_Value', 'Current Inventory - VALUE', 'Current Inventory-VALUE', 'Value', 'Stock Value',
+            'VALUE(Unit Price* Short/Excess Inventory)', 'Variance Value', 'Impact Value',
             # Vendor columns
-            ['VENDOR', 'Vendor', 'Vendor Name', 'VENDOR NAME'],
-            
+            'VENDOR', 'Vendor', 'Vendor Name', 'VENDOR NAME',
             # Additional useful columns
-            ['Unit Price', 'UNIT PRICE', 'Price', 'Rate'],
-            ['Category', 'CATEGORY', 'Part Category', 'PART CATEGORY']
+            'Unit Price', 'UNIT PRICE', 'Price', 'Rate',
+            'Category', 'CATEGORY', 'Part Category', 'PART CATEGORY'
         ]
         # Select columns that exist in the dataframe
         available_columns = []
         for col in priority_columns:
-            if col in df.columns:
+            if col in df.columns and col not in available_columns:
                 available_columns.append(col)
         # Add any remaining important columns not in priority list
         for col in df.columns:
             if col not in available_columns and len(available_columns) < 10:
                 available_columns.append(col)
-        return available_columns[:10]  # Limit to 10 columns for readability
+        return available_columns[:10]  # Limit to 10 c
         
     def _get_column_formatters(self):
         """Helper method to format columns appropriately - Safe version"""
