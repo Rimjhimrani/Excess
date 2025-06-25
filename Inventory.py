@@ -1731,7 +1731,7 @@ class InventoryManagementSystem:
                     st.warning(f"📋 **Reorder Alert**: {len(reorder_candidates)} parts may need reordering soon")
                     # Display reorder table
                     reorder_display = reorder_candidates[['PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 
-                                                'MIN QTY REQUIRED', 'Current Inventory - VALUE']].copy()
+                                                          , 'Current Inventory - VALUE']].copy()
                     reorder_display['Days to Reorder'] = np.random.randint(5, 30, len(reorder_display))  # Simulated
                     st.dataframe(reorder_display, use_container_width=True)
                 # Seasonal analysis placeholder
@@ -2027,7 +2027,7 @@ class InventoryManagementSystem:
             optimization_candidates = df[df['Status'] == 'Excess Inventory'].nlargest(10, 'Current Inventory - VALUE')
             if not optimization_candidates.empty:
                 opt_display = optimization_candidates[['PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 
-                                                       'MIN QTY REQUIRED', 'Current Inventory - VALUE']].copy()
+                                                       , 'Current Inventory - VALUE']].copy()
                 opt_display['Excess Qty'] = opt_display['Current Inventory-QTY'] - opt_display['Current Inventory - VALUE']
                 opt_display['Optimization Potential'] = opt_display['Excess Qty'] * (opt_display['Current Inventory - VALUE'] / opt_display['Current Inventory-QTY'])
                 st.dataframe(opt_display, use_container_width=True)
