@@ -1482,8 +1482,8 @@ class InventoryManagementSystem:
         """Helper method to select key columns for display"""
         # Define priority columns to show
         priority_columns = [
-            'PART NO', 'PART DESCRIPTION', 'Status', 
-            'Current Inventory-QTY', 'MIN QTY REQUIRED', 'MAX QTY REQUIRED',
+            'PART NO', 'PART DESCRIPTION', 'Status',
+            'Current Inventory-QTY', 'MIN QTY REQUIRED', 'MAX QTY REQUIRED',  # ← Update these column names
             'Stock_Value', 'Current Inventory - VALUE', 'Current Inventory-VALUE',
             'VENDOR', 'Vendor', 'Vendor Name',
             'VALUE(Unit Price* Short/Excess Inventory)'
@@ -1506,8 +1506,8 @@ class InventoryManagementSystem:
             'Current Inventory-VALUE': '₹{:,.0f}',
             'VALUE(Unit Price* Short/Excess Inventory)': '₹{:,.0f}',
             'Current Inventory-QTY': '{:,.0f}',
-            'MIN QTY REQUIRED': '{:,.0f}',
-            'MAX QTY REQUIRED': '{:,.0f}'
+            'MIN QTY REQUIRED': '{:,.0f}',  # ← Update this column name
+            'MAX QTY REQUIRED': '{:,.0f}'   # ← Update this column name
         }
     def display_overview_metrics(self, analysis_results):
         """Display key overview metrics"""
