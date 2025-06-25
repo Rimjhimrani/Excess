@@ -1482,6 +1482,7 @@ class InventoryManagementSystem:
         # Return the display dataframe for further use if needed
         display_columns = self._get_key_display_columns(df)
         return df[display_columns] if display_columns else df
+        
     def _get_value_column(self, df):
         """Helper method to identify the main value column"""
         value_columns = ['Stock_Value', 'Current Inventory - VALUE', 'Current Inventory-VALUE']
@@ -1489,6 +1490,7 @@ class InventoryManagementSystem:
             if col in df.columns:
                 return col
         return None
+        
     def _get_key_display_columns(self, df):
         """Helper method to select key columns for display"""
         # Define priority columns to show
@@ -1872,6 +1874,7 @@ class InventoryManagementSystem:
             st.success(f"✅ Critical items report prepared! ({len(critical_items)} items)")
         except Exception as e:
             st.error(f"❌ Export failed: {str(e)}")
+            
     def export_executive_summary(self, analysis_results):
         """Export executive summary"""
         try:
@@ -2127,7 +2130,7 @@ class InventoryManagementSystem:
         # Status filter
         if 'Status' in df.columns:
             status_options = df['Status'].unique().tolist()
-            selected_statuses = st.sidebar.multiselect(
+            selected_statuses = st.selectbox(
                 "Filter by Status",
                 options=status_options,
                 default=status_options
@@ -2164,7 +2167,7 @@ class InventoryManagementSystem:
         if vendor_col and vendor_col in df.columns:
             vendors = df[vendor_col].dropna().unique().tolist()
             if vendors:
-                selected_vendors = st.sidebar.multiselect(
+                selected_vendors = st.selectbox(
                     f"Filter by {vendor_col}",
                     options=vendors,
                     default=vendors
