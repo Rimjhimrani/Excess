@@ -765,6 +765,7 @@ class InventoryManagementSystem:
             'extra_parts_list': list(extra_parts),
             'zero_qty_parts_list': zero_qty_parts
         }
+        
     def admin_data_management(self):
         """Admin-only PFEP data management interface"""
         st.header("🔧 Admin Dashboard - PFEP Data Management")
@@ -1214,7 +1215,7 @@ class InventoryManagementSystem:
         st.markdown("""
         <style>
         .metric-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 80%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 60%);
             padding: 0.8rem;
             border-radius: 10px;
             margin: 0.3rem 0;
