@@ -1376,14 +1376,6 @@ class InventoryManagementSystem:
         """Display enhanced detailed tables with proper formatting"""
         st.header("📊 Detailed Analysis Tables")
         df = pd.DataFrame(analysis_results)
-        display_columns = self._get_key_display_columns(df)
-        display_df = df[display_columns].copy()
-        # OPTION 1: Simple call without parameters
-        styled_df = display_df.style.format(self._get_column_formatters())
-        # OR OPTION 2: Call with dataframe parameter (only if you modified the method)
-        # styled_df = display_df.style.format(self._get_column_formatters(display_df))
-        st.dataframe(styled_df, use_container_width=True, hide_index=True)
-        return display_df
         # Create tabs for different views
         tab1, tab2, tab3, tab4 = st.tabs(["🔍 All Items", "🔴 Short Inventory", "🔵 Excess Inventory", "🟢 Within Norms"])
         with tab1:
@@ -1401,10 +1393,12 @@ class InventoryManagementSystem:
             # Select key columns for display
             display_columns = self._get_key_display_columns(display_df)
             if display_columns:
+                styled_df = display_df[display_columns].style.format(self._get_column_formatters())
                 st.dataframe(
-                    display_df[display_columns].style.format(self._get_column_formatters(display_df)),
+                    styled_df,
                     use_container_width=True,
-                    height=400
+                    height=400,
+                    hide_index=True
                 )
             else:
                 st.dataframe(display_df, use_container_width=True, height=400)
@@ -1428,10 +1422,12 @@ class InventoryManagementSystem:
                     )
                 display_columns = self._get_key_display_columns(short_items)
                 if display_columns:
+                    styled_df = short_items[display_columns].style.format(self._get_column_formatters())
                     st.dataframe(
-                        short_items[display_columns].style.format(self._get_column_formatters(short_items)),
+                        styled_df,
                         use_container_width=True,
-                        height=400
+                        height=400,
+                        hide_index=True
                     )
                 else:
                     st.dataframe(short_items, use_container_width=True, height=400)
@@ -1452,10 +1448,12 @@ class InventoryManagementSystem:
                     st.metric("Total Excess Value", f"₹{total_excess_value:,.0f}")
                 display_columns = self._get_key_display_columns(excess_items)
                 if display_columns:
+                    styled_df = excess_items[display_columns].style.format(self._get_column_formatters())
                     st.dataframe(
-                        excess_items[display_columns].style.format(self._get_column_formatters(excess_items)),
+                        styled_df,
                         use_container_width=True,
-                        height=400
+                        height=400,
+                        hide_index=True
                     )
                 else:
                     st.dataframe(excess_items, use_container_width=True, height=400)
@@ -1468,15 +1466,20 @@ class InventoryManagementSystem:
                 st.success(f"✅ {len(normal_items)} items are within normal inventory levels")
                 display_columns = self._get_key_display_columns(normal_items)
                 if display_columns:
+                    styled_df = normal_items[display_columns].style.format(self._get_column_formatters())
                     st.dataframe(
-                        normal_items[display_columns].style.format(self._get_column_formatters(normal_items)),
+                        styled_df,
                         use_container_width=True,
-                        height=400
+                        height=400,
+                        hide_index=True
                     )
                 else:
                     st.dataframe(normal_items, use_container_width=True, height=400)
             else:
                 st.warning("⚠️ No items are currently within normal inventory levels!")
+        # Return the display dataframe for further use if needed
+        display_columns = self._get_key_display_columns(df)
+        return df[display_columns] if display_columns else df
     def _get_value_column(self, df):
         """Helper method to identify the main value column"""
         value_columns = ['Stock_Value', 'Current Inventory - VALUE', 'Current Inventory-VALUE']
