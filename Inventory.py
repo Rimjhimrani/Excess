@@ -1216,12 +1216,12 @@ class InventoryManagementSystem:
         <style>
         .metric-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 1rem;
-            border-radius: 12px;
-            margin: 0.5rem 0;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 0.6rem;
+            border-radius: 8px;
+            margin: 0.3rem 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
             text-align: center;
-            min-height: 100px;
+            min-height: 70px;
             display: flex;
             transition: transform 0.2s ease;
             width: 100%;
@@ -1235,9 +1235,9 @@ class InventoryManagementSystem:
         .metric-card .metric-value { 
             color: white; 
             font-weight: bold; 
-            font-size: 1.4rem;
-            margin-bottom: 0.3rem;
-            line-height: 1.2;
+            font-size: 1.1rem;
+            margin-bottom: 0.2rem;
+            line-height: 1.1;
         }
         .metric-card .metric-label { 
             color: #f0f0f0; 
@@ -1247,40 +1247,40 @@ class InventoryManagementSystem:
         }
         .metric-card .metric-delta { 
             color: #e0e0e0; 
-            font-size: 0.85rem;
+            font-size: 0.75rem;
             font-weight: 500;
         }
         .highlight-box {
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            padding: 1.5rem;
-            border-radius: 12px;
+            padding: 1rem;
+            border-radius: 10px;
             color: white;
-            margin: 1.5rem 0;
+            margin: 1rem 0;
             max-width: 100%;
             box-sizing: border-box;
         }
         .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 1rem;
-            margin: 1rem 0;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 0.6rem;
+            margin: 0.8rem 0;
             width: 100%;
         }
         .kpi-item {
             text-align: center;
-            padding: 0.8rem;
+            padding: 0.5rem;
             background: rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
+            border-radius: 6px;
             backdrop-filter: blur(10px);
         }
         .kpi-label {
             font-weight: 600;
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
+            margin-bottom: 0.3rem;
+            font-size: 0.75rem;
             opacity: 0.9;
         }
         .kpi-value {
-            font-size: 1.2rem;
+            font-size: 1rem;
             font-weight: bold;
             color: #ffffff;
         }
@@ -1288,62 +1288,65 @@ class InventoryManagementSystem:
         .status-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin: 1rem 0;
+            gap: 0.6rem;
+            margin: 0.8rem 0;
             width: 100%;
         }
         /* Mobile responsiveness */
         @media (max-width: 768px) {
             .highlight-box {
-                padding: 1rem;
-                margin: 1rem 0;
+                padding: 0.8rem;
+                margin: 0.8rem 0;
             }
             .kpi-grid {
                 grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-                gap: 0.8rem;
+                gap: 0.5rem;
             }
             .kpi-item {
-                padding: 0.6rem;
+                padding: 0.4rem;
             }
             .kpi-label {
-                font-size: 0.8rem;
+                font-size: 0.7rem;
             }
             .kpi-value {
-                font-size: 1rem;
+                font-size: 0.9rem;
             }
             .metric-card {
-                padding: 0.8rem;
-                min-height: 90px;
+                padding: 0.5rem;
+                min-height: 60px;
             }
             .metric-card .metric-value {
-                font-size: 1.1rem;
+                font-size: 1rem;
             }
             .metric-card .metric-label {
-                font-size: 0.8rem;
+                font-size: 0.7rem;
             }
             .status-container {
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-                gap: 0.8rem;
+                grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+                gap: 0.5rem;
             }
         }
         @media (max-width: 480px) {
             .kpi-grid {
                 grid-template-columns: repeat(2, 1fr);
-                gap: 0.5rem;
+                gap: 0.4rem;
             }
             .status-container {
                 grid-template-columns: repeat(2, 1fr);
-                gap: 0.5rem;
+                gap: 0.4rem;
             }
             .highlight-box {
-                padding: 0.8rem;
+                padding: 0.6rem;
             }
             .metric-card {
-                padding: 0.6rem;
-                min-height: 80px;
+                padding: 0.4rem;
+                min-height: 55px;
             }
             .metric-card .metric-value {
-                font-size: 1rem;
+                font-size: 0.95rem;
+            }
+            .metric-card .metric-label {
+                font-size: 0.65rem,
             }
         }
         /* Container wrapper */
