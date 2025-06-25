@@ -2130,7 +2130,7 @@ class InventoryManagementSystem:
         # Status filter
         if 'Status' in df.columns:
             status_options = df['Status'].unique().tolist()
-            selected_statuses = st.selectbox(
+            selected_statuses = st.sidebar.multiselect(
                 "Filter by Status",
                 options=status_options,
                 default=status_options
@@ -2167,7 +2167,7 @@ class InventoryManagementSystem:
         if vendor_col and vendor_col in df.columns:
             vendors = df[vendor_col].dropna().unique().tolist()
             if vendors:
-                selected_vendors = st.selectbox(
+                selected_vendors = st.sidebar.multiselect(
                     f"Filter by {vendor_col}",
                     options=vendors,
                     default=vendors
