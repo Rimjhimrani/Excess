@@ -1216,12 +1216,12 @@ class InventoryManagementSystem:
         <style>
         .metric-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 0.6rem;
-            border-radius: 8px;
-            margin: 0.3rem 0;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            padding: 0.4rem;
+            border-radius: 6px;
+            margin: 0.2rem 0;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
             text-align: center;
-            min-height: 70px;
+            min-height: 55px;
             display: flex;
             transition: transform 0.2s ease;
             width: 100%;
@@ -1235,118 +1235,134 @@ class InventoryManagementSystem:
         .metric-card .metric-value { 
             color: white; 
             font-weight: bold; 
-            font-size: 1.1rem;
-            margin-bottom: 0.2rem;
-            line-height: 1.1;
+            font-size: 0.9rem;
+            margin-bottom: 0.1rem;
+            line-height: 1;
+            white-space: nowrap
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .metric-card .metric-label { 
             color: #f0f0f0; 
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
+            font-size: 0.65rem;
+            margin-bottom: 0.2rem;
             font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .metric-card .metric-delta { 
             color: #e0e0e0; 
-            font-size: 0.75rem;
+            font-size: 0.6rem;
             font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .highlight-box {
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            padding: 1rem;
-            border-radius: 10px;
+            padding: 0.6rem;
+            border-radius: 8px;
             color: white;
-            margin: 1rem 0;
+            margin: 0.6rem 0;
             max-width: 100%;
             box-sizing: border-box;
         }
         .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 0.6rem;
-            margin: 0.8rem 0;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0.4rem;
+            margin: 0.6rem 0;
             width: 100%;
         }
         .kpi-item {
             text-align: center;
-            padding: 0.5rem;
+            padding: 0.4rem;
             background: rgba(255, 255, 255, 0.1);
             border-radius: 6px;
             backdrop-filter: blur(10px);
+            min-width: 0;
         }
         .kpi-label {
             font-weight: 600;
-            margin-bottom: 0.3rem;
-            font-size: 0.75rem;
+            margin-bottom: 0.2rem;
+            font-size: 0.7rem;
             opacity: 0.9;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         .kpi-value {
-            font-size: 1rem;
+            font-size: 0.9rem;
             font-weight: bold;
             color: #ffffff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         /* Status cards container */
         .status-container {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 0.6rem;
-            margin: 0.8rem 0;
+            gap: 0.4rem;
+            margin: 0.6rem 0;
             width: 100%;
         }
         /* Mobile responsiveness */
         @media (max-width: 768px) {
             .highlight-box {
-                padding: 0.8rem;
-                margin: 0.8rem 0;
+                padding: 0.5rem;
+                margin: 0.5rem 0;
             }
             .kpi-grid {
                 grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-                gap: 0.5rem;
+                gap: 0.3rem;
             }
             .kpi-item {
-                padding: 0.4rem;
+                padding: 0.3rem;
             }
             .kpi-label {
-                font-size: 0.7rem;
+                font-size: 0.6rem;
             }
             .kpi-value {
-                font-size: 0.9rem;
+                font-size: 0.8rem;
             }
             .metric-card {
-                padding: 0.5rem;
-                min-height: 60px;
+                padding: 0.3rem;
+                min-height: 50px;
             }
             .metric-card .metric-value {
-                font-size: 1rem;
+                font-size: 0.8rem;
             }
             .metric-card .metric-label {
-                font-size: 0.7rem;
+                font-size: 0.6rem;
             }
             .status-container {
-                grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-                gap: 0.5rem;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 0.3rem;
             }
         }
         @media (max-width: 480px) {
             .kpi-grid {
                 grid-template-columns: repeat(2, 1fr);
-                gap: 0.4rem;
+                gap: 0.2rem;
             }
             .status-container {
                 grid-template-columns: repeat(2, 1fr);
-                gap: 0.4rem;
+                gap: 0.2rem;
             }
             .highlight-box {
-                padding: 0.6rem;
+                padding: 0.4rem;
             }
             .metric-card {
-                padding: 0.4rem;
-                min-height: 55px;
+                padding: 0.2rem;
+                min-height: 45px;
             }
             .metric-card .metric-value {
-                font-size: 0.95rem;
+                font-size: 0.75rem;
             }
             .metric-card .metric-label {
-                font-size: 0.65rem,
+                font-size: 0.55rem,
             }
         }
         /* Container wrapper */
