@@ -1397,7 +1397,7 @@ class InventoryManagementSystem:
             display_columns = self._get_key_display_columns(display_df)
             if display_columns:
                 st.dataframe(
-                    display_df[display_columns].style.format(self._get_column_formatters(dispaly_df)),
+                    display_df[display_columns].style.format(self._get_column_formatters(display_df)),
                     use_container_width=True,
                     height=400
                 )
