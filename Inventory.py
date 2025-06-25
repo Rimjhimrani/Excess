@@ -30,25 +30,6 @@ st.set_page_config(
 # Custom CSS for better styling
 st.markdown("""
 <style>
-/* Restrict max width of entire page content */
-.main > div {
-    max-width: 70% !important;
-    margin: auto;
-}
-
-/* Ensure dashboard container follows this */
-.dashboard-container {
-    width: 100%;
-    overflow-x: auto;
-    padding: 1rem 0;
-}
-
-/* Make sure dataframes and charts also stay inside bounds */
-.block-container {
-    padding-left: 1rem !important;
-    padding-right: 1rem !important;
-    overflow-x: auto;
-}
 .graph-description {
     background-color: #f0f2f6;
     padding: 10px;
