@@ -1216,13 +1216,15 @@ class InventoryManagementSystem:
         <style>
         .metric-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 0.8rem;
-            border-radius: 10px;
-            margin: 0.3rem 0;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 1rem;
+            border-radius: 12px;
+            margin: 0.5rem 0;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             text-align: center;
-            min-height: 120px;
+            min-height: 100px;
             display: flex;
+            transition: transform 0.2s ease;
+            width: 100%;
             flex-direction: column;
             justify-content: center;
         }
@@ -1233,56 +1235,127 @@ class InventoryManagementSystem:
         .metric-card .metric-value { 
             color: white; 
             font-weight: bold; 
-            font-size: 1.2rem;
-            margin-bottom: 0.2rem;
+            font-size: 1.4rem;
+            margin-bottom: 0.3rem;
+            line-height: 1.2;
         }
         .metric-card .metric-label { 
             color: #f0f0f0; 
             font-size: 0.9rem;
-            margin-bottom: 0.3rem;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
         }
         .metric-card .metric-delta { 
             color: #e0e0e0; 
-            font-size: 0.8rem;
+            font-size: 0.85rem;
+            font-weight: 500;
         }
         .highlight-box {
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            padding: 1rem;
-            border-radius: 8px;
+            padding: 1.5rem;
+            border-radius: 12px;
             color: white;
-            margin: 1rem 0;
+            margin: 1.5rem 0;
             max-width: 100%;
             box-sizing: border-box;
         }
         .kpi-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 0.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
             margin: 1rem 0;
+            width: 100%;
         }
         .kpi-item {
-            text-align: left;
-            padding: 0.5rem 0;
+            text-align: center;
+            padding: 0.8rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
         }
         .kpi-label {
-            font-weight: bold;
-            margin-bottom: 0.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            opacity: 0.9;
         }
-        /* Responsive adjustments */
-        @media (max-width: 660px) {
-            .metric-card {
+        .kpi-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #ffffff;
+        }
+        /* Status cards container */
+        .status-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+            width: 100%;
+        }
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .highlight-box {
+                padding: 1rem;
+                margin: 1rem 0;
+            }
+            .kpi-grid {
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                gap: 0.8rem;
+            }
+            .kpi-item {
                 padding: 0.6rem;
-                min-height: 100px;
+            }
+            .kpi-label {
+                font-size: 0.8rem;
+            }
+            .kpi-value {
+                font-size: 1rem;
+            }
+            .metric-card {
+                padding: 0.8rem;
+                min-height: 90px;
             }
             .metric-card .metric-value {
-                font-size: 1rem;
+                font-size: 1.1rem;
+            }
+            .metric-card .metric-label {
+                font-size: 0.8rem;
+            }
+            .status-container {
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 0.8rem;
+            }
+        }
+        @media (max-width: 480px) {
+            .kpi-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.5rem;
+            }
+            .status-container {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 0.5rem;
             }
             .highlight-box {
                 padding: 0.8rem;
             }
+            .metric-card {
+                padding: 0.6rem;
+                min-height: 80px;
+            }
+            .metric-card .metric-value {
+                font-size: 1rem;
+            }
+        }
+        /* Container wrapper */
+        .dashboard-container {
+            max-width: 100%;
+            margin: 0 auto;
+            padding: 0;
         }
         </style>
         """, unsafe_allow_html=True)
+
+        # Wrap everything in a container
         df = pd.DataFrame(analysis_results)
         # Calculate enhanced metrics with error handling
         total_parts = len(analysis_results)
