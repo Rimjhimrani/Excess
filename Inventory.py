@@ -1373,12 +1373,18 @@ class InventoryManagementSystem:
             st.plotly_chart(fig, use_container_width=True)
 
     def display_enhanced_detailed_tables(self, analysis_results):
-        """Display enhanced detailed tables with filtering and sorting"""
-        st.subheader("📋 Detailed Analysis Tables")
+        """Display enhanced detailed tables with proper formatting"""
+        st.header("📊 Detailed Analysis Tables")
         df = pd.DataFrame(analysis_results)
-        if df.empty:
-            st.warning("⚠️ No data available for detailed tables.")
-            return
+        display_columns = self._get_key_display_columns(df)
+        display_df = df[display_columns].copy()
+        # OPTION 1: Simple call without parameters
+        styled_df = display_df.style.format(self._get_column_formatters())
+        # OR OPTION 2: Call with dataframe parameter (only if you modified the method)
+        # styled_df = display_df.style.format(self._get_column_formatters(display_df))
+        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+    
+    return display_df
         # Create tabs for different views
         tab1, tab2, tab3, tab4 = st.tabs(["🔍 All Items", "🔴 Short Inventory", "🔵 Excess Inventory", "🟢 Within Norms"])
         with tab1:
