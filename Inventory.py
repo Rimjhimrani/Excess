@@ -1209,9 +1209,9 @@ class InventoryManagementSystem:
         )
         
     def display_enhanced_summary_metrics(self, analysis_results):
-        """Enhanced summary metrics dashboard - Fixed Width Issues"""
+       """Enhanced summary metrics dashboard - Fixed Width Issues"""
         st.header("📊 Executive Summary Dashboard")
-        # Add CSS
+        # Add CSS with better responsive design
         st.markdown("""
         <style>
         .metric-card {
@@ -1224,6 +1224,8 @@ class InventoryManagementSystem:
             display: flex;
             flex-direction: column;
             justify-content: center;
+            max-width: 100%;
+            box-sizing: border-box;
         }
         .status-normal { background: linear-gradient(135deg, #4CAF50, #45a049); }
         .status-excess { background: linear-gradient(135deg, #2196F3, #1976D2); }
@@ -1232,17 +1234,20 @@ class InventoryManagementSystem:
         .metric-value {
             color: white;
             font-weight: bold;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             margin-bottom: 0.1rem;
+            word-wrap: break-word;
         }
         .metric-label {
             color: #f0f0f0;
-            font-size: 0.7rem;
+            font-size: 0.65rem;
             margin-bottom: 0.2rem;
+            word-wrap: break-word;
         }
         .metric-delta {
             color: #e0e0e0;
-            font-size: 0.6rem;
+            font-size: 0.55rem;
+            word-wrap: break-word;
         }
         .highlight-box {
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
@@ -1250,9 +1255,17 @@ class InventoryManagementSystem:
             border-radius: 8px;
             color: white;
             margin: 0.6rem 0;
+            max-width: 70%;
+            box-sizing: border-box;
+        }
+        .dashboard-container {
+            max-width: 70%;
+            overflow-x: auto;
         }
         </style>
         """, unsafe_allow_html=True)
+        # Wrap everything in a container with 70% max width
+        st.markdown('<div class="dashboard-container">', unsafe_allow_html=True)
         # DataFrame prep
         df = pd.DataFrame(analysis_results)
         value_col = None
@@ -1265,12 +1278,10 @@ class InventoryManagementSystem:
         status_col = 'Status' if 'Status' in df.columns else 'INVENTORY REMARK STATUS'
         short_value = df[df[status_col] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum() if 'VALUE(Unit Price* Short/Excess Inventory)' in df.columns else 0
         excess_value = df[df[status_col] == 'Excess Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum() if 'VALUE(Unit Price* Short/Excess Inventory)' in df.columns else 0
-
         # KPI Summary
         st.markdown('<div class="highlight-box">', unsafe_allow_html=True)
         st.markdown(f"""
         ### 🎯 Key Inventory KPIs
-
         - **Total Parts Analyzed**: {total_parts:,}
         - **Total Inventory Value**: ₹{total_stock_value:,.0f}
         - **Short Inventory Impact**: ₹{abs(short_value):,.0f}
@@ -1278,7 +1289,6 @@ class InventoryManagementSystem:
         - **Net Financial Impact**: ₹{abs(short_value) + excess_value:,.0f}
         """)
         st.markdown('</div>', unsafe_allow_html=True)
-
         # Status breakdown
         status_counts = df[status_col].value_counts()
         summary_data = {}
@@ -1289,8 +1299,8 @@ class InventoryManagementSystem:
                 'value': status_data[value_col].sum() if value_col and value_col in status_data.columns else 0
             }
         st.markdown("### Status Distribution")
-        cols = st.columns(4)  # Responsive width fix
-
+        # Use smaller column ratios and ensure they fit within the container
+        cols = st.columns([1, 1, 1, 1])  # Equal width columns that will fit in 70% container
         with cols[0]:
             normal = summary_data.get('Within Norms', {'count': 0, 'value': 0})
             st.markdown(f"""
@@ -1326,6 +1336,8 @@ class InventoryManagementSystem:
                 <div class="metric-delta">₹{total_stock_value:,.0f}</div>
             </div>
             """, unsafe_allow_html=True)
+        # Close the container
+        st.markdown('</div>', unsafe_allow_html=True)
             
     def display_enhanced_vendor_summary(self, analysis_results):
         """Enhanced vendor summary with better analytics"""
