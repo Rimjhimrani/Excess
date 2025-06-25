@@ -1209,7 +1209,7 @@ class InventoryManagementSystem:
         )
         
     def display_enhanced_summary_metrics(self, analysis_results):
-       """Enhanced summary metrics dashboard - Fixed Width Issues"""
+        """Enhanced summary metrics dashboard - Fixed Width Issues"""
         st.header("📊 Executive Summary Dashboard")
         # Add CSS with better responsive design
         st.markdown("""
