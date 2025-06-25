@@ -1383,8 +1383,7 @@ class InventoryManagementSystem:
         # OR OPTION 2: Call with dataframe parameter (only if you modified the method)
         # styled_df = display_df.style.format(self._get_column_formatters(display_df))
         st.dataframe(styled_df, use_container_width=True, hide_index=True)
-    
-    return display_df
+        return display_df
         # Create tabs for different views
         tab1, tab2, tab3, tab4 = st.tabs(["🔍 All Items", "🔴 Short Inventory", "🔵 Excess Inventory", "🟢 Within Norms"])
         with tab1:
