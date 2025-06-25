@@ -1682,7 +1682,7 @@ class InventoryManagementSystem:
                 )
                 st.plotly_chart(fig, use_container_width=True)
                 # Top value contributor
-                top_value_parts = df.nlargest(20, 'Stock_Value')
+                top_value_parts = df.nlargest(20, 'Current Inventory - VALUE')
                 fig = px.scatter(
                     top_value_parts,
                     x='Current Inventory-QTY',
