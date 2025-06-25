@@ -1215,7 +1215,7 @@ class InventoryManagementSystem:
         st.markdown("""
         <style>
         .metric-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 60%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             padding: 0.8rem;
             border-radius: 10px;
             margin: 0.3rem 0;
