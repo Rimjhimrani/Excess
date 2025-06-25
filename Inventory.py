@@ -1225,8 +1225,10 @@ class InventoryManagementSystem:
             display: flex;
             transition: transform 0.2s ease;
             width: 100%;
+            max-width: 100%;
             flex-direction: column;
             justify-content: center;
+            box-sizing: border-box;
         }
         .status-normal { background: linear-gradient(135deg, #4CAF50, #45a049); }
         .status-excess { background: linear-gradient(135deg, #2196F3, #1976D2); }
@@ -1238,9 +1240,10 @@ class InventoryManagementSystem:
             font-size: 0.9rem;
             margin-bottom: 0.1rem;
             line-height: 1;
-            white-space: nowrap
+            white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            width: 100%;
         }
         .metric-card .metric-label { 
             color: #f0f0f0; 
@@ -1250,6 +1253,7 @@ class InventoryManagementSystem:
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            width: 100%;
         }
         .metric-card .metric-delta { 
             color: #e0e0e0; 
@@ -1258,6 +1262,7 @@ class InventoryManagementSystem:
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            width: 100%;
         }
         .highlight-box {
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
@@ -1265,8 +1270,10 @@ class InventoryManagementSystem:
             border-radius: 8px;
             color: white;
             margin: 0.6rem 0;
+            width: 100%;
             max-width: 100%;
             box-sizing: border-box;
+            overflow: hidden;
         }
         .kpi-grid {
             display: grid;
@@ -1274,6 +1281,8 @@ class InventoryManagementSystem:
             gap: 0.4rem;
             margin: 0.6rem 0;
             width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
         }
         .kpi-item {
             text-align: center;
@@ -1282,6 +1291,10 @@ class InventoryManagementSystem:
             border-radius: 6px;
             backdrop-filter: blur(10px);
             min-width: 0;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
         }
         .kpi-label {
             font-weight: 600;
@@ -1291,22 +1304,26 @@ class InventoryManagementSystem:
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            width: 100%;
         }
         .kpi-value {
-            font-size: 0.9rem;
-            font-weight: bold;
-            color: #ffffff;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+           font-size: 0.9rem;
+           font-weight: bold;
+           color: #ffffff;
+           white-space: nowrap;
+           overflow: hidden;
+           text-overflow: ellipsis;
+           width: 100%;
         }
         /* Status cards container */
         .status-container {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(4, 1fr);
             gap: 0.4rem;
             margin: 0.6rem 0;
             width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
         }
         /* Mobile responsiveness */
         @media (max-width: 768px) {
@@ -1367,14 +1384,30 @@ class InventoryManagementSystem:
         }
         /* Container wrapper */
         .dashboard-container {
+           .dashboard-container {
+            width: 100%;
             max-width: 100%;
             margin: 0 auto;
             padding: 0;
+            box-sizing: border-box;
+            overflow-x: hidden;
+        }
+        * Streamlit column fixes */
+        .stColumn {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        /* Additional container fixes */
+        .element-container {
+            width: 100% !important;
+            max-width: 100% !important;
         }
         </style>
         """, unsafe_allow_html=True)
 
-        # Wrap everything in a container
+        st.markdown('<div class="dashboard-container">', unsafe_allow_html=True)
+
         df = pd.DataFrame(analysis_results)
         # Calculate enhanced metrics with error handling
         total_parts = len(analysis_results)
