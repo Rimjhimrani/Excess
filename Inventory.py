@@ -1170,10 +1170,12 @@ class InventoryManagementSystem:
         """Display comprehensive analysis results with enhanced features"""
         st.success(f"✅ Analysis Complete: {len(analysis_results)} parts analyzed")
         # Summary metrics with better styling
+        
         self.display_enhanced_summary_metrics(analysis_results)
         # Enhanced charts and visualizations
+        
         self.display_enhanced_analysis_charts(analysis_results)
-    
+        
         # Improved detailed data tables
         self.display_enhanced_detailed_tables(analysis_results)
     
