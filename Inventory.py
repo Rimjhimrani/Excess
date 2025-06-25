@@ -1494,8 +1494,6 @@ class InventoryManagementSystem:
             'Status', 'STATUS', 'Inventory Status',
             # Quantity columns
             'Current Inventory-QTY', 'Current Inventory QTY', 'Current_Inventory_QTY', 'QTY', 'Quantity',
-            'MIN QTY REQUIRED', 'Min Qty Required', 'MIN_QTY_REQUIRED', 'Min Qty', 'Minimum Qty',
-            'MAX QTY REQUIRED', 'Max Qty Required', 'MAX_QTY_REQUIRED', 'Max Qty', 'Maximum Qty',
             # Value columns
             'Stock_Value', 'Current Inventory - VALUE', 'Current Inventory-VALUE', 'Value', 'Stock Value',
             'VALUE(Unit Price* Short/Excess Inventory)', 'Variance Value', 'Impact Value',
@@ -1534,8 +1532,6 @@ class InventoryManagementSystem:
                 'Current Inventory - VALUE': lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
                 'Stock_Value': lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
                 'Current Inventory-QTY': lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
-                'MIN QTY REQUIRED': lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
-                'MAX QTY REQUIRED': lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
                 'UNIT PRICE': lambda x: f"₹{x:,.2f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
             }
         return formatters
