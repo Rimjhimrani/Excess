@@ -1166,6 +1166,7 @@ class InventoryManagementSystem:
             st.error("❌ Unexpected error during analysis results display")
             st.code(str(e))
             return
+            
     def display_comprehensive_analysis(self, analysis_results):
         """Display comprehensive analysis results with enhanced features"""
         st.success(f"✅ Analysis Complete: {len(analysis_results)} parts analyzed")
@@ -1796,6 +1797,7 @@ class InventoryManagementSystem:
             title="Risk Assessment by Value Impact"
         )
         st.plotly_chart(fig, use_container_width=True)
+        
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
         st.header("📥 Export & Reporting Options")
@@ -2148,7 +2150,7 @@ class InventoryManagementSystem:
         if category_col and category_col in df.columns:
             categories = df[category_col].dropna().unique().tolist()
             if categories:
-                selected_categories = st.sidebar.selectbox(
+                selected_categories = st.sidebar.multiselect(
                     f"Filter by {category_col}",
                     options=categories,
                     default=categories
@@ -2167,7 +2169,7 @@ class InventoryManagementSystem:
         if vendor_col and vendor_col in df.columns:
             vendors = df[vendor_col].dropna().unique().tolist()
             if vendors:
-                selected_vendors = st.sidebar.selectbox(
+                selected_vendors = st.sidebar.multiselect(
                     f"Filter by {vendor_col}",
                     options=vendors,
                     default=vendors
