@@ -1240,28 +1240,25 @@ class InventoryManagementSystem:
         # Calculate enhanced metrics
         total_parts = len(analysis_results)
         total_stock_value = df['Current Inventory - VALUE'].sum() if 'Stock_Value' in df.columns else 0
-    
-        # Status distribution
-        status_counts = Counter(df['Status'] if 'Status' in df.columns else df.get('INVENTORY REMARK STATUS', []))
-    
-        # Calculate financial impact
-        short_impact = sum(item.get('VALUE(Unit Price* Short/Excess Inventory)', 0) 
-                           for item in analysis_results 
-                           if item.get('Status') == 'Short Inventory')
-        excess_impact = sum(item.get('VALUE(Unit Price* Short/Excess Inventory)', 0) 
-                            for item in analysis_results 
-                            if item.get('Status') == 'Excess Inventory')
-        # Display key performance indicator
+
+        short_value = df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum()
+        excess_value = df[df['Status'] == 'Excess Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum()
+
+        # Summary
         st.markdown('<div class="highlight-box">', unsafe_allow_html=True)
         st.markdown(f"""
         ### 🎯 Key Performance Indicators
         - **Total Parts Analyzed**: {total_parts:,}
-        - **Total Inventory Value**: ₹{total_stock_value:,.0f}
-        - **Short Inventory Impact**: ₹{abs(short_impact):,.0f}
-        - **Excess Inventory Impact**: ₹{excess_impact:,.0f}
-        - **Net Financial Impact**: ₹{abs(short_impact) + excess_impact:,.0f}
+        - **Total Inventory Value**: ₹{total_value:,.0f}
+        - **Short Inventory Impact**: ₹{abs(short_value):,.0f}
+        - **Excess Inventory Impact**: ₹{excess_value:,.0f}
+        - **Net Financial Impact**: ₹{abs(short_value) + excess_value:,.0f}
         """)
         st.markdown('</div>', unsafe_allow_html=True)
+    
+        # Status distribution
+        status_counts = df['Status'].value_counts()
+        value_by_status = df.groupby('Status')['Current Inventory - VALUE'].sum()
     
         # Enhanced metric cards with your original structure
         col1, col2, col3, col4 = st.columns(4)
