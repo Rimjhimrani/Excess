@@ -2148,7 +2148,7 @@ class InventoryManagementSystem:
         if category_col and category_col in df.columns:
             categories = df[category_col].dropna().unique().tolist()
             if categories:
-                selected_categories = st.sidebar.multiselect(
+                selected_categories = st.sidebar.selectbox(
                     f"Filter by {category_col}",
                     options=categories,
                     default=categories
@@ -2167,7 +2167,7 @@ class InventoryManagementSystem:
         if vendor_col and vendor_col in df.columns:
             vendors = df[vendor_col].dropna().unique().tolist()
             if vendors:
-                selected_vendors = st.sidebar.multiselect(
+                selected_vendors = st.sidebar.selectbox(
                     f"Filter by {vendor_col}",
                     options=vendors,
                     default=vendors
