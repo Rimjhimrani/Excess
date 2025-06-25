@@ -1267,7 +1267,7 @@ class InventoryManagementSystem:
             margin-bottom: 0.2rem;
         }
         /* Responsive adjustments */
-        @media (max-width: 768px) {
+        @media (max-width: 700px) {
             .metric-card {
                 padding: 0.6rem;
                 min-height: 100px;
