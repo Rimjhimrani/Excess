@@ -1511,22 +1511,28 @@ class InventoryManagementSystem:
                 available_columns.append(col)
         return available_columns[:10]  # Limit to 10 c
         
-    def _get_column_formatters(self):
-        """Helper method to format columns appropriately - Safe version"""
+    def _get_column_formatters(self,df=None):
+        """Get column formatters for styling dataframes"""
         formatters = {}
-        # Define formatting rules for different column patterns
-        value_patterns = ['value', 'price', 'cost', 'amount']
-        qty_patterns = ['qty', 'quantity', 'count']
-        for col in df.columns:
-            col_lower = col.lower()
-            # Format currency columns
-            if any(pattern in col_lower for pattern in value_patterns):
-                if df[col].dtype in ['float64', 'int64'] and not df[col].isna().all():
-                    formatters[col] = '₹{:,.0f}'
-            # Format quantity columns
-            elif any(pattern in col_lower for pattern in qty_patterns):
-                if df[col].dtype in ['float64', 'int64'] and not df[col].isna().all():
-                    formatters[col] = '{:,.0f}'
+        if df is not None:
+            for col in df.columns:
+                if 'VALUE' in col.upper() or 'PRICE' in col.upper() or 'COST' in col.upper():
+                    formatters[col] = lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
+                elif 'QTY' in col.upper() or 'QUANTITY' in col.upper():
+                    formatters[col] = lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
+                elif 'PERCENTAGE' in col.upper() or 'SCORE' in col.upper():
+                    formatters[col] = lambda x: f"{x:.1f}%" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
+        else:
+            # Default formatters when no dataframe is provided
+            formatters = {
+                'VALUE(Unit Price* Short/Excess Inventory)': lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+                'Current Inventory - VALUE': lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+                'Stock_Value': lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+                'Current Inventory-QTY': lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+                'MIN QTY REQUIRED': lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+                'MAX QTY REQUIRED': lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+                'UNIT PRICE': lambda x: f"₹{x:,.2f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+            }
         return formatters
     
     def display_overview_metrics(self, analysis_results):
