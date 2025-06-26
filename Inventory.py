@@ -2558,25 +2558,25 @@ class InventoryManagementSystem:
                         f"Total Value: ₹{row[value_col]:,.0f}"
                     ), axis=1)
                     # ✅ Remove color=..., and force fixed bar color
-                fig = px.bar(
-                    chart_df,
-                    x=vendor_col,
-                    y='Value_Lakh',
-                    text=vendor_col,
-                    title=title
-                )
-                # ✅ Set solid color manually
-                fig.update_traces(
-                    marker_color=color,
-                    customdata=chart_df['HOVER_TEXT'],
-                    hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                    texttemplate='%{text}',
-                    textposition='auto'
-                )
-                fig.update_layout(
-                    xaxis_tickangle=-45,
-                    yaxis_title="Inventory Value",
-                    yaxis=dict(
+                    fig = px.bar(
+                        chart_df,
+                        x=vendor_col,
+                        y='Value_Lakh',
+                        text=vendor_col,
+                        title=title
+                    )
+                    # ✅ Set solid color manually
+                    fig.update_traces(
+                        marker_color=color,
+                        customdata=chart_df['HOVER_TEXT'],
+                        hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+                        texttemplate='%{text}',
+                        textposition='auto'
+                    )
+                    fig.update_layout(
+                        xaxis_tickangle=-45,
+                        yaxis_title="Inventory Value",
+                        yaxis=dict(
                         tickformat=',.0f',
                         ticksuffix='L'
                     )
