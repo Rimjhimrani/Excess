@@ -2539,9 +2539,9 @@ class InventoryManagementSystem:
                 st.warning("⚠️ Required columns missing for vendor status chart.")
             else:
                 for status, title, key, color in [
-                    ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", "#FF9999"),
-                    ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", "#FF6666"),
-                    ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", "#66CC66"),
+                    ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", "#1f77b4"),
+                    ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", "#d62728"),
+                    ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", "#2ca02c"),
                 ]:
                     st.subheader(title)
                     filtered = df[df['INVENTORY REMARK STATUS'] == status]
@@ -2556,21 +2556,24 @@ class InventoryManagementSystem:
                         f"Vendor: {row[vendor_col]}<br>"
                         f"Total Value: ₹{row[value_col]:,.0f}"
                     ), axis=1)
+                    
                     fig = px.bar(
                         chart_df,
                         x=vendor_col,
                         y='Value_Lakh',
                         text=vendor_col,
                         color='Value_Lakh',
-                        color_continuous_scale='Viridis',
+                        color_discrete_sequence=[color],
                         title=title
                     )
+                    
                     fig.update_traces(
                         customdata=chart_df['HOVER_TEXT'],
                         hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
                         texttemplate='%{text}',
                         textposition='auto'
                     )
+                    
                     fig.update_layout(
                         xaxis_tickangle=-45,
                         yaxis_title="Inventory Value",
