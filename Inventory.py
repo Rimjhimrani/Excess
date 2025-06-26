@@ -2562,7 +2562,7 @@ class InventoryManagementSystem:
                     fig.update_traces(
                         customdata=chart_df['HOVER_TEXT'],
                         hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                        texttemplate='%{text}'
+                        texttemplate='%{text}',
                         textposition='auto'
                     )
                     fig.update_layout(
