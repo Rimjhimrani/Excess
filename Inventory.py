@@ -2495,6 +2495,7 @@ class InventoryManagementSystem:
                     yaxis=dict(
                         tickformat=',.0f',
                         ticksuffix='L'  # ✅ Show values like 120L
+                    )
                 )
                 st.plotly_chart(fig3, use_container_width=True)
             else:
