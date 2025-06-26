@@ -231,7 +231,7 @@ class InventoryAnalyzer:
         # Fixed: Return statement moved outside the loop
         return summary
         
-    def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color):
+    def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color,value_format='lakhs'):
         """Show top 10 vendors filtered by inventory remark status (short, excess, within norms)"""
         # Filter by inventory status
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
@@ -2575,8 +2575,7 @@ class InventoryManagementSystem:
                     status,             # status_filter
                     title,              # chart_title
                     key,                # chart_key
-                    color,              # color
-                    "lakhs"             # value_format
+                    color            # color
                 )
                 # Option 2: All keyword arguments (alternative)
                 # analyzer.show_vendor_chart_by_status(
