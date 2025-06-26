@@ -2489,7 +2489,7 @@ class InventoryManagementSystem:
                     texttemplate='%{text}',
                     textposition='auto'
                 )
-                fig3.update_la++yout(
+                fig3.update_layout(
                     xaxis_tickangle=-45,
                     yaxis_title="Current Inventory - VALUE",
                     yaxis=dict(
