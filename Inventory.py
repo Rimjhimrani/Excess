@@ -2396,26 +2396,36 @@ class InventoryManagementSystem:
             return
         # ✅ 1. Top 10 Parts by Value - Check for multiple possible value columns
         value_col = None
-        if 'Current Inventory - VALUE' in df.columns:
-            value_col = 'Current Inventory - VALUE'
-        elif 'Stock_Value' in df.columns:
-            value_col = 'Stock_Value'
-        elif 'Current Inventory-VALUE' in df.columns:
-            value_col = 'Current Inventory-VALUE'
+        for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE']:
+            if col in df.columns:
+                value_col = col
+                break
         if value_col and 'PART NO' in df.columns:
-            # Remove rows with zero or null values for better visualization
+            # Filter top 10 parts with non-zero value
             chart_data = df[df[value_col] > 0].sort_values(by=value_col, ascending=False).head(10)
             if not chart_data.empty:
+                chart_data['Value_Lakh'] = chart_data[value_col] / 100000
+                chart_data['HOVER_TEXT'] = chart_data.apply(lambda row: (
+                    f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
+                    f"Qty: {row.get('Current Inventory-QTY', 'N/A')}<br>"
+                    f"Value: ₹{row[value_col]:,.0f}"
+                ), axis=1)
                 fig1 = px.bar(
                     chart_data,
                     x='PART NO',
-                    y=value_col,
-                    title="Top 10 Parts by Inventory Value",
+                    y='Value_Lakh',
+                    title="Top 10 Parts by Inventory Value (₹ Lakhs)",
                     text='PART DESCRIPTION' if 'PART DESCRIPTION' in chart_data.columns else None,
                     color=value_col,
                     color_continuous_scale='Blues'
                 )
-                fig1.update_layout(xaxis_tickangle=-45)
+                fig1.update_traces(
+                    customdata=chart_data['HOVER_TEXT'],
+                    hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+                    texttemplate='₹%{y:,.1f} Lakh',
+                    textposition='auto'
+                )
+                fig1.update_layout(xaxis_tickangle=-45, yaxis_title="Inventory Value (₹ Lakhs)")
                 st.plotly_chart(fig1, use_container_width=True)
             else:
                 st.info("ℹ️ No valid data found for top parts chart (all values are 0).")
