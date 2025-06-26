@@ -13,6 +13,7 @@ import re
 from typing import Union, Any, Optional, List, Dict
 from decimal import Decimal, InvalidOperation
 from collections import Counter
+from collections import defaultdict
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -236,7 +237,7 @@ class InventoryAnalyzer:
         # Filter by inventory status
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
         # Sum Stock Value by Vendor
-        vendor_totals = defaultdict(float)
+        vendor_totals = {}
         for item in filtered:
             vendor = item.get('Vendor Name', 'Unknown')
             try:
@@ -245,7 +246,8 @@ class InventoryAnalyzer:
                 stock_value = float(stock_value) if stock_value else 0.0
             except (ValueError, TypeError):
                 stock_value = 0.0
-            vendor_totals[vendor] += stock_value
+            # Use regular dictionary with get method instead of defaultdict
+            vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + stock_value
         # Sort top 10 within this specific status (Fixed: changed from 5 to 10)
         sorted_vendors = sorted(vendor_totals.items(), key=lambda x: x[1], reverse=True)[:10]
         if not sorted_vendors:
