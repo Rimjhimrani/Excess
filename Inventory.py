@@ -2415,7 +2415,7 @@ class InventoryManagementSystem:
                     x='PART NO',
                     y='Value_Lakh',
                     title="Top 10 Parts by Inventory Value (₹ Lakhs)",
-                    text='PART DESCRIPTION' if 'PART DESCRIPTION' in chart_data.columns else None,
+                    text='PART DESCRIPTION', 
                     color=value_col,
                     color_continuous_scale='Blues'
                 )
