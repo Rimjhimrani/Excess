@@ -2585,9 +2585,9 @@ class InventoryManagementSystem:
                          )
                      )
                      st.plotly_chart(fig, use_container_width=True, key=key)
-         except Exception as e:
-             st.error("❌ Error displaying Top Vendors by Status")
-             st.code(str(e))
+        except Exception as e:
+            st.error("❌ Error displaying Top Vendors by Status")
+            st.code(str(e))
             
 if __name__ == "__main__":
     app = InventoryManagementSystem()
