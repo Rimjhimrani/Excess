@@ -1331,6 +1331,7 @@ class InventoryManagementSystem:
                 <div class="metric-delta">₹{excess['value']:,.0f}</div>
             </div>
             """, unsafe_allow_html=True)
+            
         with cols[2]:
             short = summary_data.get('Short Inventory', {'count': 0, 'value': 0})
             st.markdown(f"""
@@ -1340,6 +1341,7 @@ class InventoryManagementSystem:
                 <div class="metric-delta">₹{short['value']:,.0f}</div>
             </div>
             """, unsafe_allow_html=True)
+            
         with cols[3]:
             st.markdown(f"""
             <div class="metric-card status-total">
