@@ -2447,7 +2447,6 @@ class InventoryManagementSystem:
             st.warning(f"⚠️ Vendor analysis chart cannot be displayed. Missing: {', '.join(missing_cols)}")
         # ✅ 4. Top 10 Parts by Inventory Status
         st.markdown("## 🧩 Top 10 Parts by Inventory Status")
-        processed_data = analysis_results
         analyzer = self.analyzer
         ims = self
         for status, label, color, key in [
