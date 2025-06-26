@@ -2483,18 +2483,18 @@ class InventoryManagementSystem:
                     color_continuous_scale='Viridis',
                     title='Top 10 Vendors by Inventory Value (₹ Lakhs)'
                 )
-                 fig3.update_traces(
-                     customdata=vendor_data['HOVER_TEXT'],
-                     hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                     texttemplate='%{text}',
-                     textposition='auto'
-                 )
-                 fig3.update_la++yout(
-                     xaxis_tickangle=-45,
-                     yaxis_title="Current Inventory - VALUE",
-                     yaxis=dict(
-                         tickformat=',.0f',
-                         ticksuffix='L'  # ✅ Show values like 120L
+                fig3.update_traces(
+                    customdata=vendor_data['HOVER_TEXT'],
+                    hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+                    texttemplate='%{text}',
+                    textposition='auto'
+                )
+                fig3.update_la++yout(
+                    xaxis_tickangle=-45,
+                    yaxis_title="Current Inventory - VALUE",
+                    yaxis=dict(
+                        tickformat=',.0f',
+                        ticksuffix='L'  # ✅ Show values like 120L
                 )
                 st.plotly_chart(fig3, use_container_width=True)
             else:
