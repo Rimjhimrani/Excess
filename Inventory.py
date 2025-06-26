@@ -2463,22 +2463,27 @@ class InventoryManagementSystem:
             st.warning("⚠️ Status column not found for status distribution chart.")
 
         # ✅ 3. Vendor vs Value (Fixed vendor_col definition)
-        vendor_col = None
-        if 'Vendor' in df.columns:
-            vendor_col = 'Vendor'
-        elif 'Vendor Name' in df.columns:
-            vendor_col = 'Vendor Name'
-        elif 'VENDOR' in df.columns:
-            vendor_col = 'VENDOR'
+        vendor_col = next((col for col in ['Vendor', 'Vendor Name', 'VENDOR'] if col in df.columns), None)
         if vendor_col and value_col and vendor_col in df.columns:
-            # Group by vendor and sum values, removing zero values
-            vendor_data = df[df[value_col] > 0].groupby(vendor_col)[value_col].sum().sort_values(ascending=False).head(10)
+            vendor_data = (
+                df[df[value_col] > 0]
+                .groupby(vendor_col)[value_col]
+                .sum()
+                .sort_values(ascending=False)
+                .head(10)
+                .reset_index()
+            )
             if not vendor_data.empty:
+                vendor_data['Value_Lakh'] = vendor_data[value_col] / 100000  # Convert to ₹ Lakhs
+                vendor_data['HOVER_TEXT'] = vendor_data.apply(lambda row: (
+                    f"Vendor: {row[vendor_col]}<br>"
+                    f"Inventory Value: ₹{row[value_col]:,.0f}"
+                ), axis=1)
                 fig3 = px.bar(
                     vendor_data,
                     x=vendor_col,
                     y='Value_Lakh',
-                    text=vendor_col,  # Show vendor name on bar
+                    text=vendor_col,  # ✅ Label each bar with vendor name
                     color='Value_Lakh',
                     color_continuous_scale='Viridis',
                     title='Top 10 Vendors by Inventory Value (₹ Lakhs)'
@@ -2486,20 +2491,20 @@ class InventoryManagementSystem:
                 fig3.update_traces(
                     customdata=vendor_data['HOVER_TEXT'],
                     hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                    texttemplate='%{text}',
+                    texttemplate='%{text}',       # Show vendor name as label
                     textposition='auto'
                 )
                 fig3.update_layout(
                     xaxis_tickangle=-45,
-                    yaxis_title="Current Inventory - VALUE",
+                    yaxis_title="Inventory Value",
                     yaxis=dict(
                         tickformat=',.0f',
-                        ticksuffix='L'  # ✅ Show values like 120L
+                        ticksuffix='L'  # ✅ Show values like 150L instead of 15000000
                     )
                 )
                 st.plotly_chart(fig3, use_container_width=True)
             else:
-                st.info("ℹ️ No valid vendor data found for chart (all values are 0).")
+                st.info("ℹ️ No valid vendor data found (all values are 0).")
         else:
             missing_cols = []
             if not vendor_col:
@@ -2507,6 +2512,7 @@ class InventoryManagementSystem:
             if not value_col:
                 missing_cols.append("value column")
             st.warning(f"⚠️ Vendor analysis chart cannot be displayed. Missing: {', '.join(missing_cols)}")
+
         # ✅ 4. Top 10 Parts by Inventory Status
         try:
             st.markdown("## 🧩 Top 10 Parts by Inventory Status")
