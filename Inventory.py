@@ -377,17 +377,21 @@ class InventoryManagementSystem:
             y='Value_Lakh',
             color_discrete_sequence=[bar_color],
             title=f"Top 10 Parts - {status_filter} (₹ in Lakhs)",
-            text='Value_Lakh'
+            text='PART DESCRIPTION'
         )
         fig.update_traces(
             hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
             customdata=df['HOVER_TEXT'],
-            texttemplate='₹%{y:,.1f} Lakh',
+            texttemplate='%{text}',
             textposition='auto'
         )
         fig.update_layout(
             xaxis_tickangle=-45,
-            yaxis_title="Inventory Value (₹ Lakhs)"
+            yaxis_title="Inventory Value (₹ Lakhs)",
+            yaxis=dict(
+                tickformat=',.0f',          # thousands separator (200)
+                ticksuffix='L'              # add L to each tick (200L)
+            )
         )
         st.plotly_chart(fig, use_container_width=True, key=key)
 
