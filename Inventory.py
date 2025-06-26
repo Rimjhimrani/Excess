@@ -2413,7 +2413,7 @@ class InventoryManagementSystem:
                 fig1 = px.bar(
                     chart_data,
                     x='PART NO',
-                    y='Value_Lakh',\
+                    y='Value_Lakh',
                     title="Top 10 Parts by Inventory Value",
                     text='PART DESCRIPTION',  # ✅ Show description as bar label
                     color='Value_Lakh',
@@ -2422,10 +2422,18 @@ class InventoryManagementSystem:
                 fig1.update_traces(
                     customdata=chart_data['HOVER_TEXT'],
                     hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                    texttemplate='₹%{y:,.1f} Lakh',
+                    texttemplate='%{text}',
                     textposition='auto'
                 )
-                fig1.update_layout(xaxis_tickangle=-45, yaxis_title="Inventory Value (₹ Lakhs)")
+                fig1.update_layout(
+                    xaxis_tickangle=-45, 
+                    yaxis_title="Inventory Value (₹ Lakhs)",
+                    yaxis=dict(
+                        tickformat=',.0f',          # thousands separator (200)
+                        ticksuffix='L'              # add L to each tick (200L)
+                    )
+                )
+            
                 st.plotly_chart(fig1, use_container_width=True)
             else:
                 st.info("ℹ️ No valid data found for top parts chart (all values are 0).")
