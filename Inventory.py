@@ -1277,50 +1277,51 @@ class InventoryManagementSystem:
         <style>
         .metric-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 0.4rem;
-            border-radius: 6px;
-            margin: 0.2rem 0;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            padding: 1rem; /* Increased padding for more height */
+            border-radius: 8px;
+            margin: 0.4rem 0;
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
             text-align: center;
             display: flex;
             flex-direction: column;
             justify-content: center;
             max-width: 100%;
             box-sizing: border-box;
+            min-height: 100px; /* Added height */
         }
-        .status-normal { background: linear-gradient(135deg, #4CAF50, #45a049); }
+        .status-normal { background: linear-gradient(135deg, #4CAF50, #45a049); 
         .status-excess { background: linear-gradient(135deg, #2196F3, #1976D2); }
         .status-short { background: linear-gradient(135deg, #F44336, #D32F2F); }
         .status-total { background: linear-gradient(135deg, #FF9800, #F57C00); }
         .metric-value {
             color: white;
             font-weight: bold;
-            font-size: 0.85rem;
-            margin-bottom: 0.1rem;
+            font-size: 1.1rem; /* Increased font size */
+            margin-bottom: 0.2rem;
             word-wrap: break-word;
         }
         .metric-label {
             color: #f0f0f0;
-            font-size: 0.65rem;
-            margin-bottom: 0.2rem;
+            font-size: 0.85rem; /* Increased font size */
+            margin-bottom: 0.3rem;
             word-wrap: break-word;
         }
         .metric-delta {
             color: #e0e0e0;
-            font-size: 0.55rem;
+            font-size: 0.75rem; /* Increased font size */
             word-wrap: break-word;
         }
         .highlight-box {
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            padding: 0.6rem;
+            padding: 0.8rem;
             border-radius: 8px;
             color: white;
             margin: 0.6rem 0;
-            max-width: 70%;
+            max-width: 80%; /* Slightly wider box */
             box-sizing: border-box;
         }
         .dashboard-container {
-            max-width: 70%;
+            max-width: 80%;  /* Was 70%, now a bit wider */
             overflow-x: auto;
         }
         </style>
