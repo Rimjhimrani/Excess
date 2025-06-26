@@ -2567,16 +2567,26 @@ class InventoryManagementSystem:
             for status, title, key, color in [
                 ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", analyzer.status_colors["Excess Inventory"]),
                 ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", analyzer.status_colors["Short Inventory"]),
-                ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", analyzer.status_colors["Within Norms"]),
+                ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", analyzer.status_colors["Within Norms"])
             ]:
+                # Option 1: All positional arguments
                 analyzer.show_vendor_chart_by_status(
-                    analysis_results, 
-                    status, 
-                    title, 
-                    chart_key=key, 
-                    color=color,
-                    value_format="lakhs"  # Add this parameter to format in lakhs
+                    analysis_results,    # processed_data
+                    status,             # status_filter
+                    title,              # chart_title
+                    key,                # chart_key
+                    color,              # color
+                    "lakhs"             # value_format
                 )
+                # Option 2: All keyword arguments (alternative)
+                # analyzer.show_vendor_chart_by_status(
+                #     processed_data=analysis_results,
+                #     status_filter=status,
+                #     chart_title=title,
+                #     chart_key=key,
+                #     color=color,
+                #     value_format="lakhs"
+                # )
         except Exception as e:
             st.error("❌ Error displaying Top Vendors by Status")
             st.code(str(e))
