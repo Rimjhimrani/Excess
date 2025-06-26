@@ -2413,10 +2413,10 @@ class InventoryManagementSystem:
                 fig1 = px.bar(
                     chart_data,
                     x='PART NO',
-                    y='Value_Lakh',
-                    title="Top 10 Parts by Inventory Value (₹ Lakhs)",
-                    text='PART DESCRIPTION', 
-                    color=value_col,
+                    y='Value_Lakh',\
+                    title="Top 10 Parts by Inventory Value",
+                    text='PART DESCRIPTION',  # ✅ Show description as bar label
+                    color='Value_Lakh',
                     color_continuous_scale='Blues'
                 )
                 fig1.update_traces(
