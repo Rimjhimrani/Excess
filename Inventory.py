@@ -1162,11 +1162,39 @@ class InventoryManagementSystem:
                 return
         # Try to display the results
         try:
-            self.display_analysis_results()
+            analysis_results = self.persistence.load_data_from_session_state('persistent_analysis_results')
+            if not analysis_results:
+                st.warning("⚠️ No analysis results found.")
+                return
+            # ✅ Display full analysis dashboard
+            self.display_comprehensive_analysis(analysis_results)
+            # ✅ Top 10 Parts by Status
+            st.markdown("## 🧩 Top 10 Parts by Inventory Status")
+            processed_data = analysis_results
+            analyzer = self.analyzer
+            ims = self
+
+            for status, label, color, key in [
+                ("Excess Inventory", "🔵 Top 10 Excess Inventory Parts", analyzer.status_colors["Excess Inventory"], "excess_parts"),
+                ("Short Inventory", "🔴 Top 10 Short Inventory Parts", analyzer.status_colors["Short Inventory"], "short_parts"),
+                ("Within Norms", "🟢 Top 10 Within Norms Parts", analyzer.status_colors["Within Norms"], "normal_parts")
+            ]:
+                st.subheader(label)
+                st.markdown(f'<div class="graph-description">Top 10 parts under "{status}" based on inventory value impact.</div>', unsafe_allow_html=True)
+                ims.create_top_parts_chart(processed_data, status, color, key)
+            # ✅ Top 10 Vendors by Status
+            st.markdown("## 🏢 Top Vendors by Inventory Status")
+            for status, title, key, color in [
+                ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", analyzer.status_colors["Excess Inventory"]),
+                ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", analyzer.status_colors["Short Inventory"]),
+                ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", analyzer.status_colors["Within Norms"]),
+            ]:
+                analyzer.show_vendor_chart_by_status(processed_data, status, title, chart_key=key, color=color)
         except Exception as e:
             st.error("❌ Unexpected error during analysis results display")
             st.code(str(e))
             return
+
             
     def display_comprehensive_analysis(self, analysis_results):
         """Display comprehensive analysis results with enhanced features"""
