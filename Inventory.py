@@ -2445,26 +2445,6 @@ class InventoryManagementSystem:
             if not value_col:
                 missing_cols.append("value column")
             st.warning(f"⚠️ Vendor analysis chart cannot be displayed. Missing: {', '.join(missing_cols)}")
-        # ✅ 4. Top 10 Parts by Inventory Status
-        st.markdown("## 🧩 Top 10 Parts by Inventory Status")
-        analyzer = self.analyzer
-        ims = self
-        for status, label, color, key in [
-            ("Excess Inventory", "🔵 Top 10 Excess Inventory Parts", analyzer.status_colors["Excess Inventory"], "excess_parts"),
-            ("Short Inventory", "🔴 Top 10 Short Inventory Parts", analyzer.status_colors["Short Inventory"], "short_parts"),
-            ("Within Norms", "🟢 Top 10 Within Norms Parts", analyzer.status_colors["Within Norms"], "normal_parts")
-        ]:
-            st.subheader(label)
-            st.markdown(f'<div class="graph-description">Top 10 parts under "{status}" based on inventory value impact.</div>', unsafe_allow_html=True)
-            ims.create_top_parts_chart(processed_data, status, color, key)
-        # ✅ 5. Top 10 Vendors by Inventory Status
-        st.markdown("## 🏢 Top Vendors by Inventory Status")
-        for status, title, key, color in [
-            ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", analyzer.status_colors["Excess Inventory"]),
-            ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", analyzer.status_colors["Short Inventory"]),
-            ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", analyzer.status_colors["Within Norms"]),
-        ]:
-            analyzer.show_vendor_chart_by_status(processed_data, status, title, chart_key=key, color=color)
 
 if __name__ == "__main__":
     app = InventoryManagementSystem()
