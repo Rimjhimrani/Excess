@@ -348,9 +348,9 @@ class InventoryManagementSystem:
         return int(float_result)
             
     def create_top_parts_chart(self, data, status_type, color, key):
-        """Reusable chart builder for top 10 parts by status with detailed hover info"""
+        """Top 10 parts chart by status — values shown in ₹ Lakhs for Indian format"""
         df = pd.DataFrame(data)
-        # ✅ Determine value column
+        # ✅ Find correct inventory value column
         value_col = None
         for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE']:
             if col in df.columns:
@@ -359,14 +359,14 @@ class InventoryManagementSystem:
         if not value_col or 'PART NO' not in df.columns:
             st.warning("⚠️ Required columns missing for top parts chart.")
             return
-        # ✅ Filter and clean
+        # ✅ Filter relevant parts and format values in ₹ Lakhs
         df = df[df['INVENTORY REMARK STATUS'] == status_filter]
         df = df[df[value_col] > 0]
         df = df.sort_values(by=value_col, ascending=False).head(10)
         if df.empty:
             st.info(f"No data found for '{status_filter}' parts.")
             return
-        # ✅ Prepare hover text with description and value
+        df['Value_Lakh'] = df[value_col] / 100000  # 💡 Convert to ₹ Lakh
         df['HOVER_TEXT'] = df.apply(lambda row: (
             f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
             f"Value: ₹{row[value_col]:,.0f}"
@@ -374,19 +374,23 @@ class InventoryManagementSystem:
         fig = px.bar(
             df,
             x='PART NO',
-            y=value_col,
+            y='Value_Lakh',
             color_discrete_sequence=[bar_color],
-            title=f"Top 10 Parts - {status_filter}",
-            text=value_col  # shows label above bars
+            title=f"Top 10 Parts - {status_filter} (₹ in Lakhs)",
+            text='Value_Lakh'
         )
         fig.update_traces(
-            hovertemplate='<b>%{x}</b><br>%{customdata}',
+            hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
             customdata=df['HOVER_TEXT'],
+            texttemplate='₹%{y:,.1f} Lakh',
             textposition='auto'
         )
-        fig.update_layout(xaxis_tickangle=-45)
+        fig.update_layout(
+            xaxis_tickangle=-45,
+            yaxis_title="Inventory Value (₹ Lakhs)"
+        )
         st.plotly_chart(fig, use_container_width=True, key=key)
- 
+
     def authenticate_user(self):
         """Enhanced authentication system with better UX and user switching"""
         st.sidebar.markdown("### 🔐 Authentication")
