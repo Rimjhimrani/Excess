@@ -2538,56 +2538,54 @@ class InventoryManagementSystem:
             if not vendor_col or not value_col or 'INVENTORY REMARK STATUS' not in df.columns:
                 st.warning("⚠️ Required columns missing for vendor status chart.")
             else:
-                 status_configs = [
-                    ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", "#1f77b4"),
-                    ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", "#d62728"),
-                    ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", "#2ca02c"),
-                 ]
-                 for status, title, key, color in status_configs:
-                     st.subheader(title)
-                     filtered = df[df['INVENTORY REMARK STATUS'] == status]
-                     filtered = filtered[filtered[value_col] > 0]
-                     vendor_summary = filtered.groupby(vendor_col)[value_col].sum().sort_values(ascending=False).head(10)
-                     if vendor_summary.empty:
-                         st.info(f"No vendors found for '{status}'")
-                         continue
-
-                     chart_df = vendor_summary.reset_index()
-                     chart_df['Value_Lakh'] = chart_df[value_col] / 100000
-                     chart_df['HOVER_TEXT'] = chart_df.apply(lambda row: (
-                         f"Vendor: {row[vendor_col]}<br>"
-                         f"Total Value: ₹{row[value_col]:,.0f}"
-                     ), axis=1)
-                    
-                     fig = px.bar(
-                         chart_df,
-                         x=vendor_col,
-                         y='Value_Lakh',
-                         text=vendor_col,
-                         color='Value_Lakh',
-                         color_discrete_sequence=[color],
-                         title=title
-                     )
-                    
-                     fig.update_traces(
-                         customdata=chart_df['HOVER_TEXT'],
-                         hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                         texttemplate='%{text}',
-                         textposition='auto'
-                     )
-                    
-                     fig.update_layout(
-                         xaxis_tickangle=-45,
-                         yaxis_title="Inventory Value",
-                         yaxis=dict(
-                             tickformat=',.0f',
-                             ticksuffix='L'  # ✅ Format Y-axis in Lakhs
-                         )
-                     )
-                     st.plotly_chart(fig, use_container_width=True, key=key)
+                status_configs = [
+                    ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", "#1f77b4"),  # Blue
+                    ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", "#d62728"),     # Red
+                    ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", "#2ca02c"),          # Green
+                ]
+                for status, title, key, color in status_configs:
+                    st.subheader(title)
+                    filtered = df[df['INVENTORY REMARK STATUS'] == status]
+                    filtered = filtered[filtered[value_col] > 0]
+                    vendor_summary = filtered.groupby(vendor_col)[value_col].sum().sort_values(ascending=False).head(10)
+                    if vendor_summary.empty:
+                        st.info(f"No vendors found for '{status}'")
+                        continue
+                    chart_df = vendor_summary.reset_index()
+                    chart_df['Value_Lakh'] = chart_df[value_col] / 100000
+                    chart_df['HOVER_TEXT'] = chart_df.apply(lambda row: (
+                        f"Vendor: {row[vendor_col]}<br>"
+                        f"Total Value: ₹{row[value_col]:,.0f}"
+                    ), axis=1)
+                    # ✅ Remove color=..., and force fixed bar color
+                fig = px.bar(
+                    chart_df,
+                    x=vendor_col,
+                    y='Value_Lakh',
+                    text=vendor_col,
+                    title=title
+                )
+                # ✅ Set solid color manually
+                fig.update_traces(
+                    marker_color=color,
+                    customdata=chart_df['HOVER_TEXT'],
+                    hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+                    texttemplate='%{text}',
+                    textposition='auto'
+                )
+                fig.update_layout(
+                    xaxis_tickangle=-45,
+                    yaxis_title="Inventory Value",
+                    yaxis=dict(
+                        tickformat=',.0f',
+                        ticksuffix='L'
+                    )
+                )
+                st.plotly_chart(fig, use_container_width=True, key=key)
         except Exception as e:
             st.error("❌ Error displaying Top Vendors by Status")
             st.code(str(e))
+
             
 if __name__ == "__main__":
     app = InventoryManagementSystem()
