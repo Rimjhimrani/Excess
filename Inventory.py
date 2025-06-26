@@ -2475,14 +2475,27 @@ class InventoryManagementSystem:
             vendor_data = df[df[value_col] > 0].groupby(vendor_col)[value_col].sum().sort_values(ascending=False).head(10)
             if not vendor_data.empty:
                 fig3 = px.bar(
-                    x=vendor_data.index,
-                    y=vendor_data.values,
-                    title='Top 10 Vendors by Inventory Value',
-                    labels={'x': vendor_col, 'y': f'Total Value (₹)'},
-                    color=vendor_data.values,
-                    color_continuous_scale='Viridis'
+                    vendor_data,
+                    x=vendor_col,
+                    y='Value_Lakh',
+                    text=vendor_col,  # Show vendor name on bar
+                    color='Value_Lakh',
+                    color_continuous_scale='Viridis',
+                    title='Top 10 Vendors by Inventory Value (₹ Lakhs)'
                 )
-                fig3.update_layout(xaxis_tickangle=-45)
+                 fig3.update_traces(
+                     customdata=vendor_data['HOVER_TEXT'],
+                     hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+                     texttemplate='%{text}',
+                     textposition='auto'
+                 )
+                 fig3.update_layout(
+                     xaxis_tickangle=-45,
+                     yaxis_title="Current Inventory - VALUE",
+                     yaxis=dict(
+                         tickformat=',.0f',
+                         ticksuffix='L'  # ✅ Show values like 120L
+                )
                 st.plotly_chart(fig3, use_container_width=True)
             else:
                 st.info("ℹ️ No valid vendor data found for chart (all values are 0).")
