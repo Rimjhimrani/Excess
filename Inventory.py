@@ -232,7 +232,7 @@ class InventoryAnalyzer:
         return summary
         
     def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color):
-         """Show top 10 vendors filtered by inventory remark status (short, excess, within norms)"""
+        """Show top 10 vendors filtered by inventory remark status (short, excess, within norms)"""
         # Filter by inventory status
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
         # Sum Stock Value by Vendor
@@ -252,28 +252,45 @@ class InventoryAnalyzer:
             st.info(f"No vendors found in '{status_filter}' status")
             return
         vendor_names = [v[0] for v in sorted_vendors]
-        # Convert stock values to lakhs (divide by 100,000)
-        stock_values_lakhs = [v[1] / 100000 for v in sorted_vendors]
+        # Handle different value formats
+        if value_format == 'lakhs':
+            # Convert stock values to lakhs (divide by 100,000)
+            stock_values = [v[1] / 100000 for v in sorted_vendors]
+            y_axis_title = "Stock Value (₹ Lakhs)"
+            hover_suffix = "L"
+            tick_suffix = "L"
+        elif value_format == 'crores':
+            # Convert stock values to crores (divide by 10,000,000)
+            stock_values = [v[1] / 10000000 for v in sorted_vendors]
+            y_axis_title = "Stock Value (₹ Crores)"
+            hover_suffix = "Cr"
+            tick_suffix = "Cr"
+        else:
+            # Keep original values
+            stock_values = [v[1] for v in sorted_vendors]
+            y_axis_title = "Stock Value (₹)"
+            hover_suffix = ""
+            tick_suffix = ""
         # Plot chart
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=vendor_names, 
-            y=stock_values_lakhs, 
+            y=stock_values, 
             marker_color=color,
-            # Add hover template to show values in lakhs format
+            # Add hover template to show values in appropriate format
             hovertemplate='<b>%{x}</b><br>' +
-                     'Stock Value: ₹%{y:.1f}L<br>' +
-                     '<extra></extra>'
+            f'Stock Value: ₹%{{y:.1f}}{hover_suffix}<br>' +
+            '<extra></extra>'
         ))
         fig.update_layout(
             title=chart_title,
             xaxis_title="Vendor",
-            yaxis_title="Stock Value (₹ Lakhs)",  # Updated y-axis title
+            yaxis_title=y_axis_title,
             showlegend=False,
-            # Format y-axis to show lakhs with 'L' suffix
+            # Format y-axis appropriately
             yaxis=dict(
                 tickformat=".1f",
-                ticksuffix="L"
+                ticksuffix=tick_suffix
             )
         )
         st.plotly_chart(fig, use_container_width=True, key=chart_key)
