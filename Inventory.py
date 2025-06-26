@@ -2613,15 +2613,16 @@ class InventoryManagementSystem:
                         st.write(f"- Total vendors: {len(vendor_summary)}")
                         st.write(f"- Total value: ₹{vendor_summary.sum():,.0f}")
                         st.write("---")
-             except Exception as e:
-                 st.error("❌ Error displaying Top Vendors by Status")
-                 st.code(str(e))
-                 st.write("Debug info:")
-                 st.write(f"DataFrame shape: {df.shape}")
-                 st.write(f"DataFrame columns: {list(df.columns)}")
-                 if 'INVENTORY REMARK STATUS' in df.columns:
-                     st.write(f"Status column unique values: {df['INVENTORY REMARK STATUS'].unique()}")
-            
+                        
+        except Exception as e:
+            st.error("❌ Error displaying Top Vendors by Status")
+            st.code(str(e))
+            st.write("Debug info:")
+            st.write(f"DataFrame shape: {df.shape}")
+            st.write(f"DataFrame columns: {list(df.columns)}")
+            if 'INVENTORY REMARK STATUS' in df.columns:
+                st.write(f"Status column unique values: {df['INVENTORY REMARK STATUS'].unique()}")
+
 if __name__ == "__main__":
     app = InventoryManagementSystem()
     app.run()  # This runs the full dashboard
