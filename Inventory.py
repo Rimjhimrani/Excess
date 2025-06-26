@@ -1076,7 +1076,6 @@ class InventoryManagementSystem:
     def display_validation_results(self, validation_result):
         """Display inventory validation results"""
         st.markdown("**📋 Validation Results**")
-        
         if validation_result['is_valid']:
             st.success("✅ Inventory data validation passed!")
         else:
@@ -1176,14 +1175,26 @@ class InventoryManagementSystem:
     def display_comprehensive_analysis(self, analysis_results):
         """Display comprehensive analysis results with enhanced features"""
         st.success(f"✅ Analysis Complete: {len(analysis_results)} parts analyzed")
-        # Summary metrics with better styling
-        self.display_enhanced_summary_metrics(analysis_results)
-        # Enhanced charts and visualizations
-        self.display_enhanced_analysis_charts(analysis_results)
-        # Improved detailed data tables
-        self.display_enhanced_detailed_tables(analysis_results)
-        # Advanced export options
-        self.display_enhanced_export_options(analysis_results)
+        try:
+            self.display_enhanced_summary_metrics(analysis_results)
+        except Exception as e:
+            st.error("❌ Error in Summary Metrics")
+            st.code(str(e))
+        try:
+            self.display_enhanced_analysis_charts(analysis_results)
+        except Exception as e:
+            st.error("❌ Error in Charts")
+            st.code(str(e))
+        try:
+            self.display_enhanced_detailed_tables(analysis_results)
+        except Exception as e:
+            st.error("❌ Error in Detailed Tables")
+            st.code(str(e))
+        try:
+            self.display_enhanced_export_options(analysis_results)
+        except Exception as e:
+            st.error("❌ Error in Export Options")
+            st.code(str(e))
 
     def display_enhanced_export_options(self, analysis_results):
         """Allow users to export the analysis results"""
