@@ -490,7 +490,7 @@ class InventoryManagementSystem:
             if st.session_state.user_role == "Admin":
                 with st.sidebar.expander("⚙️ Preferences"):
                     st.session_state.user_preferences['default_tolerance'] = st.selectbox(
-                        "Default Tolerance", [10, 20, 30, 40, 50], 
+                        "Default Tolerance", [0, 10, 20, 30, 40, 50], 
                         index=2, key="pref_tolerance"
                     )
                     st.session_state.user_preferences['chart_theme'] = st.selectbox(
@@ -855,8 +855,8 @@ class InventoryManagementSystem:
         # Create selectbox with proper callback
         new_tolerance = st.selectbox(
             "Tolerance Zone (+/-)",
-            options=[10, 20, 30, 40, 50],
-            index=[10, 20, 30, 40, 50].index(st.session_state.admin_tolerance),
+            options=[0, 10, 20, 30, 40, 50],
+            index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance),
             format_func=lambda x: f"{x}%",
             key="tolerance_selector"
         )
