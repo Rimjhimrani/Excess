@@ -2532,104 +2532,16 @@ class InventoryManagementSystem:
             
         # ✅ 5. Top 10 Vendors by Inventory Status (₹ Lakhs)
         try:
-            st.markdown("## 🏢 Top 10 Vendors by Inventory Status (₹ Lakhs)")
-            vendor_col = next((col for col in ['Vendor', 'Vendor Name', 'VENDOR'] if col in df.columns), None)
-            value_col = next((col for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE'] if col in df.columns), None)
-            if not vendor_col or not value_col or 'INVENTORY REMARK STATUS' not in df.columns:
-                st.warning("⚠️ Required columns missing for vendor status chart.")
-                st.write(f"Available columns: {list(df.columns)}")  # Debug info
-            else:
-                # Debug: Check unique values in status column
-                st.write(f"Debug - Unique status values: {df['INVENTORY REMARK STATUS'].unique()}")
-                st.write(f"Debug - Status value counts: {df['INVENTORY REMARK STATUS'].value_counts()}")
-                st.write(f"Debug - Using vendor column: '{vendor_col}', value column: '{value_col}'")
-                status_configs = [
-                    ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", "#1f77b4"),  # Blue
-                    ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", "#d62728"),     # Red
-                    ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", "#2ca02c"),          # Green
-                ]
-                for status, title, key, color in status_configs:
-                    st.subheader(title)  # Show title first
-                    # Filter data for current status
-                    filtered = df[df['INVENTORY REMARK STATUS'] == status]
-                    st.write(f"Debug - {status}: {len(filtered)} records found")
-                    if filtered.empty:
-                        st.info(f"No records found for '{status}'")
-                        continue
-                    # Debug: Check value column data
-                    st.write(f"Debug - Value column '{value_col}' info:")
-                    st.write(f"  - Data type: {filtered[value_col].dtype}")
-                    st.write(f"  - Sample values: {filtered[value_col].head().tolist()}")
-                    st.write(f"  - Value range: {filtered[value_col].min()} to {filtered[value_col].max()}")
-                    st.write(f"  - Non-null count: {filtered[value_col].notna().sum()}")
-                    # Convert to numeric if needed and filter out zero/negative values
-                    filtered[value_col] = pd.to_numeric(filtered[value_col], errors='coerce')
-                    filtered = filtered[filtered[value_col] > 0]
-                    st.write(f"Debug - {status} after value filter: {len(filtered)} records")
-                    if filtered.empty:
-                        st.info(f"No vendors with positive inventory value for '{status}'")
-                        continue
-                    # Group by vendor and sum values
-                    vendor_summary = (
-                        filtered
-                        .groupby(vendor_col)[value_col]
-                        .sum()
-                        .sort_values(ascending=False)
-                        .head(10)
-                    )
-                    st.write(f"Debug - Vendor summary for {status}:")
-                    st.write(vendor_summary)
-                    if vendor_summary.empty:
-                        st.info(f"No vendor summary data for '{status}'")
-                        continue
-                    # Create chart data
-                    chart_df = vendor_summary.reset_index()
-                    chart_df['Value_Lakh'] = chart_df[value_col] / 100000
-                    chart_df['HOVER_TEXT'] = chart_df.apply(lambda row: (
-                        f"Vendor: {row[vendor_col]}<br>"
-                        f"Total Value: ₹{row[value_col]:,.0f}"
-                    ), axis=1)
-                    # Create the chart
-                    fig = px.bar(
-                        chart_df,
-                        x=vendor_col,
-                        y='Value_Lakh',
-                        title=title,
-                        text='Value_Lakh'
-                    )
-                    # Update chart styling
-                    fig.update_traces(
-                        marker_color=color,
-                        customdata=chart_df['HOVER_TEXT'],
-                        hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                        texttemplate='₹%{text:.1f}L',
-                        textposition='auto'
-                    )
-                    fig.update_layout(
-                        xaxis_tickangle=-45,
-                        yaxis_title="Inventory Value (₹ Lakhs)",
-                        xaxis_title="Vendor",
-                        showlegend=False,
-                        height=500,
-                        yaxis=dict(
-                            tickformat=',.1f',
-                            ticksuffix='L'
-                        )
-                    )
-                    st.plotly_chart(fig, use_container_width=True, key=key)
-                    # Show summary stats
-                    st.write(f"📊 **{status} Summary:**")
-                    st.write(f"- Total vendors: {len(vendor_summary)}")
-                    st.write(f"- Total value: ₹{vendor_summary.sum():,.0f}")
-                    st.write("---")
+            st.markdown("## 🏢 Top Vendors by Inventory Status")
+            for status, title, key, color in [
+                ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", analyzer.status_colors["Excess Inventory"]),
+                ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", analyzer.status_colors["Short Inventory"]),
+                ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", analyzer.status_colors["Within Norms"]),
+            ]:
+                analyzer.show_vendor_chart_by_status(analysis_results, status, title, chart_key=key, color=color)
         except Exception as e:
             st.error("❌ Error displaying Top Vendors by Status")
             st.code(str(e))
-            st.write("Debug info:")
-            st.write(f"DataFrame shape: {df.shape}")
-            st.write(f"DataFrame columns: {list(df.columns)}")
-            if 'INVENTORY REMARK STATUS' in df.columns:
-                st.write(f"Status column unique values: {df['INVENTORY REMARK STATUS'].unique()}")
         
 if __name__ == "__main__":
     app = InventoryManagementSystem()
