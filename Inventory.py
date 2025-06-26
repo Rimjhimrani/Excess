@@ -347,7 +347,7 @@ class InventoryManagementSystem:
         float_result = self.safe_float_convert(value)
         return int(float_result)
             
-    def create_top_parts_chart(self, data, status_filter, color, key):
+    def create_top_parts_chart(self, data, status_filter, bar_color, key):
         """Top 10 parts chart by status — values shown in ₹ Lakhs for Indian format"""
         df = pd.DataFrame(data)
         # ✅ Find correct inventory value column
