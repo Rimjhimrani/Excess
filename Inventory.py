@@ -2580,47 +2580,47 @@ class InventoryManagementSystem:
                             f"Vendor: {row[vendor_col]}<br>"
                             f"Total Value: ₹{row[value_col]:,.0f}"
                         ), axis=1)
-                       # Create the chart
-                       fig = px.bar(
-                           chart_df,
-                           x=vendor_col,
-                           y='Value_Lakh',
-                           title=title,
-                           text='Value_Lakh'
-                       )
-                       # Update chart styling
-                       fig.update_traces(
-                           marker_color=color,
-                           customdata=chart_df['HOVER_TEXT'],
-                           hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                           texttemplate='₹%{text:.1f}L',
-                           textposition='auto'
-                       )
-                       fig.update_layout(
-                           xaxis_tickangle=-45,
-                           yaxis_title="Inventory Value (₹ Lakhs)",
-                           xaxis_title="Vendor",
-                           showlegend=False,
-                           height=500,
-                           yaxis=dict(
-                               tickformat=',.1f',
-                               ticksuffix='L'
-                           )
-                       )
-                       st.plotly_chart(fig, use_container_width=True, key=key)
-                       # Show summary stats
-                       st.write(f"📊 **{status} Summary:**")
-                       st.write(f"- Total vendors: {len(vendor_summary)}")
-                       st.write(f"- Total value: ₹{vendor_summary.sum():,.0f}")
-                       st.write("---")
-            except Exception as e:
-                st.error("❌ Error displaying Top Vendors by Status")
-                st.code(str(e))
-                st.write("Debug info:")
-                st.write(f"DataFrame shape: {df.shape}")
-                st.write(f"DataFrame columns: {list(df.columns)}")
-                if 'INVENTORY REMARK STATUS' in df.columns:
-                    st.write(f"Status column unique values: {df['INVENTORY REMARK STATUS'].unique()}")
+                        # Create the chart
+                        fig = px.bar(
+                            chart_df,
+                            x=vendor_col,
+                            y='Value_Lakh',
+                            title=title,
+                            text='Value_Lakh'
+                        )
+                        # Update chart styling
+                        fig.update_traces(
+                            marker_color=color,
+                            customdata=chart_df['HOVER_TEXT'],
+                            hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+                            texttemplate='₹%{text:.1f}L',
+                            textposition='auto'
+                        )
+                        fig.update_layout(
+                            xaxis_tickangle=-45,
+                            yaxis_title="Inventory Value (₹ Lakhs)",
+                            xaxis_title="Vendor",
+                            showlegend=False,
+                            height=500,
+                            yaxis=dict(
+                                tickformat=',.1f',
+                                ticksuffix='L'
+                            )
+                        )
+                        st.plotly_chart(fig, use_container_width=True, key=key)
+                        # Show summary stats
+                        st.write(f"📊 **{status} Summary:**")
+                        st.write(f"- Total vendors: {len(vendor_summary)}")
+                        st.write(f"- Total value: ₹{vendor_summary.sum():,.0f}")
+                        st.write("---")
+             except Exception as e:
+                 st.error("❌ Error displaying Top Vendors by Status")
+                 st.code(str(e))
+                 st.write("Debug info:")
+                 st.write(f"DataFrame shape: {df.shape}")
+                 st.write(f"DataFrame columns: {list(df.columns)}")
+                 if 'INVENTORY REMARK STATUS' in df.columns:
+                     st.write(f"Status column unique values: {df['INVENTORY REMARK STATUS'].unique()}")
             
 if __name__ == "__main__":
     app = InventoryManagementSystem()
