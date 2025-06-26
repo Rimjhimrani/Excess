@@ -2444,38 +2444,23 @@ class InventoryManagementSystem:
         else:
             st.warning("⚠️ Required columns for parts value chart not found.")
         # ✅ 2. Inventory Status Breakdown (Pie)
-        value_col = next((col for col in [
-            'Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE'
-        ] if col in df.columns), None)
-        if 'Status' in df.columns and value_col:
-            # Group by Status and sum inventory values
-            status_values = (
-                df.groupby('Status')[value_col]
-                .sum()
-                .reset_index()
-                .sort_values(by=value_col, ascending=False)
-            )
-            status_values['Value_Lakh'] = status_values[value_col] / 100000
-            if not status_values.empty:
+        if 'Status' in df.columns:
+            status_counts = df['Status'].value_counts().reset_index()
+            status_counts.columns = ['Status', 'Count']
+            if not status_counts.empty:
                 fig2 = px.pie(
-                    status_values,
+                    status_counts,
                     names='Status',
-                    values='Value_Lakh',
-                    title='Inventory Status Distribution by Value (₹ Lakhs)',
+                    values='Count',
+                    title='Inventory Status Distribution',
                     hole=0.4,
                     color_discrete_sequence=px.colors.qualitative.Set2
                 )
-                fig2.update_traces(
-                    overtemplate='%{label}: ₹%{value:,.1f} Lakh<extra></extra>',
-                    texttemplate='%{label}<br>₹%{value:,.1f} Lakh'
-                )
                 st.plotly_chart(fig2, use_container_width=True)
             else:
-                st.info("ℹ️ No value data available for status pie chart.")
-        elif 'Status' not in df.columns:
-            st.warning("⚠️ Status column not found for status distribution chart.")
+                st.info("ℹ️ No status data available for pie chart.")
         else:
-            st.warning("⚠️ Inventory value column not found. Cannot plot status pie chart.")
+            st.warning("⚠️ Status column not found for status distribution chart.")
 
         # ✅ 3. Vendor vs Value (Fixed vendor_col definition)
         vendor_col = None
@@ -2527,57 +2512,16 @@ class InventoryManagementSystem:
             
         # ✅ 5. Top 10 Vendors by Inventory Status (₹ Lakhs)
         try:
-            st.markdown("## 🏢 Top 10 Vendors by Inventory Status (₹ Lakhs)")
-            vendor_col = next((col for col in ['Vendor', 'Vendor Name', 'VENDOR'] if col in df.columns), None)
-            value_col = next((col for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE'] if col in df.columns), None)
-            if not vendor_col or not value_col or 'INVENTORY REMARK STATUS' not in df.columns:
-                st.warning("⚠️ Required columns missing for vendor status chart.")
-            else:
-                for status, title, key, color in [
-                    ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", "#FF9999"),
-                    ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", "#FF6666"),
-                    ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", "#66CC66"),
-                ]:
-                    st.subheader(title)
-                    filtered = df[df['INVENTORY REMARK STATUS'] == status]
-                    filtered = filtered[filtered[value_col] > 0]
-                    vendor_summary = filtered.groupby(vendor_col)[value_col].sum().sort_values(ascending=False).head(10)
-                    if vendor_summary.empty:
-                        st.info(f"No vendors found for '{status}'")
-                        continue
-                    chart_df = vendor_summary.reset_index()
-                    chart_df['Value_Lakh'] = chart_df[value_col] / 100000
-                    chart_df['HOVER_TEXT'] = chart_df.apply(lambda row: (
-                        f"Vendor: {row[vendor_col]}<br>"
-                        f"Total Value: ₹{row[value_col]:,.0f}"
-                    ), axis=1)
-                    fig = px.bar(
-                        chart_df,
-                        x=vendor_col,
-                        y='Value_Lakh',
-                        text=vendor_col,
-                        color='Value_Lakh',
-                        color_continuous_scale='Viridis',
-                        title=title
-                    )
-                    fig.update_traces(
-                        customdata=chart_df['HOVER_TEXT'],
-                        hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                        texttemplate='%{text}',
-                        textposition='auto'
-                    )
-                    fig.update_layout(
-                        xaxis_tickangle=-45,
-                        yaxis_title="Inventory Value",
-                        yaxis=dict(
-                            tickformat=',.0f',
-                            ticksuffix='L'  # ✅ Format Y-axis in Lakhs
-                        )
-                    )
-                    st.plotly_chart(fig, use_container_width=True, key=key)
+            st.markdown("## 🏢 Top Vendors by Inventory Status")
+            for status, title, key, color in [
+                ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", analyzer.status_colors["Excess Inventory"]),
+                ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", analyzer.status_colors["Short Inventory"]),
+                ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", analyzer.status_colors["Within Norms"]),
+            ]:
+                analyzer.show_vendor_chart_by_status(analysis_results, status, title, chart_key=key, color=color)
         except Exception as e:
             st.error("❌ Error displaying Top Vendors by Status")
-            st.code(str(e))
+            st.code(str(e)) for this i also want this 
 
 if __name__ == "__main__":
     app = InventoryManagementSystem()
