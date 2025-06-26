@@ -348,35 +348,43 @@ class InventoryManagementSystem:
         return int(float_result)
             
     def create_top_parts_chart(self, data, status_type, color, key):
-        """Display top 10 parts by absolute value of short/excess inventory impact (₹)."""
-        # Filter top parts by selected inventory status
-        top_items = [
-            item for item in data 
-            if item['INVENTORY REMARK STATUS'] == status_type
-        ]
-        # Sort by absolute ₹ value of short/excess impact
-        top_items = sorted(
-            top_items,
-            key=lambda x: abs(x['VALUE(Unit Price* Short/Excess Inventory)']),
-            reverse=False  # BUG: should be True for descending order
-        )[:10]
-        
-        if not top_items:
-            st.info(f"No parts found for status: {status_type}")
+        """Reusable chart builder for top 10 parts by status with detailed hover info"""
+        df = pd.DataFrame(data)
+        # ✅ Determine value column
+        value_col = None
+        for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE']:
+            if col in df.columns:
+                value_col = col
+                break
+        if not value_col or 'PART NO' not in df.columns:
+            st.warning("⚠️ Required columns missing for top parts chart.")
             return
-        part_nos = [item['PART NO'] for item in top_items]
-        values = [item['VALUE(Unit Price* Short/Excess Inventory)'] for item in top_items]
-        # Create horizontal bar chart
-        fig = go.Figure(data=[
-            go.Bar(x=values, y=part_nos, orientation='h', marker_color=color)
-        ])
-        fig.update_layout(
-            title=f"Top 10 Parts by Value - {status_type}",
-            xaxis_title="Inventory Value Impact (₹)",
-            yaxis_title="Part Number",
-            yaxis=dict(autorange='reversed')
+        # ✅ Filter and clean
+        df = df[df['INVENTORY REMARK STATUS'] == status_filter]
+        df = df[df[value_col] > 0]
+        df = df.sort_values(by=value_col, ascending=False).head(10)
+        if df.empty:
+            st.info(f"No data found for '{status_filter}' parts.")
+            return
+        # ✅ Prepare hover text with description and value
+        df['HOVER_TEXT'] = df.apply(lambda row: (
+            f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
+            f"Value: ₹{row[value_col]:,.0f}"
+        ), axis=1)
+        fig = px.bar(
+            df,
+            x='PART NO',
+            y=value_col,
+            color_discrete_sequence=[bar_color],
+            title=f"Top 10 Parts - {status_filter}",
+            text=value_col  # shows label above bars
         )
-        
+        fig.update_traces(
+            hovertemplate='<b>%{x}</b><br>%{customdata}',
+            customdata=df['HOVER_TEXT'],
+            textposition='auto'
+        )
+        fig.update_layout(xaxis_tickangle=-45)
         st.plotly_chart(fig, use_container_width=True, key=key)
  
     def authenticate_user(self):
