@@ -2547,7 +2547,7 @@ class InventoryManagementSystem:
                     st.subheader(title)
                     filtered = df[df['INVENTORY REMARK STATUS'] == status]
                     filtered = filtered[filtered[value_col] > 0]
-                     vendor_summary = (
+                    vendor_summary = (
                          filtered
                          .groupby(vendor_col)[value_col]
                          .sum()
