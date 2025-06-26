@@ -2521,7 +2521,7 @@ class InventoryManagementSystem:
                 analyzer.show_vendor_chart_by_status(analysis_results, status, title, chart_key=key, color=color)
         except Exception as e:
             st.error("❌ Error displaying Top Vendors by Status")
-            st.code(str(e)) for this i also want this 
+            st.code(str(e))
 
 if __name__ == "__main__":
     app = InventoryManagementSystem()
