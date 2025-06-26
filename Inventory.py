@@ -2538,11 +2538,12 @@ class InventoryManagementSystem:
             if not vendor_col or not value_col or 'INVENTORY REMARK STATUS' not in df.columns:
                 st.warning("⚠️ Required columns missing for vendor status chart.")
             else:
-                for status, title, key, color in [
+                 status_configs = [
                     ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", "#1f77b4"),
                     ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", "#d62728"),
                     ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", "#2ca02c"),
-                ]:
+                ]
+                for status, title, key, color in status_configs:
                     st.subheader(title)
                     filtered = df[df['INVENTORY REMARK STATUS'] == status]
                     filtered = filtered[filtered[value_col] > 0]
@@ -2550,6 +2551,7 @@ class InventoryManagementSystem:
                     if vendor_summary.empty:
                         st.info(f"No vendors found for '{status}'")
                         continue
+
                     chart_df = vendor_summary.reset_index()
                     chart_df['Value_Lakh'] = chart_df[value_col] / 100000
                     chart_df['HOVER_TEXT'] = chart_df.apply(lambda row: (
