@@ -1277,17 +1277,17 @@ class InventoryManagementSystem:
         <style>
         .metric-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 1rem; /* Increased padding for more height */
-            border-radius: 8px;
+            padding: 1.2rem; /* Increased padding for more height */
+            border-radius: 10px;
             margin: 0.4rem 0;
-            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
             text-align: center;
             display: flex;
             flex-direction: column;
             justify-content: center;
             max-width: 100%;
             box-sizing: border-box;
-            min-height: 100px; /* Added height */
+            min-height: 120px; /* Added height */
         }
         .status-normal { background: linear-gradient(135deg, #4CAF50, #45a049); 
         .status-excess { background: linear-gradient(135deg, #2196F3, #1976D2); }
@@ -1296,28 +1296,28 @@ class InventoryManagementSystem:
         .metric-value {
             color: white;
             font-weight: bold;
-            font-size: 1.1rem; /* Increased font size */
-            margin-bottom: 0.2rem;
+            font-size: 1.4rem; /* Increased font size */
+            margin-bottom: 0.3rem;
             word-wrap: break-word;
         }
         .metric-label {
             color: #f0f0f0;
-            font-size: 0.85rem; /* Increased font size */
-            margin-bottom: 0.3rem;
+            font-size: 1.0rem; /* Increased font size */
+            margin-bottom: 0.4rem;
             word-wrap: break-word;
         }
         .metric-delta {
             color: #e0e0e0;
-            font-size: 0.75rem; /* Increased font size */
+            font-size: 0.85rem; /* Increased font size */
             word-wrap: break-word;
         }
         .highlight-box {
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            padding: 0.8rem;
-            border-radius: 8px;
+            padding: 1rem;
+            border-radius: 10px;
             color: white;
-            margin: 0.6rem 0;
-            max-width: 80%; /* Slightly wider box */
+            margin: 0.8rem 0;
+            max-width: 85%; /* Slightly wider box */
             box-sizing: border-box;
         }
         .dashboard-container {
