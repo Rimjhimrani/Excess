@@ -2444,27 +2444,39 @@ class InventoryManagementSystem:
         else:
             st.warning("⚠️ Required columns for parts value chart not found.")
         # ✅ 2. Inventory Status Breakdown (Pie)
-        if 'Status' in df.columns:
-            status_counts = df['Status'].value_counts().reset_index()
-            status_counts.columns = ['Status', 'Count']
-            if not status_counts.empty:
+        value_col = next((col for col in [
+            'Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE'
+        ] if col in df.columns), None)
+        if 'Status' in df.columns and value_col:
+            # Group by Status and sum inventory values
+            status_values = (
+                df.groupby('Status')[value_col]
+                .sum()
+                .reset_index()
+                .sort_values(by=value_col, ascending=False)
+            )
+            status_values['Value_Lakh'] = status_values[value_col] / 100000
+            if not status_values.empty:
                 fig2 = px.pie(
-                    status_counts,
+                    status_values,
                     names='Status',
                     values='Value_Lakh',
-                    title='Inventory Status Distribution',
+                    title='Inventory Status Distribution by Value (₹ Lakhs)',
                     hole=0.4,
                     color_discrete_sequence=px.colors.qualitative.Set2
                 )
                 fig2.update_traces(
-                    hovertemplate='%{label}: ₹%{value:,.1f} Lakh<extra></extra>',
+                    overtemplate='%{label}: ₹%{value:,.1f} Lakh<extra></extra>',
                     texttemplate='%{label}<br>₹%{value:,.1f} Lakh'
                 )
                 st.plotly_chart(fig2, use_container_width=True)
             else:
-                st.info("ℹ️ No status data available for pie chart.")
-        else:
+                st.info("ℹ️ No value data available for status pie chart.")
+        elif 'Status' not in df.columns:
             st.warning("⚠️ Status column not found for status distribution chart.")
+        else:
+            st.warning("⚠️ Inventory value column not found. Cannot plot status pie chart.")
+
         # ✅ 3. Vendor vs Value (Fixed vendor_col definition)
         vendor_col = None
         if 'Vendor' in df.columns:
