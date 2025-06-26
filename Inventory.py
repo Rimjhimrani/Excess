@@ -2547,7 +2547,14 @@ class InventoryManagementSystem:
                     st.subheader(title)
                     filtered = df[df['INVENTORY REMARK STATUS'] == status]
                     filtered = filtered[filtered[value_col] > 0]
-                    vendor_summary = filtered.groupby(vendor_col)[value_col].sum().sort_values(ascending=False).head(10)
+                     vendor_summary = (
+                         filtered
+                         .groupby(vendor_col)[value_col]
+                         .sum()
+                         .sort_values(ascending=False)
+                         .head(10)
+                     )
+
                     if vendor_summary.empty:
                         st.info(f"No vendors found for '{status}'")
                         continue
