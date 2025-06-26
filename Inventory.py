@@ -161,6 +161,7 @@ class InventoryAnalyzer:
                 rm_qty = float(pfep_item.get('RM_IN_QTY', 0))
                 unit_price = float(pfep_item.get('unit_price', 0)) or 1.0  # Avoid division by zero
                 rm_days = pfep_item.get('RM_IN_DAYS', '')
+                avg_consumption_per_day = self.safe_float_convert(pfep_item.get('AVG CONSUMPTION/DAY', 0))
                 # Short/Excess Inventory calculation (FIX: multiplication, not division)
                 short_excess_qty = current_qty - rm_qty
                 value = unit_price * short_excess_qty 
@@ -180,19 +181,18 @@ class InventoryAnalyzer:
                 result = {
                     'PART NO': part_no,
                     'PART DESCRIPTION': pfep_item.get('Description', ''),
-                    'Current Inventory-QTY': current_qty,
-                    'Inventory Norms - QTY': rm_qty,
-                    'Current Inventory - VALUE': stock_value,
-                    'SHORT/EXCESS INVENTORY': short_excess_qty,
-                    'INVENTORY REMARK STATUS': status,
-                    'Status': status,
-                    'VALUE(Unit Price* Short/Excess Inventory)': value,
-                    'UNIT PRICE': unit_price,
-                    'RM IN DAYS': rm_days,
                     'Vendor Name': pfep_item.get('Vendor_Name', 'Unknown'),
                     'Vendor_Code': pfep_item.get('Vendor_Code', ''),
-                    'City': pfep_item.get('City', ''),
-                    'State': pfep_item.get('State', '')
+                    'RM IN DAYS': rm_days,
+                    'AVG CONSUMPTION/DAY': avg_consumption_per_day,
+                    'Inventory Norms - QTY': rm_qty,
+                    'UNIT PRICE': unit_price,
+                    'Current Inventory-QTY': current_qty,
+                    'Current Inventory - VALUE': stock_value,
+                    'SHORT/EXCESS INVENTORY': short_excess_qty,
+                    'VALUE(Unit Price* Short/Excess Inventory)': value,
+                    'INVENTORY REMARK STATUS': status,
+                    'Status': status,
                 }
                 results.append(result)
             except Exception as e:
@@ -633,6 +633,10 @@ class InventoryManagementSystem:
                 'vendor name', 'VENDOR_NAME', 'VENDOR NAME', 'Vendor_Name',
                 'Supplier Name', 'SUPPLIER_NAME', 'Supplier'
             ],
+            'avg_consumption_per_day': [
+                'avg consumption/day', 'average consumption/day', 'avg_per_day',
+                'avg daily usage', 'AVG CONSUMPTION/DAY', 'Average Per Day'
+            ],
             'city': ['city', 'location', 'place', 'City', 'CITY', 'Location', 'LOCATION'],
             'state': ['state', 'region', 'province', 'State', 'STATE', 'Region', 'REGION']
         }
@@ -695,6 +699,7 @@ class InventoryManagementSystem:
                     'unit_price': unit_price_value,  # Fixed: use lowercase to match analyzer expectation
                     'Vendor_Code': str(row.get(mapped_columns.get('vendor_code', ''), '')).strip(),
                     'Vendor_Name': str(row.get(mapped_columns.get('vendor_name', ''), 'Unknown')).strip(),
+                    'AVG CONSUMPTION/DAY': row.get(mapped_columns.get('avg_consumption_per_day', ''), ''),
                     'City': str(row.get(mapped_columns.get('city', ''), '')).strip(),
                     'State': str(row.get(mapped_columns.get('state', ''), '')).strip()
                 }
