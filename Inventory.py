@@ -2558,6 +2558,8 @@ class InventoryManagementSystem:
                     if vendor_summary.empty:
                         st.info(f"No vendors found for '{status}'")
                         continue
+                    # Only show subheader if chart is going to display
+                    st.subheader(title)
                     chart_df = vendor_summary.reset_index()
                     chart_df['Value_Lakh'] = chart_df[value_col] / 100000
                     chart_df['HOVER_TEXT'] = chart_df.apply(lambda row: (
