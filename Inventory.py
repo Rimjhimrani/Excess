@@ -2520,31 +2520,31 @@ class InventoryManagementSystem:
                             'Count': len(status_df),
                             'Stock_Value': status_df[value_col].sum()
                         })
-                        status_summary = pd.DataFrame(status_data)
-                        if not status_summary.empty:
-                            fig2 = px.pie(
-                                status_summary,
-                                names='Status',
-                                values='Count',
-                                title='Inventory Status Distribution',
-                                hole=0.4,
-                                color_discrete_sequence=px.colors.qualitative.Set2
-                            )
-                            # Enhanced hover with stock values
-                            fig2.update_traces(
-                                hovertemplate='<b>%{label}</b><br>' +
-                                'Parts: %{value}<br>' +
-                                'Stock Value: ₹' + status_summary['Stock_Value'].apply(lambda x: f'{x:,.0f}') + '<br>' +
-                                'Percentage: %{percent}<br>' +
-                                '<extra></extra>'
-                            )
-                            st.plotly_chart(fig2, use_container_width=True)
-                        else:
-                            st.info("ℹ️ No status data available for pie chart.")
+                    status_summary = pd.DataFrame(status_data)
+                    if not status_summary.empty:
+                        fig2 = px.pie(
+                            status_summary,
+                            names='Status',
+                            values='Count',
+                            title='Inventory Status Distribution',
+                            hole=0.4,
+                            color_discrete_sequence=px.colors.qualitative.Set2
+                        )
+                        # Enhanced hover with stock values
+                        fig2.update_traces(
+                            hovertemplate='<b>%{label}</b><br>' +
+                            'Parts: %{value}<br>' +
+                            'Stock Value: ₹' + status_summary['Stock_Value'].apply(lambda x: f'{x:,.0f}') + '<br>' +
+                            'Percentage: %{percent}<br>' +
+                            '<extra></extra>'
+                        )
+                        st.plotly_chart(fig2, use_container_width=True)
                     else:
-                        st.warning("⚠️ Value column not found for stock values.")
+                        st.info("ℹ️ No status data available for pie chart.")
                 else:
-                    st.warning("⚠️ Status column not found for status distribution chart.")
+                    st.warning("⚠️ Value column not found for stock values.")
+            else:
+                st.warning("⚠️ Status column not found for status distribution chart.")
         # ✅ 3. Vendor vs Value (Fixed vendor_col definition)
         vendor_col = next((col for col in ['Vendor', 'Vendor Name', 'VENDOR'] if col in df.columns), None)
         if vendor_col and value_col and vendor_col in df.columns:
