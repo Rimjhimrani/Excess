@@ -2457,7 +2457,7 @@ class InventoryManagementSystem:
             ]:
                 st.subheader(label)
                 st.markdown(f'<div class="graph-description">Top 10 parts under "{status}" based on inventory value impact.</div>', unsafe_allow_html=True)
-                ims.create_top_parts_chart(analysis_results, status, color, key
+                ims.create_top_parts_chart(analysis_results, status, color, key)
         except Exception as e:
                 st.error("❌ Error displaying Top Parts by Status")
                 st.code(str(e))
