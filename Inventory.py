@@ -1176,19 +1176,15 @@ class InventoryManagementSystem:
     def display_comprehensive_analysis(self, analysis_results):
         """Display comprehensive analysis results with enhanced features"""
         st.success(f"✅ Analysis Complete: {len(analysis_results)} parts analyzed")
-        # Summary metrics with better styling
-        
+        # 1. Summary metrics with better styling
         self.display_enhanced_summary_metrics(analysis_results)
-        # Enhanced charts and visualizations
-        
+        # 2. Enhanced charts and visualizations (now includes all charts)
         self.display_enhanced_analysis_charts(analysis_results)
-        
-        # Improved detailed data tables
+        # 3. Improved detailed data tables
         self.display_enhanced_detailed_tables(analysis_results)
-    
-        # Advanced export options
+        # 4. Advanced export options
         self.display_enhanced_export_options(analysis_results)
-        
+   
     def display_enhanced_export_options(self, analysis_results):
         """Allow users to export the analysis results"""
         st.subheader("📤 Export Analysis Results")
