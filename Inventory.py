@@ -1176,15 +1176,15 @@ class InventoryManagementSystem:
     def display_comprehensive_analysis(self, analysis_results):
         """Display comprehensive analysis results with enhanced features"""
         st.success(f"✅ Analysis Complete: {len(analysis_results)} parts analyzed")
-        # 1. Summary metrics with better styling
+        # Summary metrics with better styling
         self.display_enhanced_summary_metrics(analysis_results)
-        # 2. Enhanced charts and visualizations (now includes all charts)
+        # Enhanced charts and visualizations
         self.display_enhanced_analysis_charts(analysis_results)
-        # 3. Improved detailed data tables
+        # Improved detailed data tables
         self.display_enhanced_detailed_tables(analysis_results)
-        # 4. Advanced export options
+        # Advanced export options
         self.display_enhanced_export_options(analysis_results)
-   
+
     def display_enhanced_export_options(self, analysis_results):
         """Allow users to export the analysis results"""
         st.subheader("📤 Export Analysis Results")
@@ -2446,28 +2446,26 @@ class InventoryManagementSystem:
                 missing_cols.append("value column")
             st.warning(f"⚠️ Vendor analysis chart cannot be displayed. Missing: {', '.join(missing_cols)}")
         # ✅ 4. Top 10 Parts by Inventory Status
-    st.markdown("## 🧩 Top 10 Parts by Inventory Status")
-    processed_data = analysis_results
-    analyzer = self.analyzer
-    ims = self
-
-    for status, label, color, key in [
-        ("Excess Inventory", "🔵 Top 10 Excess Inventory Parts", analyzer.status_colors["Excess Inventory"], "excess_parts"),
-        ("Short Inventory", "🔴 Top 10 Short Inventory Parts", analyzer.status_colors["Short Inventory"], "short_parts"),
-        ("Within Norms", "🟢 Top 10 Within Norms Parts", analyzer.status_colors["Within Norms"], "normal_parts")
-    ]:
-        st.subheader(label)
-        st.markdown(f'<div class="graph-description">Top 10 parts under "{status}" based on inventory value impact.</div>', unsafe_allow_html=True)
-        ims.create_top_parts_chart(processed_data, status, color, key)
-
-    # ✅ 5. Top 10 Vendors by Inventory Status
-    st.markdown("## 🏢 Top Vendors by Inventory Status")
-    for status, title, key, color in [
-        ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", analyzer.status_colors["Excess Inventory"]),
-        ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", analyzer.status_colors["Short Inventory"]),
-        ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", analyzer.status_colors["Within Norms"]),
-    ]:
-        analyzer.show_vendor_chart_by_status(processed_data, status, title, chart_key=key, color=color)
+        st.markdown("## 🧩 Top 10 Parts by Inventory Status")
+        processed_data = analysis_results
+        analyzer = self.analyzer
+        ims = self
+        for status, label, color, key in [
+            ("Excess Inventory", "🔵 Top 10 Excess Inventory Parts", analyzer.status_colors["Excess Inventory"], "excess_parts"),
+            ("Short Inventory", "🔴 Top 10 Short Inventory Parts", analyzer.status_colors["Short Inventory"], "short_parts"),
+            ("Within Norms", "🟢 Top 10 Within Norms Parts", analyzer.status_colors["Within Norms"], "normal_parts")
+        ]:
+            st.subheader(label)
+            st.markdown(f'<div class="graph-description">Top 10 parts under "{status}" based on inventory value impact.</div>', unsafe_allow_html=True)
+            ims.create_top_parts_chart(processed_data, status, color, key)
+        # ✅ 5. Top 10 Vendors by Inventory Status
+        st.markdown("## 🏢 Top Vendors by Inventory Status")
+        for status, title, key, color in [
+            ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", analyzer.status_colors["Excess Inventory"]),
+            ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", analyzer.status_colors["Short Inventory"]),
+            ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", analyzer.status_colors["Within Norms"]),
+        ]:
+            analyzer.show_vendor_chart_by_status(processed_data, status, title, chart_key=key, color=color)
 
 if __name__ == "__main__":
     app = InventoryManagementSystem()
