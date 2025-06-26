@@ -1277,52 +1277,77 @@ class InventoryManagementSystem:
         <style>
         .metric-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 1.2rem; /* Increased padding for more height */
-            border-radius: 10px;
-            margin: 0.4rem 0;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25);
-            text-align: center;
+            padding: 1.5rem; /* Increased from 1.2rem */
+            border-radius: 12px; /* Slightly more rounded */
+            margin: 0.5rem 0; /* Increased margin */
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3); /* Enhanced shadow */
+            align: center;
             display: flex;
             flex-direction: column;
             justify-content: center;
             max-width: 100%;
             box-sizing: border-box;
-            min-height: 120px; /* Added height */
+            min-height: 140px; /* Increased from 120px */
+            transition: transform 0.2s ease; /* Added hover effect */
         }
-        .status-normal { background: linear-gradient(135deg, #4CAF50, #45a049); 
+        .metric-card:hover {
+            transform: translateY(-2px); /* Subtle lift on hover */
+        }
+        /* Status-specific styling remains the same */
+        .status-normal { background: linear-gradient(135deg, #4CAF50, #45a049); }
         .status-excess { background: linear-gradient(135deg, #2196F3, #1976D2); }
         .status-short { background: linear-gradient(135deg, #F44336, #D32F2F); }
         .status-total { background: linear-gradient(135deg, #FF9800, #F57C00); }
         .metric-value {
             color: white;
             font-weight: bold;
-            font-size: 1.4rem; /* Increased font size */
-            margin-bottom: 0.3rem;
+            font-size: 1.6rem; /* Increased from 1.4rem */
+            margin-bottom: 0.4rem; /* Increased spacing */
             word-wrap: break-word;
+            line-height: 1.2;
         }
         .metric-label {
             color: #f0f0f0;
-            font-size: 1.0rem; /* Increased font size */
-            margin-bottom: 0.4rem;
+            font-size: 1.1rem; /* Increased from 1.0rem */
+            margin-bottom: 0.5rem; /* Increased spacing */
             word-wrap: break-word;
+            font-weight: 500; /* Added font weight */
         }
         .metric-delta {
             color: #e0e0e0;
-            font-size: 0.85rem; /* Increased font size */
+            font-size: 0.9rem; /* Increased from 0.85rem */
             word-wrap: break-word;
+            font-weight: 400;
         }
         .highlight-box {
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            padding: 1rem;
-            border-radius: 10px;
+            padding: 1.2rem; /* Increased padding */
+            border-radius: 12px; /* Consistent with cards */
             color: white;
-            margin: 0.8rem 0;
-            max-width: 85%; /* Slightly wider box */
+            margin: 1rem 0; /* Increased margin */
+            max-width: 85%;
             box-sizing: border-box;
         }
         .dashboard-container {
-            max-width: 80%;  /* Was 70%, now a bit wider */
+            max-width: 85%; /* Increased from 80% for more space */
             overflow-x: auto;
+            margin: 0 auto; /* Center the container */
+        }
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .metric-card {
+                min-height: 100px;
+                padding: 1rem;
+            }
+            .metric-value {
+                font-size: 1.3rem;
+            }
+            .metric-label {
+                font-size: 0.9rem;
+            }
+            .dashboard-container {
+                max-width: 95%;
+            }
         }
         </style>
         """, unsafe_allow_html=True)
