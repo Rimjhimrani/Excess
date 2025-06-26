@@ -232,8 +232,7 @@ class InventoryAnalyzer:
         return summary
         
     def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color):
-        """Show top 10 vendors filtered by inventory remark status (short, excess, within norms)"""
-        from collections import defaultdict
+         """Show top 10 vendors filtered by inventory remark status (short, excess, within norms)"""
         # Filter by inventory status
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
         # Sum Stock Value by Vendor
@@ -247,21 +246,35 @@ class InventoryAnalyzer:
             except (ValueError, TypeError):
                 stock_value = 0.0
             vendor_totals[vendor] += stock_value
-        # Sort top 10
-        sorted_vendors = sorted(vendor_totals.items(), key=lambda x: x[1], reverse=True)[:5]  # BUG: only top 5 instead of 10
+        # Sort top 10 within this specific status (Fixed: changed from 5 to 10)
+        sorted_vendors = sorted(vendor_totals.items(), key=lambda x: x[1], reverse=True)[:10]
         if not sorted_vendors:
-            st.info(f"No vendors found in '{status_filter}'")
+            st.info(f"No vendors found in '{status_filter}' status")
             return
         vendor_names = [v[0] for v in sorted_vendors]
-        stock_values = [v[1] for v in sorted_vendors]
+        # Convert stock values to lakhs (divide by 100,000)
+        stock_values_lakhs = [v[1] / 100000 for v in sorted_vendors]
         # Plot chart
         fig = go.Figure()
-        fig.add_trace(go.Bar(x=vendor_names, y=stock_values, marker_color=color))
+        fig.add_trace(go.Bar(
+            x=vendor_names, 
+            y=stock_values_lakhs, 
+            marker_color=color,
+            # Add hover template to show values in lakhs format
+            hovertemplate='<b>%{x}</b><br>' +
+                     'Stock Value: ₹%{y:.1f}L<br>' +
+                     '<extra></extra>'
+        ))
         fig.update_layout(
             title=chart_title,
             xaxis_title="Vendor",
-            yaxis_title="Stock Value (₹)",
-            showlegend=False
+            yaxis_title="Stock Value (₹ Lakhs)",  # Updated y-axis title
+            showlegend=False,
+            # Format y-axis to show lakhs with 'L' suffix
+            yaxis=dict(
+                tickformat=".1f",
+                ticksuffix="L"
+            )
         )
         st.plotly_chart(fig, use_container_width=True, key=chart_key)
 
@@ -395,60 +408,7 @@ class InventoryManagementSystem:
             )
         )
         st.plotly_chart(fig, use_container_width=True, key=key)
-    def show_vendor_chart_by_status(self, analysis_results, status, title, chart_key=None, color=None, value_format="millions"):
-        """ Display vendor chart with option to format values in lakhs or millions """
-        # Get vendors for the specific status
-        vendors_data = analysis_results.get(f'{status.lower().replace(" ", "_")}_vendors', [])
-        if not vendors_data:
-            st.info(f"No vendors found for {status}")
-            return
-        # Convert to DataFrame
-        df = pd.DataFrame(vendors_data)
-    
-        # Format values based on the specified format
-        if value_format == "lakhs":
-            # Convert to lakhs (divide by 100,000)
-            df['inventory_value_formatted'] = df['inventory_value'] / 100000
-            value_suffix = " (₹ Lakhs)"
-            format_string = "₹{:.1f}L"
-        else:
-            # Convert to millions (divide by 1,000,000) - default
-            df['inventory_value_formatted'] = df['inventory_value'] / 1000000
-            value_suffix = " (₹ Millions)"
-            format_string = "₹{:.1f}M"
-        # Create the chart
-        fig = px.bar(
-            df.head(10),  # Top 10 vendors
-            x='inventory_value_formatted',
-            y='vendor_name',
-            orientation='h',
-            title=title + value_suffix,
-            color_discrete_sequence=[color] if color else None,
-            labels={
-                'inventory_value_formatted': f'Inventory Value{value_suffix}',
-                'vendor_name': 'Vendor Name'
-            }
-        )
-        # Update layout
-        fig.update_layout(
-            height=400,
-            yaxis={'categoryorder': 'total ascending'},
-            showlegend=False
-        )
-    
-        # Update hover template
-        fig.update_traces(
-            hovertemplate='<b>%{y}</b><br>' +
-            f'Value: {format_string}<br>' +
-            '<extra></extra>',
-            hoverdata={'inventory_value_formatted': ':.1f'}
-        )
-        # Display the chart
-        if chart_key:
-            st.plotly_chart(fig, use_container_width=True, key=chart_key)
-        else:
-            st.plotly_chart(fig, use_container_width=True)
-
+        
     def authenticate_user(self):
         """Enhanced authentication system with better UX and user switching"""
         st.sidebar.markdown("### 🔐 Authentication")
