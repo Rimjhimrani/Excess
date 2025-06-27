@@ -1274,14 +1274,14 @@ class InventoryManagementSystem:
             st.error("❌ Error in Summary Metrics")
             st.code(str(e))
         try:
-            self.display_enhanced_analysis_charts(analysis_results)
-        except Exception as e:
-            st.error("❌ Error in Charts")
-            st.code(str(e))
-        try:
             self.display_enhanced_detailed_tables(analysis_results)
         except Exception as e:
             st.error("❌ Error in Detailed Tables")
+            st.code(str(e))
+        try:
+            self.display_enhanced_analysis_charts(analysis_results)
+        except Exception as e:
+            st.error("❌ Error in Charts")
             st.code(str(e))
         try:
             self.display_enhanced_export_options(analysis_results)
