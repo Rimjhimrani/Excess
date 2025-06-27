@@ -398,41 +398,45 @@ class InventoryManagementSystem:
         if not value_col or 'PART NO' not in df.columns:
             st.warning("⚠️ Required columns missing for top parts chart.")
             return
-        # ✅ Filter relevant parts and format values in ₹ Lakhs
+        # ✅ Filter and sort
         df = df[df['INVENTORY REMARK STATUS'] == status_filter]
         df = df[df[value_col] > 0]
         df = df.sort_values(by=value_col, ascending=False).head(10)
         if df.empty:
             st.info(f"No data found for '{status_filter}' parts.")
             return
-        df['Value_Lakh'] = df[value_col] / 100000  # 💡 Convert to ₹ Lakh
+        # ✅ Format data
+        df['Value_Lakh'] = df[value_col] / 100000  # ₹ in Lakhs
+        df['PART_DESC_NO'] = df['PART DESCRIPTION'].astype(str) + " (" + df['PART NO'].astype(str) + ")"
         df['HOVER_TEXT'] = df.apply(lambda row: (
             f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
+            f"Part No: {row.get('PART NO')}<br>"
             f"Value: ₹{row[value_col]:,.0f}"
         ), axis=1)
+        # ✅ Build chart
         fig = px.bar(
             df,
-            x='PART DESCRIPTION',
+            x='PART_DESC_NO',
             y='Value_Lakh',
             color_discrete_sequence=[bar_color],
-            title=f"Top 10 Parts - {status_filter} (₹ in Lakhs)",
-            text='PART NO'
+            title=f"Top 10 Parts - {status_filter} (₹ in Lakhs)"
         )
+
+        # ✅ No bar text, just hover
         fig.update_traces(
             hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-            customdata=df['HOVER_TEXT'],
-            texttemplate='%{text}',
-            textposition='auto'
+            customdata=df['HOVER_TEXT']
         )
         fig.update_layout(
             xaxis_tickangle=-45,
             yaxis_title="Inventory Value (₹ Lakhs)",
             yaxis=dict(
-                tickformat=',.0f',          # thousands separator (200)
-                ticksuffix='L'              # add L to each tick (200L)
+                tickformat=',.0f',
+                ticksuffix='L'
             )
         )
         st.plotly_chart(fig, use_container_width=True, key=key)
+
         
     def authenticate_user(self):
         """Enhanced authentication system with better UX and user switching"""
