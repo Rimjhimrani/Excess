@@ -1675,7 +1675,7 @@ class InventoryManagementSystem:
              # Additional useful columns
             'Unit Price', 'UNIT PRICE', 'Price', 'Rate',
             'Category', 'CATEGORY', 'Part Category', 'PART CATEGORY'
-            'Current Inventory-QTY', 'Current Inventory - QTY', 'Current_Inventory_QTY', 'QTY', 'Quantity',
+            'Current Inventory-QTY', 'Current Inventory - QTY', 'Current_QTY', 'QTY', 'Quantity',
             'Stock_Value', 'Current Inventory - VALUE', 'Current Inventory-VALUE', 'Value', 'Stock Value',
             'VALUE(Unit Price* Short/Excess Inventory)', 'Variance Value', 'Impact Value',
             'Status', 'STATUS', 'Inventory Status'
