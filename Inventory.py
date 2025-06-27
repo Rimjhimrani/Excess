@@ -560,9 +560,9 @@ class InventoryManagementSystem:
     
     def load_sample_pfep_data(self):
         pfep_sample = [
-            ["AC0303020106", "FLAT ALUMINIUM PROFILE", 4.000, "V001", "Vendor_A", "Mumbai", "Maharashtra"],
-            # ... (your full list unchanged)
-            ["JJ1010101010", "WINDSHIELD WASHER", 25, "V002", "Vendor_B", "Delhi", "Delhi"]
+           ["AC0303020106", "FLAT ALUMINIUM PROFILE", 4.000, "V001", "Vendor_A", "Mumbai", "Maharashtra", 2.5],
+           ["JJ1010101010", "WINDSHIELD WASHER", 25, "V002", "Vendor_B", "Delhi", "Delhi", 1.8]
+           # Add more sample data with consumption values...
         ]
         pfep_data = []
         for row in pfep_sample:
@@ -576,6 +576,7 @@ class InventoryManagementSystem:
                 'State': row[6],
                 'Unit_Price': 100,            # 🔁 you can customize this per part
                 'RM_IN_DAYS': 7               # 🔁 default or configurable
+                'AVG_CONSUMPTION_PER_DAY': self.safe_float_convert(row[7]) if len(row) > 7 else ""  # ✅ Added consumption data
             })
         return pfep_data
     
@@ -640,8 +641,10 @@ class InventoryManagementSystem:
                 'Supplier Name', 'SUPPLIER_NAME', 'Supplier'
             ],
             'avg_consumption_per_day': [
-                'avg consumption/day', 'average consumption/day', 'avg_per_day',
-                'avg daily usage', 'AVG CONSUMPTION/DAY', 'Average Per Day'
+            'avg consumption/day', 'average consumption/day', 'avg_per_day',
+            'avg daily usage', 'AVG CONSUMPTION/DAY', 'Average Per Day',
+            'avg consumption per day', 'daily consumption', 'consumption per day',
+            'AVG_CONSUMPTION_PER_DAY', 'AVERAGE_CONSUMPTION_PER_DAY'
             ],
             'city': ['city', 'location', 'place', 'City', 'CITY', 'Location', 'LOCATION'],
             'state': ['state', 'region', 'province', 'State', 'STATE', 'Region', 'REGION']
@@ -682,6 +685,11 @@ class InventoryManagementSystem:
         if 'unit_price' not in mapped_columns:
             st.warning("⚠️ Unit Price column not found. Using default value of 100 for all parts.")
             st.info("💡 Expected Unit Price column names: Unit Price, Price, Unit Cost, Rate, etc.")
+            
+        if 'avg_consumption_per_day' not in mapped_columns:
+            st.warning("⚠️ AVG CONSUMPTION/DAY column not found. This will be left empty.")
+            st.info("💡 Expected column names: AVG CONSUMPTION/DAY, Average Per Day, Daily Consumption, etc.")
+            
         if self.debug:
             st.write("🔍 DEBUG: Final column mappings:")
             for k, v in mapped_columns.items():
@@ -697,6 +705,15 @@ class InventoryManagementSystem:
                     unit_price_value = self.safe_float_convert(raw_price)
                     if self.debug and idx < 3:  # Debug first 3 rows
                         st.write(f"🔍 Row {idx+1} Unit Price: '{raw_price}' -> {unit_price_value}")
+                    # Extract AVG CONSUMPTION/DAY with proper handling
+                    avg_consumption_value = ""  # Default empty string
+                    if 'avg_consumption_per_day' in mapped_columns:
+                        raw_consumption = row[mapped_columns['avg_consumption_per_day']]
+                        # Handle different data types
+                        if pd.notna(raw_consumption) and str(raw_consumption).strip() != '':
+                            avg_consumption_value = self.safe_float_convert(raw_consumption)
+                        if self.debug and idx < 3:  # Debug first 3 rows
+                            st.write(f"🔍 Row {idx+1} AVG CONSUMPTION/DAY: '{raw_consumption}' -> {avg_consumption_value}")
                 item = {
                     'Part_No': str(row[mapped_columns['part_no']]).strip(),
                     'Description': str(row.get(mapped_columns.get('description', ''), '')).strip(),
@@ -724,9 +741,19 @@ class InventoryManagementSystem:
             prices = [item['unit_price'] for item in standardized_data if item['unit_price'] > 0]
             if prices:
                 avg_price = sum(prices) / len(prices)
-                st.info(f"💰 Unit Price Summary: {len(prices)} parts with prices, Average: ₹{avg_price:.2f}")
+                st.info(f"💰 Unit Price Summary: {len(prices)} parts with prices, Average: ₹{avg_price:.2f}"   
             else:
                 st.warning("⚠️ No valid unit prices found in the data")
+            # Show AVG CONSUMPTION/DAY statistics
+            consumption_values = [item['AVG_CONSUMPTION_PER_DAY'] for item in standardized_data 
+                                  if item['AVG_CONSUMPTION_PER_DAY'] and str(item['AVG_CONSUMPTION_PER_DAY']).strip() != '']
+            if consumption_values:
+                numeric_consumption = [self.safe_float_convert(val) for val in consumption_values if self.safe_float_convert(val) > 0]
+                if numeric_consumption:
+                    avg_consumption = sum(numeric_consumption) / len(numeric_consumption)
+                    st.info(f"📊 AVG CONSUMPTION/DAY Summary: {len(numeric_consumption)} parts with consumption data, Average: {avg_consumption:.2f}")
+            else:
+                st.warning("⚠️ No AVG CONSUMPTION/DAY data found in the file")
         return standardized_data
     
     def standardize_current_inventory(self, df):
