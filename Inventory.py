@@ -1252,15 +1252,13 @@ class InventoryManagementSystem:
             else:
                 st.error("❌ Analysis failed. No results generated.")
                 return
-
-    # ✅ Use the full dashboard method
-    try:
-        self.display_analysis_results()
-    except Exception as e:
-        st.error("❌ Unexpected error during analysis results display")
-        st.code(str(e))
-        return
-
+        # ✅ Use the full dashboard method
+        try:
+            self.display_analysis_results()
+        except Exception as e:
+            st.error("❌ Unexpected error during analysis results display")
+            st.code(str(e))
+            return
             
     def display_comprehensive_analysis(self, analysis_results):
         """Display comprehensive analysis results with enhanced features"""
