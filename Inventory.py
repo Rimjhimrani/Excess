@@ -741,7 +741,7 @@ class InventoryManagementSystem:
             prices = [item['unit_price'] for item in standardized_data if item['unit_price'] > 0]
             if prices:
                 avg_price = sum(prices) / len(prices)
-                st.info(f"💰 Unit Price Summary: {len(prices)} parts with prices, Average: ₹{avg_price:.2f}"   
+                st.info(f"💰 Unit Price Summary: {len(prices)} parts with prices, Average: ₹{avg_price:.2f}")
             else:
                 st.warning("⚠️ No valid unit prices found in the data")
             # Show AVG CONSUMPTION/DAY statistics
