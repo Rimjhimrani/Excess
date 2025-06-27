@@ -2507,12 +2507,6 @@ class InventoryManagementSystem:
             if col in df.columns:
                 value_col = col
                 break
-        # 2. Ensure both PART DESCRIPTION and PART NO exist
-        value_col = None
-        for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE']:
-            if col in df.columns:
-                value_col = col
-                break
         if value_col and 'PART NO' in df.columns and 'PART DESCRIPTION' in df.columns:
             # Filter top 10 parts with non-zero value
             chart_data = (
@@ -2523,7 +2517,7 @@ class InventoryManagementSystem:
             )
             # Convert to lakhs
             chart_data['Value_Lakh'] = chart_data[value_col] / 100_000
-            # Combine description and part no into a single labe
+            # Combine description and part no into a single label
             chart_data['label'] = chart_data.apply(
                 lambda row: f"{row['PART DESCRIPTION']}\n({row['PART NO']})",
                 axis=1
