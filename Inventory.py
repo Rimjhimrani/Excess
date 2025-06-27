@@ -575,7 +575,7 @@ class InventoryManagementSystem:
                 'City': row[5],
                 'State': row[6],
                 'Unit_Price': 100,            # 🔁 you can customize this per part
-                'RM_IN_DAYS': 7               # 🔁 default or configurable
+                'RM_IN_DAYS': 7,              # 🔁 default or configurable
                 'AVG_CONSUMPTION_PER_DAY': self.safe_float_convert(row[7]) if len(row) > 7 else ""  # ✅ Added consumption data
             })
         return pfep_data
