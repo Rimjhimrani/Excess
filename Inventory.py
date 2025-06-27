@@ -1686,7 +1686,7 @@ class InventoryManagementSystem:
         for col in df.columns:
             if col not in available_columns and len(available_columns) < 10:
                 available_columns.append(col)
-        return available_columns[:10]  # Limit to 10 c
+        return available_columns # Limit to 10 c
         
     def _get_column_formatters(self,df=None):
         """Get column formatters for styling dataframes"""
