@@ -745,13 +745,19 @@ class InventoryManagementSystem:
             else:
                 st.warning("⚠️ No valid unit prices found in the data")
             # Show AVG CONSUMPTION/DAY statistics
-            consumption_values = [item['AVG_CONSUMPTION_PER_DAY'] for item in standardized_data 
-                                  if item['AVG_CONSUMPTION_PER_DAY'] and str(item['AVG_CONSUMPTION_PER_DAY']).strip() != '']
+            consumption_values = [
+                item.get('AVG CONSUMPTION/DAY')
+                for item in standardized_data
+                if item.get('AVG CONSUMPTION/DAY') not in (None, '', 'nan')
+            ]
             if consumption_values:
-                numeric_consumption = [self.safe_float_convert(val) for val in consumption_values if self.safe_float_convert(val) > 0]
-                if numeric_consumption:
-                    avg_consumption = sum(numeric_consumption) / len(numeric_consumption)
-                    st.info(f"📊 AVG CONSUMPTION/DAY Summary: {len(numeric_consumption)} parts with consumption data, Average: {avg_consumption:.2f}")
+                # Convert strings to floats, skip zeros
+                numeric = [self.safe_float_convert(val) for val in consumption_values if self.safe_float_convert(val) > 0]
+                if numeric:
+                    avg_consumption = sum(numeric) / len(numeric)
+                    st.info(f"📊 AVG CONSUMPTION/DAY Summary: {len(numeric)} parts with consumption data, Average: {avg_consumption:.2f}")
+                else:
+                    st.warning("⚠️ All AVG CONSUMPTION/DAY values were zero or invalid.")
             else:
                 st.warning("⚠️ No AVG CONSUMPTION/DAY data found in the file")
         return standardized_data
