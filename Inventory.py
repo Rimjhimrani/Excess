@@ -412,11 +412,11 @@ class InventoryManagementSystem:
         ), axis=1)
         fig = px.bar(
             df,
-            x='PART NO',
+            x='PART DESCRIPTION',
             y='Value_Lakh',
             color_discrete_sequence=[bar_color],
             title=f"Top 10 Parts - {status_filter} (₹ in Lakhs)",
-            text='PART DESCRIPTION'
+            text='PART NO'
         )
         fig.update_traces(
             hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
@@ -2486,10 +2486,10 @@ class InventoryManagementSystem:
                 ), axis=1)
                 fig1 = px.bar(
                     chart_data,
-                    x='PART NO',
+                    x='PART DESCRIPTION',
                     y='Value_Lakh',
-                    title="Top 10 Parts by Inventory Value",
-                    text='PART DESCRIPTION',  # ✅ Show description as bar label
+                    title="Top 10 Parts by Stock Value",
+                    text='PART NO',  # ✅ Show description as bar label
                     color='Value_Lakh',
                     color_continuous_scale='Blues'
                 )
@@ -2580,7 +2580,7 @@ class InventoryManagementSystem:
                     text=vendor_col,  # ✅ Label each bar with vendor name
                     color='Value_Lakh',
                     color_continuous_scale='Viridis',
-                    title='Top 10 Vendors by Inventory Value (₹ Lakhs)'
+                    title='Top 10 Vendors by Stock Value'
                 )
                 fig3.update_traces(
                     customdata=vendor_data['HOVER_TEXT'],
