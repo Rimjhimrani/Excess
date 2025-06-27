@@ -2631,7 +2631,6 @@ class InventoryManagementSystem:
                     vendor_data,
                     x=vendor_col,
                     y='Value_Lakh',
-                    text=vendor_col,  # ✅ Label each bar with vendor name
                     color='Value_Lakh',
                     color_continuous_scale='Viridis',
                     title='Top 10 Vendors by Stock Value'
@@ -2639,7 +2638,6 @@ class InventoryManagementSystem:
                 fig3.update_traces(
                     customdata=vendor_data['HOVER_TEXT'],
                     hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                    texttemplate='%{text}',       # Show vendor name as label
                     textposition='auto'
                 )
                 fig3.update_layout(
