@@ -2610,10 +2610,6 @@ class InventoryManagementSystem:
                 st.warning(f"⚠️ Cannot build status pie: missing {', '.join(missing)}.")
         else:
             st.warning("⚠️ Status column not found for status distribution chart.")
-        # then your static markdown summary:
-        st.markdown("### 📊 Status Breakdown Summary")
-        for _, row in status_summary.iterrows():
-            st.markdown(f"- **{row['Status']}**: {row['Pct']:.1f}%")
             
         # ✅ 3. Vendor vs Value (Fixed vendor_col definition)
         vendor_col = next((col for col in ['Vendor', 'Vendor Name', 'VENDOR'] if col in df.columns), None)
