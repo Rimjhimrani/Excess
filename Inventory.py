@@ -2507,56 +2507,58 @@ class InventoryManagementSystem:
             if col in df.columns:
                 value_col = col
                 break
-        if value_col and 'PART NO' in df.columns and 'PART DESCRIPTION' in df.columns:
-            # Filter top 10 parts with non-zero value
+        # 2. Ensure both PART DESCRIPTION and PART NO exist
+        if value_col and 'PART DESCRIPTION' in df.columns and 'PART NO' in df.columns:
+            # Filter and pick top 10
             chart_data = (
                 df[df[value_col] > 0]
                 .sort_values(by=value_col, ascending=False)
                 .head(10)
                 .copy()
             )
-            # Convert to lakhs
+            # 3. Convert to lakhs
             chart_data['Value_Lakh'] = chart_data[value_col] / 100_000
-            # Combine description and part no into a single label
+            # 4. Build a multiline label: 
+            #    "Description...\n(PART NO)"
             chart_data['label'] = chart_data.apply(
                 lambda row: f"{row['PART DESCRIPTION']}\n({row['PART NO']})",
                 axis=1
             )
-            # Build hover text
+            # 5. Optional: hover text
             chart_data['HOVER_TEXT'] = chart_data.apply(lambda row: (
                 f"Description: {row['PART DESCRIPTION']}<br>"
                 f"Part No: {row['PART NO']}<br>"
                 f"Qty: {row.get('Current Inventory-QTY', 'N/A')}<br>"
                 f"Value: ₹{row[value_col]:,.0f}"
             ), axis=1)
-            fig1 = px.bar(
+            # 6. Draw the bar chart
+            fig = px.bar(
                 chart_data,
-                x='label',
+                x='label',         # your two-line label
                 y='Value_Lakh',
                 title="Top 10 Parts by Stock Value",
                 color='Value_Lakh',
                 color_continuous_scale='Blues'
-                # note: no `text=` parameter → bars have no overlaid text
             )
-            fig1.update_traces(
+            # 7. Wire up the hover template
+            fig.update_traces(
                 customdata=chart_data['HOVER_TEXT'],
                 hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>'
             )
-            fig1.update_layout(
-                xaxis_tickangle=-45,
+            # 8. Tidy up the layout
+            fig.update_layout(
+                xaxis_tickangle=0,             # no tilt
+                xaxis_tickfont=dict(size=9),   # small enough to wrap
                 yaxis_title="Inventory Value (₹ Lakhs)",
                 yaxis=dict(
-                    tickformat=',.0f',   # e.g. "200"
-                    ticksuffix='L'       # e.g. "200L"
+                    tickformat=',.0f',
+                    ticksuffix='L'
                 ),
-                xaxis=dict(
-                    tickfont=dict(size=10)  # adjust if needed
-                )
+                margin=dict(b=120)             # plenty of bottom margin for two-line labels
             )
-            st.plotly_chart(fig1, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True)
         else:
             st.warning("⚠️ Required columns for parts value chart not found.")
-
         # ✅ 2. Inventory Status Breakdown (Pie)
         if 'Status' in df.columns:
             # Find the appropriate value column
