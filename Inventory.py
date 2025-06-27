@@ -641,10 +641,10 @@ class InventoryManagementSystem:
                 'Supplier Name', 'SUPPLIER_NAME', 'Supplier'
             ],
             'avg_consumption_per_day': [
-            'avg consumption/day', 'average consumption/day', 'avg_per_day',
-            'avg daily usage', 'AVG CONSUMPTION/DAY', 'Average Per Day',
-            'avg consumption per day', 'daily consumption', 'consumption per day',
-            'AVG_CONSUMPTION_PER_DAY', 'AVERAGE_CONSUMPTION_PER_DAY'
+                'avg consumption/day', 'average consumption/day', 'avg_per_day',
+                'avg daily usage', 'AVG CONSUMPTION/DAY', 'Average Per Day',
+                'avg consumption per day', 'daily consumption', 'consumption per day',
+                'AVG_CONSUMPTION_PER_DAY', 'AVERAGE_CONSUMPTION_PER_DAY'
             ],
             'city': ['city', 'location', 'place', 'City', 'CITY', 'Location', 'LOCATION'],
             'state': ['state', 'region', 'province', 'State', 'STATE', 'Region', 'REGION']
