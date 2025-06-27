@@ -2507,45 +2507,56 @@ class InventoryManagementSystem:
             if col in df.columns:
                 value_col = col
                 break
-        if value_col and 'PART NO' in df.columns:
+        if value_col and 'PART NO' in df.columns and 'PART DESCRIPTION' in df.columns:
             # Filter top 10 parts with non-zero value
-            chart_data = df[df[value_col] > 0].sort_values(by=value_col, ascending=False).head(10)
-            if not chart_data.empty:
-                chart_data['Value_Lakh'] = chart_data[value_col] / 100000
-                chart_data['HOVER_TEXT'] = chart_data.apply(lambda row: (
-                    f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
-                    f"Qty: {row.get('Current Inventory-QTY', 'N/A')}<br>"
-                    f"Value: ₹{row[value_col]:,.0f}"
-                ), axis=1)
-                fig1 = px.bar(
-                    chart_data,
-                    x='PART DESCRIPTION',
-                    y='Value_Lakh',
-                    title="Top 10 Parts by Stock Value",
-                    text='PART NO',  # ✅ Show description as bar label
-                    color='Value_Lakh',
-                    color_continuous_scale='Blues'
+            chart_data = (
+                df[df[value_col] > 0]
+                .sort_values(by=value_col, ascending=False)
+                .head(10)
+                .copy()
+            )
+            # Convert to lakhs
+            chart_data['Value_Lakh'] = chart_data[value_col] / 100_000
+            # Combine description and part no into a single label
+            chart_data['label'] = chart_data.apply(
+                lambda row: f"{row['PART DESCRIPTION']}\n({row['PART NO']})",
+                axis=1
+            )
+            # Build hover text
+            chart_data['HOVER_TEXT'] = chart_data.apply(lambda row: (
+                f"Description: {row['PART DESCRIPTION']}<br>"
+                f"Part No: {row['PART NO']}<br>"
+                f"Qty: {row.get('Current Inventory-QTY', 'N/A')}<br>"
+                f"Value: ₹{row[value_col]:,.0f}"
+            ), axis=1)
+            fig1 = px.bar(
+                chart_data,
+                x='label',
+                y='Value_Lakh',
+                title="Top 10 Parts by Stock Value",
+                color='Value_Lakh',
+                color_continuous_scale='Blues'
+                # note: no `text=` parameter → bars have no overlaid text
+            )
+            fig1.update_traces(
+                customdata=chart_data['HOVER_TEXT'],
+                hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>'
+            )
+            fig1.update_layout(
+                xaxis_tickangle=-45,
+                yaxis_title="Inventory Value (₹ Lakhs)",
+                yaxis=dict(
+                    tickformat=',.0f',   # e.g. "200"
+                    ticksuffix='L'       # e.g. "200L"
+                ),
+                xaxis=dict(
+                    tickfont=dict(size=10)  # adjust if needed
                 )
-                fig1.update_traces(
-                    customdata=chart_data['HOVER_TEXT'],
-                    hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                    texttemplate='%{text}',
-                    textposition='auto'
-                )
-                fig1.update_layout(
-                    xaxis_tickangle=-45, 
-                    yaxis_title="Inventory Value (₹ Lakhs)",
-                    yaxis=dict(
-                        tickformat=',.0f',          # thousands separator (200)
-                        ticksuffix='L'              # add L to each tick (200L)
-                    )
-                )
-            
-                st.plotly_chart(fig1, use_container_width=True)
-            else:
-                st.info("ℹ️ No valid data found for top parts chart (all values are 0).")
+            )
+            st.plotly_chart(fig1, use_container_width=True)
         else:
             st.warning("⚠️ Required columns for parts value chart not found.")
+
         # ✅ 2. Inventory Status Breakdown (Pie)
         if 'Status' in df.columns:
             # Find the appropriate value column
