@@ -2559,23 +2559,20 @@ class InventoryManagementSystem:
 
         # ✅ 2. Inventory Status Breakdown (Pie)
         if 'Status' in df.columns:
-            # Find the appropriate value column
-            value_col = None
-            for col in ['Current Inventory - VALUE', 'Stock_Value', 'VALUE']:
-                if col in df.columns:
-                    value_col = col
-                    break
-            if value_col:
-                # Create status summary with counts and stock values
-                status_data = []
-                for status in df['Status'].unique():
-                    status_df = df[df['Status'] == status]
-                    status_data.append({
+            # 1) Identify columns
+            value_col = next((c for c in ['Current Inventory - VALUE', 'Stock_Value', 'VALUE'] if c in df.columns), None)
+            rm_days_col = 'RM IN DAYS' if 'RM IN DAYS' in df.columns else None
+            if value_col and rm_days_col:
+                # 2) Build summary per status
+                summary_rows = []
+                for status, group in df.groupby('Status'):
+                    summary_rows.append({
                         'Status': status,
-                        'Count': len(status_df),
-                        'Stock_Value': status_df[value_col].sum()
+                        'Count': len(group),
+                        'Stock_Value': group[value_col].sum(),
+                        'Total_RM_Days': group[rm_days_col].sum()
                     })
-                status_summary = pd.DataFrame(status_data)
+                status_summary = pd.DataFrame(summary_rows)
                 if not status_summary.empty:
                     fig2 = px.pie(
                         status_summary,
@@ -2585,19 +2582,27 @@ class InventoryManagementSystem:
                         hole=0.4,
                         color_discrete_sequence=px.colors.qualitative.Set2
                     )
-                    # Enhanced hover with stock values
+                    # 3) Prepare hover text including Total RM IN DAYS
+                    custom_strings = status_summary.apply(lambda row: (
+                        f"<b>{row['Status']}</b><br>"
+                        f"Parts: {int(row['Count'])}<br>"
+                        f"Stock Value: ₹{row['Stock_Value']:,.0f}<br>"
+                        f"Total RM IN DAYS: {int(row['Total_RM_Days'])} days<br>"
+                        "Percentage: %{percent:.1%}<br>"
+                        "<extra></extra>"
+                    ), axis=1)
                     fig2.update_traces(
-                        hovertemplate='<b>%{label}</b><br>' +
-                        'Parts: %{value}<br>' +
-                        'Stock Value: ₹' + status_summary['Stock_Value'].apply(lambda x: f'{x:,.0f}') + '<br>' +
-                        'Percentage: %{percent}<br>' +
-                        '<extra></extra>'
+                        customdata=custom_strings,
+                        hovertemplate='%{customdata}'
                     )
                     st.plotly_chart(fig2, use_container_width=True)
                 else:
                     st.info("ℹ️ No status data available for pie chart.")
             else:
-                st.warning("⚠️ Value column not found for stock values.")
+                missing = []
+                if not value_col: missing.append("value column")
+                if not rm_days_col: missing.append("RM IN DAYS column")
+                st.warning(f"⚠️ Cannot build status pie: missing {', '.join(missing)}.")
         else:
             st.warning("⚠️ Status column not found for status distribution chart.")
             
