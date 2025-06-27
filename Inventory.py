@@ -2588,7 +2588,6 @@ class InventoryManagementSystem:
                         f"Parts: {int(row['Count'])}<br>"
                         f"Stock Value: ₹{row['Stock_Value']:,.0f}<br>"
                         f"Total RM IN DAYS: {int(row['Total_RM_Days'])} days<br>"
-                        "Percentage: %{percent:.1%}<br>"
                         "<extra></extra>"
                     ), axis=1)
                     fig2.update_traces(
