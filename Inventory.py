@@ -1236,10 +1236,10 @@ class InventoryManagementSystem:
             with st.spinner("Analyzing inventory..."):
                 try:
                     analysis_results = self.analyzer.analyze_inventory(
-                    pfep_data,
-                    inventory_data,
-                    tolerance=tolerance
-                )
+                        pfep_data,
+                        inventory_data,
+                        tolerance=tolerance
+                    )
                 except Exception as e:
                     st.error("❌ Error during inventory analysis")
                     st.code(str(e))
@@ -1252,18 +1252,15 @@ class InventoryManagementSystem:
             else:
                 st.error("❌ Analysis failed. No results generated.")
                 return
-        # Try to display the results
-        try:
-            analysis_results = self.persistence.load_data_from_session_state('persistent_analysis_results')
-            if not analysis_results:
-                st.warning("⚠️ No analysis results found.")
-                return
-            # ✅ Display full enhanced analysis dashboard
-            self.display_comprehensive_analysis(analysis_results)
-        except Exception as e:
-            st.error("❌ Unexpected error during analysis results display")
-            st.code(str(e))
-            return
+
+    # ✅ Use the full dashboard method
+    try:
+        self.display_analysis_results()
+    except Exception as e:
+        st.error("❌ Unexpected error during analysis results display")
+        st.code(str(e))
+        return
+
             
     def display_comprehensive_analysis(self, analysis_results):
         """Display comprehensive analysis results with enhanced features"""
