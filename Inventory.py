@@ -2544,7 +2544,7 @@ class InventoryManagementSystem:
             )
             fig1.update_layout(
                 xaxis_tickangle=-45,
-                yaxis_title="Inventory Value (₹ Lakhs)",
+                yaxis_title="Stock Value",
                 yaxis=dict(
                     tickformat=',.0f',   # e.g. "200"
                     ticksuffix='L'       # e.g. "200L"
@@ -2600,6 +2600,7 @@ class InventoryManagementSystem:
                 st.warning("⚠️ Value column not found for stock values.")
         else:
             st.warning("⚠️ Status column not found for status distribution chart.")
+            
         # ✅ 3. Vendor vs Value (Fixed vendor_col definition)
         vendor_col = next((col for col in ['Vendor', 'Vendor Name', 'VENDOR'] if col in df.columns), None)
         if vendor_col and value_col and vendor_col in df.columns:
