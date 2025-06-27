@@ -1667,15 +1667,15 @@ class InventoryManagementSystem:
             'PART DESCRIPTION', 'Part Description', 'Description', 'DESCRIPTION',
             'VENDOR', 'Vendor', 'Vendor Name', 'VENDOR NAME',
             'VENDOR CODE', 'Vendor Code', 'Vendor_Code', 'VendorCode', 'VENDOR_CODE',
-            'RM IN DAYS', 'RM_IN_DAYS', 'RM IN Days', 'Raw Material In Days', 'Raw Material IN DAYS',
+            'RM IN DAYS', 'RM_IN_DAYS', 'RM IN Days', 'Raw Material In Days', 'Inventory Norms - DAYS',
              # Consumption/Demand columns
             'AVG ASSUMPTION/DAY', 'AVG_ASSUMPTION_DAY', 'Average Assumption per Day', 'Avg Consumption Day',
             'Average Daily Consumption', 'Daily Average', 'AVG CONSUMPTION/DAY', 'Daily Demand',
-            'RM IN QTY', 'RM_IN_QTY', 'RM IN QUANTITY', 'Raw Material In QTY', 'Raw Material IN QTY',
+            'RM IN QTY', 'RM_IN_QTY', 'RM IN QUANTITY', 'Raw Material In QTY', 'Inventory Norms - QTY',
              # Additional useful columns
             'Unit Price', 'UNIT PRICE', 'Price', 'Rate',
             'Category', 'CATEGORY', 'Part Category', 'PART CATEGORY'
-            'Current Inventory-QTY', 'Current Inventory QTY', 'Current_Inventory_QTY', 'QTY', 'Quantity',
+            'Current Inventory-QTY', 'Current Inventory - QTY', 'Current_Inventory_QTY', 'QTY', 'Quantity',
             'Stock_Value', 'Current Inventory - VALUE', 'Current Inventory-VALUE', 'Value', 'Stock Value',
             'VALUE(Unit Price* Short/Excess Inventory)', 'Variance Value', 'Impact Value',
             'Status', 'STATUS', 'Inventory Status'
