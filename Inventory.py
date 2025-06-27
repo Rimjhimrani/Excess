@@ -2580,7 +2580,13 @@ class InventoryManagementSystem:
                         values='Count',
                         title='Inventory Status Distribution',
                         hole=0.4,
-                        color_discrete_sequence=px.colors.qualitative.Set2
+                        # map each status to its custom color:
+                        color='Status',
+                        color_discrete_map={
+                            "Excess Inventory": "#2196F3",  # blue
+                            "Short Inventory":  "#F44336",  # red
+                            "Within Norms":      "#4CAF50"   # green
+                        }
                     )
                     # 3) Prepare hover text including Total RM IN DAYS
                     custom_strings = status_summary.apply(lambda row: (
