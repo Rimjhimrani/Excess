@@ -1667,7 +1667,7 @@ class InventoryManagementSystem:
             'PART DESCRIPTION',
             'Vendor Name',
             'Vendor_Code',
-            'Inventory Norms - DAYS',
+            'RM IN DAYS',
             'AVG CONSUMPTION/DAY',
             'Inventory Norms - QTY',
             'UNIT PRICE',
