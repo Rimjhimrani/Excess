@@ -2518,7 +2518,7 @@ class InventoryManagementSystem:
             # Convert to lakhs
             chart_data['Value_Lakh'] = chart_data[value_col] / 100_000
             # Combine description and part no into a single label
-            chart_data['label'] = chart_data.apply(
+            chart_data['Part'] = chart_data.apply(
                 lambda row: f"{row['PART DESCRIPTION']}\n({row['PART NO']})",
                 axis=1
             )
@@ -2531,7 +2531,7 @@ class InventoryManagementSystem:
             ), axis=1)
             fig1 = px.bar(
                 chart_data,
-                x='label',
+                x='Part',
                 y='Value_Lakh',
                 title="Top 10 Parts by Stock Value",
                 color='Value_Lakh',
