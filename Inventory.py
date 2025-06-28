@@ -2176,43 +2176,106 @@ class InventoryManagementSystem:
                 
         with tab2:
             st.subheader("💰 Cost Optimization Opportunities")
-            # Ensure expected columns are available
-            required_cols = ['Status', 'Current Inventory - VALUE', 'Current Inventory-QTY',
-                             'VALUE(Unit Price* Short/Excess Inventory)', 'unit_price', 'RM_IN_QTY']
-            if all(col in df.columns for col in required_cols):
-                # 1️⃣ Calculate total excess value using only excess portion
-                excess_df = df[df['Status'] == 'Excess Inventory']
-                excess_value = excess_df['VALUE(Unit Price* Short/Excess Inventory)'].sum()
-                # 2️⃣ Potential savings: assuming 10% carrying cost
-                potential_savings = excess_value * 0.10
-                # 3️⃣ Capital that could be freed (e.g., through PO control or reallocation)
-                freed_capital = excess_value * 0.70
-                # 4️⃣ Display metrics
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric(
-                        "Potential Annual Savings",
-                        f"₹{potential_savings:,.0f}",
-                        help="Based on 10% carrying cost reduction of actual excess"
-                    )
-                with col2:
-                    st.metric(
-                        "Capital That Could Be Freed",
-                        f"₹{freed_capital:,.0f}",
-                        help="From excess inventory optimization"
-                    )
-                # 5️⃣ Show Top Optimization Candidates
-                st.subheader("🎯 Top Optimization Candidates")
-                # Select top 10 excess items by their excess value
-                top_excess = excess_df.copy()
-                top_excess['Excess Qty'] = top_excess['Current Inventory-QTY'] - top_excess['RM_IN_QTY']
-                top_excess['Optimization Potential'] = top_excess['Excess Qty'] * top_excess['unit_price']
-                top_excess = top_excess.sort_values(by='Optimization Potential', ascending=False).head(10)
-                display_cols = ['PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 'RM_IN_QTY',
-                                'Excess Qty', 'unit_price', 'Optimization Potential']
-                st.dataframe(top_excess[display_cols], use_container_width=True)
+            # Required columns
+            required_cols = [
+                'Status', 'Current Inventory - VALUE', 'Current Inventory-QTY',
+                'VALUE(Unit Price* Short/Excess Inventory)', 'unit_price', 'RM_IN_QTY'
+            ]
+            # Check if all required columns exist
+            missing_cols = [col for col in required_cols if col not in df.columns]
+            if not missing_cols:
+                # 1️⃣ Filter excess inventory with error handling
+                excess_df = df[df['Status'] == 'Excess Inventory'].copy()
+                if len(excess_df) == 0:
+                    st.info("No excess inventory found in the current dataset.")
+                else:
+                    # 2️⃣ Handle potential NaN values and calculate excess value
+                    excess_df['VALUE(Unit Price* Short/Excess Inventory)'] = pd.to_numeric(
+                        excess_df['VALUE(Unit Price* Short/Excess Inventory)'], errors='coerce'
+                    ).fillna(0)
+                    excess_value = excess_df['VALUE(Unit Price* Short/Excess Inventory)'].sum()
+                    # 3️⃣ Calculate savings and capital with configurable rates
+                    CARRYING_COST_RATE = 0.10  # 10% carrying cost
+                    RECOVERY_RATE = 0.70       # 70% capital recovery rate
+                    potential_savings = excess_value * CARRYING_COST_RATE
+                    freed_capital = excess_value * RECOVERY_RATE
+                    # 4️⃣ Display KPIs with better formatting
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric(
+                            "Total Excess Value",
+                            f"₹{excess_value:,.0f}",
+                            help="Total value of excess inventory"
+                        )
+                    with col2:
+                        st.metric(
+                            "Potential Annual Savings",
+                            f"₹{potential_savings:,.0f}",
+                            help=f"Based on {CARRYING_COST_RATE*100}% carrying cost reduction"
+                        )
+                    with col3:
+                        st.metric(
+                            "Capital That Could Be Freed",
+                            f"₹{freed_capital:,.0f}",
+                            help=f"Estimated {RECOVERY_RATE*100}% recoverable capital from excess stock"
+                        )
+                    # 5️⃣ Top optimization candidates with enhanced calculations
+                    st.subheader("🎯 Top Optimization Candidates")
+                    top_excess = excess_df.copy()
+                    # Ensure numeric columns are properly converted
+                    numeric_cols = ['Current Inventory-QTY', 'RM_IN_QTY', 'unit_price']
+                    for col in numeric_cols:
+                        if col in top_excess.columns:
+                            top_excess[col] = pd.to_numeric(top_excess[col], errors='coerce').fillna(0)
+                    # Calculate excess quantity and optimization potential
+                    top_excess['Excess Qty'] = top_excess['Current Inventory-QTY'] - top_excess['RM_IN_QTY']
+                    top_excess['Optimization Potential'] = top_excess['Excess Qty'] * top_excess['unit_price']
+                    # Filter out items with zero or negative optimization potential
+                    top_excess = top_excess[top_excess['Optimization Potential'] > 0]
+                    # Sort and get top candidates
+                    top_excess = top_excess.sort_values(by='Optimization Potential', ascending=False).head(10)
+                    if len(top_excess) > 0:
+                        # Format the display dataframe
+                        display_df = top_excess[[
+                            'PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 'RM_IN_QTY',
+                            'Excess Qty', 'unit_price', 'Optimization Potential'
+                        ]].copy()
+                        # Format monetary columns
+                        display_df['unit_price'] = display_df['unit_price'].apply(lambda x: f"₹{x:,.2f}")
+                        display_df['Optimization Potential'] = display_df['Optimization Potential'].apply(lambda x: f"₹{x:,.0f}")
+                        # Rename columns for better displa
+                        display_df.columns = [
+                            'Part Number', 'Description', 'Current Qty', 'Required Qty',
+                            'Excess Qty', 'Unit Price', 'Optimization Value'
+                        ]
+                        st.dataframe(display_df, use_container_width=True)
+            
+                        # 6️⃣ Additional insights
+                        st.subheader("📊 Optimization Insights")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write("**Top Categories by Excess Value:**")
+                            if 'CATEGORY' in excess_df.columns:
+                                category_analysis = excess_df.groupby('CATEGORY')['Optimization Potential'].sum().sort_values(ascending=False).head(5)
+                                for category, value in category_analysis.items():
+                                    st.write(f"• {category}: ₹{value:,.0f}")
+                            else:
+                                st.write("Category information not available")
+                        with col2:
+                            st.write("**Optimization Summary:**")
+                            st.write(f"• Total excess items: {len(excess_df):,}")
+                            st.write(f"• Avg excess per item: ₹{excess_value/len(excess_df):,.0f}")
+                            st.write(f"• Top 10 items represent: {top_excess['Optimization Potential'].sum()/excess_value*100:.1f}% of total")
+                    else:
+                        st.info("No items with positive optimization potential found.")
             else:
-                st.warning("Some required columns are missing for cost optimization calculation.")
+                st.error(f"❌ Missing required columns: {', '.join(missing_cols)}")
+                st.write("**Available columns:**")
+                st.write(list(df.columns))
+                st.write("\n**Required columns:**")
+                for col in required_cols:
+                    status = "✅" if col in df.columns else "❌"
+                    st.write(f"{status} {col}")
                 
         with tab3:
             st.subheader("📊 Performance Analysis")
