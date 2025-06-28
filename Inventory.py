@@ -2179,7 +2179,7 @@ class InventoryManagementSystem:
             # Required columns
             required_cols = [
                 'Status', 'Current Inventory - VALUE', 'Current Inventory-QTY',
-                'VALUE(Unit Price* Short/Excess Inventory)', 'UNIT PRICE', 'INVENTORY NORMS - QTY'
+                'VALUE(Unit Price* Short/Excess Inventory)', 'UNIT PRICE', 'Inventory Norms - QTY'
             ]
             # Check if all required columns exist
             missing_cols = [col for col in required_cols if col not in df.columns]
