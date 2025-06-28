@@ -2176,35 +2176,43 @@ class InventoryManagementSystem:
                 
         with tab2:
             st.subheader("💰 Cost Optimization Opportunities")
-            # Calculate potential savings
-            excess_value = df[df['Status'] == 'Excess Inventory']['Current Inventory - VALUE'].sum()
-            potential_savings = excess_value * 0.1  # Assume 10% carrying cost
-        
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.metric(
-                    "Potential Annual Savings",
-                    f"₹{potential_savings:,.0f}",
-                    help="Based on 10% carrying cost reduction"
-                )
-                
-            with col2:
-                freed_capital = excess_value * 0.7  # 70% could be freed up
-                st.metric(
-                    "Capital That Could Be Freed",
-                    f"₹{freed_capital:,.0f}",
-                    help="From excess inventory optimization"
-                )
-            # Top optimization candidates
-            st.subheader("🎯 Top Optimization Candidates")
-            optimization_candidates = df[df['Status'] == 'Excess Inventory'].nlargest(10, 'Current Inventory - VALUE')
-            if not optimization_candidates.empty:
-                opt_display = optimization_candidates[['PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 
-                                                       'Current Inventory - VALUE']].copy()
-                opt_display['Excess Qty'] = opt_display['Current Inventory-QTY'] - opt_display['Current Inventory - VALUE']
-                opt_display['Optimization Potential'] = opt_display['Excess Qty'] * (opt_display['Current Inventory - VALUE'] / opt_display['Current Inventory-QTY'])
-                st.dataframe(opt_display, use_container_width=True)
+            # Ensure expected columns are available
+            required_cols = ['Status', 'Current Inventory - VALUE', 'Current Inventory-QTY',
+                             'VALUE(Unit Price* Short/Excess Inventory)', 'unit_price', 'RM_IN_QTY']
+            if all(col in df.columns for col in required_cols):
+                # 1️⃣ Calculate total excess value using only excess portion
+                excess_df = df[df['Status'] == 'Excess Inventory']
+                excess_value = excess_df['VALUE(Unit Price* Short/Excess Inventory)'].sum()
+                # 2️⃣ Potential savings: assuming 10% carrying cost
+                potential_savings = excess_value * 0.10
+                # 3️⃣ Capital that could be freed (e.g., through PO control or reallocation)
+                freed_capital = excess_value * 0.70
+                # 4️⃣ Display metrics
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric(
+                        "Potential Annual Savings",
+                        f"₹{potential_savings:,.0f}",
+                        help="Based on 10% carrying cost reduction of actual excess"
+                    )
+                with col2:
+                    st.metric(
+                        "Capital That Could Be Freed",
+                        f"₹{freed_capital:,.0f}",
+                        help="From excess inventory optimization"
+                    )
+                # 5️⃣ Show Top Optimization Candidates
+                st.subheader("🎯 Top Optimization Candidates")
+                # Select top 10 excess items by their excess value
+                top_excess = excess_df.copy()
+                top_excess['Excess Qty'] = top_excess['Current Inventory-QTY'] - top_excess['RM_IN_QTY']
+                top_excess['Optimization Potential'] = top_excess['Excess Qty'] * top_excess['unit_price']
+                top_excess = top_excess.sort_values(by='Optimization Potential', ascending=False).head(10)
+                display_cols = ['PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 'RM_IN_QTY',
+                                'Excess Qty', 'unit_price', 'Optimization Potential']
+                st.dataframe(top_excess[display_cols], use_container_width=True)
+            else:
+                st.warning("Some required columns are missing for cost optimization calculation.")
                 
         with tab3:
             st.subheader("📊 Performance Analysis")
