@@ -2578,29 +2578,29 @@ class InventoryManagementSystem:
             if col in df.columns:
                 value_col = col
                 break
-        # ✅ Proceed only if required columns are available
+        # ✅ Proceed if required columns exist
         if value_col and 'PART NO' in df.columns and 'PART DESCRIPTION' in df.columns and 'Status' in df.columns:
-            # 📊 Filter top 10 parts with non-zero value
+            # 📊 Filter top 10 rows with non-zero stock value
             chart_data = (
                 df[df[value_col] > 0]
                 .sort_values(by=value_col, ascending=False)
                 .head(10)
                 .copy()
             )
-            # 💰 Convert value to lakhs
-            chart_data['Value_Lakh'] = chart_data[value_col] / 100_000
-            # 🏷️ Combine part number and description into one label
+            # 💰 Convert value to Lakhs
+            chart_data['Value_Lakh'] = chart_data[value_col] / 100000
+            # 🔤 Combine part description and part number for X-axis label
             chart_data['Part'] = chart_data.apply(
                 lambda row: f"{row['PART DESCRIPTION']}\n({row['PART NO']})", axis=1
             )
-            # 🧾 Build custom hover tooltip
+            # 🧾 Create hover text
             chart_data['HOVER_TEXT'] = chart_data.apply(lambda row: (
                 f"Description: {row['PART DESCRIPTION']}<br>"
                 f"Part No: {row['PART NO']}<br>"
                 f"Qty: {row.get('Current Inventory-QTY', 'N/A')}<br>"
                 f"Value: ₹{row[value_col]:,.0f}"
             ), axis=1)
-            # 📈 Plot the bar chart
+            # 📈 Create bar chart with color based on inventory status
             fig1 = px.bar(
                 chart_data,
                 x='Part',
@@ -2613,12 +2613,12 @@ class InventoryManagementSystem:
                     "Within Norms": "#2ca02c"        # Green
                 }
             )
-            # 🖱️ Add hover tooltip
+            # 🖱️ Add tooltip
             fig1.update_traces(
                 customdata=chart_data['HOVER_TEXT'],
                 hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>'
             )
-            # 🎨 Style layout
+            # 🎨 Layout formatting
             fig1.update_layout(
                 xaxis_tickangle=-45,
                 yaxis_title="Stock Value",
@@ -2631,10 +2631,14 @@ class InventoryManagementSystem:
                 ),
                 legend_title_text='Inventory Status'
             )
-            # 📊 Display chart
+            # 📊 Display chart in Streamlit
             st.plotly_chart(fig1, use_container_width=True)
         else:
-            st.warning("⚠️ Required columns for parts value chart not found.")
+            st.warning("⚠️ Required columns for the chart not found. Please check if the following columns exist:")
+            st.write("- PART NO")
+            st.write("- PART DESCRIPTION")
+            st.write("- Status")
+            st.write("- One of: 'Current Inventory - VALUE', 'Stock_Value', or 'Current Inventory-VALUE'")
 
         # ✅ 2. Inventory Status Breakdown (Pie)
         if 'Status' in df.columns:
