@@ -2707,7 +2707,6 @@ class InventoryManagementSystem:
                     x=vendor_col,
                     y='Value_Lakh',
                     title='Top 10 Vendors by Stock Value',
-                    color='Status',  # 🔁 Color by inventory status
                     color_discrete_map={
                         "Excess Inventory": "#1f77b4",   # Blue
                         "Short Inventory": "#d62728",    # Red
