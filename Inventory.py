@@ -2605,9 +2605,12 @@ class InventoryManagementSystem:
                 x='Part',
                 y='Value_Lakh',
                 title="Top 10 Parts by Stock Value",
-                color='Value_Lakh',
-                color_continuous_scale='Blues'
-                # note: no text= parameter → bars have no overlaid text
+                color='Status',  # 🔁 Color by inventory status
+                color_discrete_map={
+                    "Excess Inventory": "#1f77b4",   # Blue
+                    "Short Inventory": "#d62728",    # Red
+                    "Within Norms": "#2ca02c"        # Green
+                }
             )
             fig1.update_traces(
                 customdata=chart_data['HOVER_TEXT'],
@@ -2703,9 +2706,13 @@ class InventoryManagementSystem:
                     vendor_data,
                     x=vendor_col,
                     y='Value_Lakh',
-                    color='Value_Lakh',
-                    color_continuous_scale='Viridis',
-                    title='Top 10 Vendors by Stock Value'
+                    title='Top 10 Vendors by Stock Value',
+                    color='Status',  # 🔁 Color by inventory status
+                    color_discrete_map={
+                        "Excess Inventory": "#1f77b4",   # Blue
+                        "Short Inventory": "#d62728",    # Red
+                        "Within Norms": "#2ca02c"        # Green
+                    }
                 )
                 fig3.update_traces(
                     customdata=vendor_data['HOVER_TEXT'],
