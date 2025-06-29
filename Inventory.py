@@ -2574,10 +2574,10 @@ class InventoryManagementSystem:
             return
         # ✅ 1. Top 10 Parts by Value - Check for multiple possible value columns
         value_col = None
-        for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE']
-        if col in df.columns:
-            value_col = col
-            break
+        for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE']:
+            if col in df.columns:
+                value_col = col
+                break
         # ✅ Proceed only if required columns are available
         if value_col and 'PART NO' in df.columns and 'PART DESCRIPTION' in df.columns and 'Status' in df.columns:
             # 📊 Filter top 10 parts with non-zero value
