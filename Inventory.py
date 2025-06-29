@@ -2605,12 +2605,9 @@ class InventoryManagementSystem:
                 x='Part',
                 y='Value_Lakh',
                 title="Top 10 Parts by Stock Value",
-                color='Status',
-                color_discrete_map={
-                    "Excess Inventory": "#EF553B",     # re
-                    "Within Norms": "#00CC96",         # green
-                    "Short Inventory": "#FFA15A",      # orange
-                }
+                color='Value_Lakh',
+                color_continuous_scale='Blues'
+                # note: no text= parameter → bars have no overlaid text
             )
             fig1.update_traces(
                 customdata=chart_data['HOVER_TEXT'],
