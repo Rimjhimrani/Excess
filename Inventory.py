@@ -2223,12 +2223,12 @@ class InventoryManagementSystem:
                     st.subheader("🎯 Top Optimization Candidates")
                     top_excess = excess_df.copy()
                     # Ensure numeric columns are properly converted
-                    numeric_cols = ['Current Inventory-QTY', 'RM_IN_QTY', 'unit_price']
+                    numeric_cols = ['Current Inventory-QTY', 'Inventory Norms - QTY', 'unit_price']
                     for col in numeric_cols:
                         if col in top_excess.columns:
                             top_excess[col] = pd.to_numeric(top_excess[col], errors='coerce').fillna(0)
                     # Calculate excess quantity and optimization potential
-                    top_excess['Excess Qty'] = top_excess['Current Inventory-QTY'] - top_excess['RM_IN_QTY']
+                    top_excess['Excess Qty'] = top_excess['Current Inventory-QTY'] - top_excess['Inventory Norms - QTY']
                     top_excess['Optimization Potential'] = top_excess['Excess Qty'] * top_excess['unit_price']
                     # Filter out items with zero or negative optimization potential
                     top_excess = top_excess[top_excess['Optimization Potential'] > 0]
@@ -2237,7 +2237,7 @@ class InventoryManagementSystem:
                     if len(top_excess) > 0:
                         # Format the display dataframe
                         display_df = top_excess[[
-                            'PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 'RM_IN_QTY',
+                            'PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 'Inventory Norms - QTY',
                             'Excess Qty', 'unit_price', 'Optimization Potential'
                         ]].copy()
                         # Format monetary columns
