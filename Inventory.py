@@ -2564,6 +2564,7 @@ class InventoryManagementSystem:
     
         st.markdown("---")
         self.display_help_and_documentation()
+        
     def display_enhanced_analysis_charts(self, analysis_results):
         """Display enhanced visual summaries with better error handling"""
         st.subheader("📊 Enhanced Inventory Charts")
@@ -2573,56 +2574,64 @@ class InventoryManagementSystem:
             return
         # ✅ 1. Top 10 Parts by Value - Check for multiple possible value columns
         value_col = None
-        for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE']:
-            if col in df.columns:
-                value_col = col
-                break
-        if value_col and 'PART NO' in df.columns and 'PART DESCRIPTION' in df.columns:
-            # Filter top 10 parts with non-zero value
+        for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE']
+        if col in df.columns:
+            value_col = col
+            break
+        # ✅ Proceed only if required columns are available
+        if value_col and 'PART NO' in df.columns and 'PART DESCRIPTION' in df.columns and 'Status' in df.columns:
+            # 📊 Filter top 10 parts with non-zero value
             chart_data = (
                 df[df[value_col] > 0]
                 .sort_values(by=value_col, ascending=False)
                 .head(10)
                 .copy()
             )
-            # Convert to lakhs
+            # 💰 Convert value to lakhs
             chart_data['Value_Lakh'] = chart_data[value_col] / 100_000
-            # Combine description and part no into a single label
+            # 🏷️ Combine part number and description into one label
             chart_data['Part'] = chart_data.apply(
-                lambda row: f"{row['PART DESCRIPTION']}\n({row['PART NO']})",
-                axis=1
+                lambda row: f"{row['PART DESCRIPTION']}\n({row['PART NO']})", axis=1
             )
-            # Build hover text
+            # 🧾 Build custom hover tooltip
             chart_data['HOVER_TEXT'] = chart_data.apply(lambda row: (
                 f"Description: {row['PART DESCRIPTION']}<br>"
                 f"Part No: {row['PART NO']}<br>"
                 f"Qty: {row.get('Current Inventory-QTY', 'N/A')}<br>"
                 f"Value: ₹{row[value_col]:,.0f}"
             ), axis=1)
+            # 📈 Plot the bar chart
             fig1 = px.bar(
                 chart_data,
                 x='Part',
                 y='Value_Lakh',
                 title="Top 10 Parts by Stock Value",
-                color='Value_Lakh',
-                color_continuous_scale='Blues'
-                # note: no `text=` parameter → bars have no overlaid text
+                color='Status',
+                color_discrete_map={
+                    "Excess Inventory": "#1f77b4",   # Blue
+                    "Short Inventory": "#d62728",    # Red
+                    "Within Norms": "#2ca02c"        # Green
+                }
             )
+            # 🖱️ Add hover tooltip
             fig1.update_traces(
                 customdata=chart_data['HOVER_TEXT'],
                 hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>'
             )
+            # 🎨 Style layout
             fig1.update_layout(
                 xaxis_tickangle=-45,
                 yaxis_title="Stock Value",
                 yaxis=dict(
-                    tickformat=',.0f',   # e.g. "200"
-                    ticksuffix='L'       # e.g. "200L"
+                    tickformat=',.0f',
+                    ticksuffix='L'
                 ),
                 xaxis=dict(
-                    tickfont=dict(size=10)  # adjust if needed
-                )
+                    tickfont=dict(size=10)
+                ),
+                legend_title_text='Inventory Status'
             )
+            # 📊 Display chart
             st.plotly_chart(fig1, use_container_width=True)
         else:
             st.warning("⚠️ Required columns for parts value chart not found.")
