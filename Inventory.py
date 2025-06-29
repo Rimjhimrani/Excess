@@ -2223,13 +2223,13 @@ class InventoryManagementSystem:
                     st.subheader("🎯 Top Optimization Candidates")
                     top_excess = excess_df.copy()
                     # Ensure numeric columns are properly converted
-                    numeric_cols = ['Current Inventory-QTY', 'Inventory Norms - QTY', 'unit_price']
+                    numeric_cols = ['Current Inventory-QTY', 'Inventory Norms - QTY', 'UNIT PRICE']
                     for col in numeric_cols:
                         if col in top_excess.columns:
                             top_excess[col] = pd.to_numeric(top_excess[col], errors='coerce').fillna(0)
                     # Calculate excess quantity and optimization potential
                     top_excess['Excess Qty'] = top_excess['Current Inventory-QTY'] - top_excess['Inventory Norms - QTY']
-                    top_excess['Optimization Potential'] = top_excess['Excess Qty'] * top_excess['unit_price']
+                    top_excess['Optimization Potential'] = top_excess['Excess Qty'] * top_excess['UNIT PRICE']
                     # Filter out items with zero or negative optimization potential
                     top_excess = top_excess[top_excess['Optimization Potential'] > 0]
                     # Sort and get top candidates
@@ -2238,10 +2238,10 @@ class InventoryManagementSystem:
                         # Format the display dataframe
                         display_df = top_excess[[
                             'PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 'Inventory Norms - QTY',
-                            'Excess Qty', 'unit_price', 'Optimization Potential'
+                            'Excess Qty', 'UNIT PRICE', 'Optimization Potential'
                         ]].copy()
                         # Format monetary columns
-                        display_df['unit_price'] = display_df['unit_price'].apply(lambda x: f"₹{x:,.2f}")
+                        display_df['UNIT PRICE'] = display_df['UNIT PRICE'].apply(lambda x: f"₹{x:,.2f}")
                         display_df['Optimization Potential'] = display_df['Optimization Potential'].apply(lambda x: f"₹{x:,.0f}")
                         # Rename columns for better displa
                         display_df.columns = [
