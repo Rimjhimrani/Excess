@@ -2672,7 +2672,6 @@ class InventoryManagementSystem:
                         title='Inventory Status Distribution',
                         hole=0.4,
                         # map each status to its custom color:
-                        color='Status',
                         color_discrete_map={
                             "Excess Inventory": "#2196F3",  # blue
                             "Short Inventory":  "#F44336",  # red
