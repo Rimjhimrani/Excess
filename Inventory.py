@@ -1867,27 +1867,30 @@ class InventoryManagementSystem:
                 )
                 st.plotly_chart(fig, use_container_width=True)
             with tab2:
-                # Value distribution analysis
-                value_ranges = pd.cut(df['Current Inventory - VALUE'], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
+                # ✅ Convert 'Current Inventory - VALUE' to lakhs for visualization
+                df['Value_Lakh'] = df['Current Inventory - VALUE'] / 100000
+                # 1️⃣ Value distribution analysis
+                value_ranges = pd.cut(df['Value_Lakh'], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
                 value_status = pd.crosstab(value_ranges, df['Status'])
-                fig = px.bar(
+                fig1 = px.bar(
                     value_status,
-                    title="Status Distribution by Value Range",
+                    title="Status Distribution by Value Range (in ₹ Lakhs)",
                     color_discrete_map={
-                        'Within Norms': '#4CAF50',
-                        'Excess Inventory': '#2196F3',
-                        'Short Inventory': '#F44336'
+                        'Within Norms': '#4CAF50',       # Green
+                        'Excess Inventory': '#2196F3',   # Blue
+                        'Short Inventory': '#F44336'     # Red
                     }
                 )
-                st.plotly_chart(fig, use_container_width=True)
-                # Top value contributor
-                top_value_parts = df.nlargest(20, 'Current Inventory - VALUE')
-                fig = px.scatter(
+                fig1.update_layout(yaxis_title="Number of Parts")
+                st.plotly_chart(fig1, use_container_width=True)
+                # 2️⃣ Top value contributors
+                top_value_parts = df.nlargest(20, 'Value_Lakh')
+                fig2 = px.scatter(
                     top_value_parts,
                     x='Current Inventory-QTY',
-                    y='Current Inventory - VALUE',
+                    y='Value_Lakh',
                     color='Status',
-                    size='Current Inventory - VALUE',
+                    size='Value_Lakh',
                     hover_data=['PART NO', 'PART DESCRIPTION'],
                     title="Top 20 Parts by Value - Quantity vs Value Analysis",
                     color_discrete_map={
@@ -1896,11 +1899,12 @@ class InventoryManagementSystem:
                         'Short Inventory': '#F44336'     # Red
                     }
                 )
-                fig.update_layout(
+                fig2.update_layout(
                     xaxis_title="Inventory Quantity",
-                    yaxis_title="Inventory Value"
+                    yaxis_title="Inventory Value (in ₹ Lakhs)"
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig2, use_container_width=True)
+
             with tab3:
                 st.subheader("🔮 Predictive Insights")
                 # Calculate reorder predictions
