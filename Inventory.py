@@ -2625,7 +2625,7 @@ class InventoryManagementSystem:
                 title="Top 10 Parts by Stock Value"
             )
             fig1.update_traces(
-                marker_color='#556B2F',  # Set fixed color (blue)
+                marker_color='#c1dada',  # Set fixed color (blue)
                 customdata=chart_data['HOVER_TEXT'],
                 hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>'
             )
@@ -2722,7 +2722,7 @@ class InventoryManagementSystem:
                     title='Top 10 Vendors by Stock Value',
                 )
                 fig3.update_traces(
-                    marker_color='#9370DB',  # 🟪 Use single color (light purple)
+                    marker_color='#c1dada',  # 🟪 Use single color (light purple)
                     customdata=vendor_data['HOVER_TEXT'],
                     hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
                     textposition='auto'
