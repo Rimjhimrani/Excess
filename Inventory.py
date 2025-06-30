@@ -1428,17 +1428,16 @@ class InventoryManagementSystem:
         - **Total Inventory Value**: ₹{total_stock_value:,.0f}
         - **Short Inventory Impact**: ₹{abs(short_value):,.0f}
         - **Excess Inventory Impact**: ₹{excess_value:,.0f}
-        - **Net Financial Impact**: ₹{abs(short_value) + excess_value:,.0f}
+        - **Net Financial Impact**: ₹{abs(short_value) - excess_value:,.0f}
         """)
         st.markdown('</div>', unsafe_allow_html=True)
         # Status breakdown
-        status_counts = df[status_col].value_counts()
-        summary_data = {}
-        for status in status_counts.index:
-            status_data = df[df[status_col] == status]
-            summary_data[status] = {
-                'count': status_counts[status],
-                'value': status_data[value_col].sum() if value_col and value_col in status_data.columns else 0
+        status_values = {}
+        for label in ['Within Norms', 'Excess Inventory', 'Short Inventory']:
+            filtered = df[df[status_col] == label]
+            status_values[label] = {
+                'count': len(filtered),
+                'value': filtered[inventory_value_col].sum() if inventory_value_col in filtered.columns else 0
             }
         st.markdown("### Status Distribution")
         # Use smaller column ratios and ensure they fit within the container
