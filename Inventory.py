@@ -1882,7 +1882,7 @@ class InventoryManagementSystem:
                 df['VALUE_LAKH'] = df['Current Inventory - VALUE'] / 100000
                 # ✅ 1️⃣ Value Distribution Analysis (Bar Chart)
                 value_ranges = pd.cut(df['VALUE_LAKH'], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
-                value_status = pd.crosstab(value_ranges, df['STATUS'])
+                value_status = pd.crosstab(value_ranges, df['Status'])
                 fig1 = px.bar(
                     value_status,
                     title="Status Distribution by Value Range (in ₹ Lakhs)",
@@ -1901,9 +1901,9 @@ class InventoryManagementSystem:
                     top_value_parts,
                     x='Current Inventory - Qty',
                     y='VALUE_LAKH',
-                    color='STATUS',
+                    color='Status',
                     size='VALUE_LAKH',
-                    hover_data=['PART_NO', 'PART_DESCRIPTION'],
+                    hover_data=['Part No', 'Part Description'],
                     title="Top 20 Parts by Value - Quantity vs Value Analysis",
                     color_discrete_map={
                         'Within Norms': '#4CAF50',
