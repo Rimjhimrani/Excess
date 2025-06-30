@@ -159,6 +159,7 @@ class InventoryAnalyzer:
                 continue  # Skip unmatched parts
             try:
                 # Column A–F: From PFEP
+                current_qty = float(inventory_item.get('Current_QTY', 0)) or 0.0
                 part_desc = pfep_item.get('Description', '')
                 unit_price = float(pfep_item.get('unit_price', 0)) or 1.0
                 avg_per_day = self.safe_float_convert(pfep_item.get('AVG CONSUMPTION/DAY', 0))
