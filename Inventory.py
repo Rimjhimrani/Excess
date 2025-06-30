@@ -2213,7 +2213,7 @@ class InventoryManagementSystem:
                         with col2:
                             st.write(f"Value: ₹{part['Current Inventory - VALUE']:,.0f}")
                         with col3:
-                            shortage = part['Current Inventory - VALUE'] - part['Current Inventory-QTY']
+                            shortage = part['Current Inventory - VALUE'] - part['Current Inventory - Qty']
                             st.write(f"Need: {shortage} units")
             # Excess inventory actions
             excess_items = df[
@@ -2227,8 +2227,8 @@ class InventoryManagementSystem:
             st.subheader("💰 Cost Optimization Opportunities")
             # Required columns
             required_cols = [
-                'Status', 'Current Inventory - VALUE', 'Current Inventory-QTY',
-                'VALUE(Unit Price* Short/Excess Inventory)', 'UNIT PRICE', 'Inventory Norms - QTY'
+                'Status', 'Current Inventory - VALUE', 'Current Inventory - Qty',
+                'Stock Deviation Value', 'UNIT PRICE', 'Inventory Norms - QTY'
             ]
             # Check if all required columns exist
             missing_cols = [col for col in required_cols if col not in df.columns]
@@ -2239,8 +2239,8 @@ class InventoryManagementSystem:
                     st.info("No excess inventory found in the current dataset.")
                 else:
                     # 2️⃣ Handle potential NaN values and calculate excess value
-                    excess_df['VALUE(Unit Price* Short/Excess Inventory)'] = pd.to_numeric(
-                        excess_df['VALUE(Unit Price* Short/Excess Inventory)'], errors='coerce'
+                    excess_df['Stock Deviation Value'] = pd.to_numeric(
+                        excess_df['Stock Deviation Value'], errors='coerce'
                     ).fillna(0)
                     excess_value = excess_df['Stock Deviation Value'].sum()
                     # 3️⃣ Calculate savings and capital with configurable rates
@@ -2272,12 +2272,12 @@ class InventoryManagementSystem:
                     st.subheader("🎯 Top Optimization Candidates")
                     top_excess = excess_df.copy()
                     # Ensure numeric columns are properly converted
-                    numeric_cols = ['Current Inventory-QTY', 'Inventory Norms - QTY', 'UNIT PRICE']
+                    numeric_cols = ['Current Inventory - Qty', 'Inventory Norms - QTY', 'UNIT PRICE']
                     for col in numeric_cols:
                         if col in top_excess.columns:
                             top_excess[col] = pd.to_numeric(top_excess[col], errors='coerce').fillna(0)
                     # Calculate excess quantity and optimization potential
-                    top_excess['Excess Qty'] = top_excess['Current Inventory-QTY'] - top_excess['Inventory Norms - QTY']
+                    top_excess['Excess Qty'] = top_excess['Current Inventory - Qty'] - top_excess['Inventory Norms - QTY']
                     top_excess['Optimization Potential'] = top_excess['Excess Qty'] * top_excess['UNIT PRICE']
                     # Filter out items with zero or negative optimization potential
                     top_excess = top_excess[top_excess['Optimization Potential'] > 0]
