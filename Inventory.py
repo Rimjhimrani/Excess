@@ -2617,19 +2617,15 @@ class InventoryManagementSystem:
                 f"Qty: {row.get('Current Inventory-QTY', 'N/A')}<br>"
                 f"Value: ₹{row[value_col]:,.0f}"
             ), axis=1)
+            # Create bar chart with single color (blue)
             fig1 = px.bar(
                 chart_data,
                 x='Part',
                 y='Value_Lakh',
-                title="Top 10 Parts by Stock Value",
-                color='Status',  # 🔁 Color by inventory status
-                color_discrete_map={
-                    "Excess Inventory": "#1f77b4",   # Blue
-                    "Short Inventory": "#d62728",    # Red
-                    "Within Norms": "#2ca02c"        # Green
-                }
+                title="Top 10 Parts by Stock Value"
             )
             fig1.update_traces(
+                marker_color='#1f77b4',  # Set fixed color (blue)
                 customdata=chart_data['HOVER_TEXT'],
                 hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>'
             )
@@ -2637,16 +2633,17 @@ class InventoryManagementSystem:
                 xaxis_tickangle=-45,
                 yaxis_title="Stock Value",
                 yaxis=dict(
-                    tickformat=',.0f',   # e.g. "200"
-                    ticksuffix='L'       # e.g. "200L"
+                    tickformat=',.0f',
+                    ticksuffix='L'
                 ),
                 xaxis=dict(
-                    tickfont=dict(size=10)  # adjust if needed
+                    tickfont=dict(size=10)
                 )
             )
             st.plotly_chart(fig1, use_container_width=True)
         else:
             st.warning("⚠️ Required columns for parts value chart not found.")
+
 
         # ✅ 2. Inventory Status Breakdown (Pie)
         if 'Status' in df.columns:
