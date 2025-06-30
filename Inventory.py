@@ -199,7 +199,6 @@ class InventoryAnalyzer:
                     'SHORT/EXCESS INVENTORY': deviation_qty,  # Column J name restored
                     'Stock Deviation Qty w.r.t Revised Norm': deviation_qty,  # For internal use
                     'Stock Deviation Value': deviation_value,
-                    'VALUE(Unit Price* Short/Excess Inventory)': deviation_value,
                     'Status': status,
                     'INVENTORY REMARK STATUS': status  # Maintained for legacy compatibility
                 }
