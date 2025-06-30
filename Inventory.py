@@ -1903,7 +1903,7 @@ class InventoryManagementSystem:
                     y='VALUE_LAKH',
                     color='Status',
                     size='VALUE_LAKH',
-                    hover_data=['Part No', 'Part Description'],
+                    hover_data=['PART NO', 'PART DESCRIPTION'],
                     title="Top 20 Parts by Value - Quantity vs Value Analysis",
                     color_discrete_map={
                         'Within Norms': '#4CAF50',
