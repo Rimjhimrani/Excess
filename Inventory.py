@@ -1682,7 +1682,7 @@ class InventoryManagementSystem:
             'AVG CONSUMPTION/DAY',
             'RM Norm - In Qty',
             'UNIT PRICE',
-            'Current Inventory-QTY',
+            'Current Inventory - Qty',
             'Current Inventory - VALUE',
             'SHORT/EXCESS INVENTORY',
             'VALUE(Unit Price* Short/Excess Inventory)',
@@ -1715,7 +1715,7 @@ class InventoryManagementSystem:
             formatters = {
                 'VALUE(Unit Price* Short/Excess Inventory)': lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
                 'Current Inventory - VALUE': lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
-                'Current Inventory-QTY': lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+                'Current Inventory - Qty': lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
                 'UNIT PRICE': lambda x: f"₹{x:,.2f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
             }
         return formatters
@@ -1827,11 +1827,11 @@ class InventoryManagementSystem:
                 (filtered_df['Current Inventory - VALUE'] <= max_val)
             ]
         # Apply quantity filter
-        if hasattr(st.session_state, 'qty_filter') and 'Current Inventory-QTY' in df.columns:
+        if hasattr(st.session_state, 'qty_filter') and 'Current Inventory - Qty' in df.columns:
             min_qty, max_qty = st.session_state.qty_filter
             filtered_df = filtered_df[
-                (filtered_df['Current Inventory-QTY'] >= min_qty) & 
-                (filtered_df['Current Inventory-QTY'] <= max_qty)
+                (filtered_df['Current Inventory - Qty'] >= min_qty) & 
+                (filtered_df['Current Inventory - Qty'] <= max_qty)
             ]
         # Apply vendor filter (FIXED: properly handle vendor column)
         if hasattr(st.session_state, 'vendor_filter'):
@@ -2286,7 +2286,7 @@ class InventoryManagementSystem:
                     if len(top_excess) > 0:
                         # Format the display dataframe
                         display_df = top_excess[[
-                            'PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 'RM Norm - In Qty',
+                            'PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty', 'RM Norm - In Qty',
                             'Excess Qty', 'UNIT PRICE', 'Optimization Potential'
                         ]].copy()
                         # Format monetary columns
