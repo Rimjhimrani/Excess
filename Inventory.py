@@ -1923,7 +1923,7 @@ class InventoryManagementSystem:
                 # Calculate reorder predictions
                 reorder_candidates = df[
                     (df['Status'] == 'Within Norms') & 
-                    (df['Current Inventory-QTY'] <= df['Current Inventory - VALUE'] * 1.2)
+                    (df['Current Inventory - Qty'] <= df['Current Inventory - VALUE'] * 1.2)
                 ]
                 if not reorder_candidates.empty:
                     st.warning(f"📋 **Reorder Alert**: {len(reorder_candidates)} parts may need reordering soon")
