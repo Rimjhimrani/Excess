@@ -143,64 +143,68 @@ class InventoryAnalyzer:
         }
         
     def analyze_inventory(self, pfep_data, current_inventory, tolerance=None):
-        """Analyze ONLY inventory parts that exist in PFEP and apply cleaned output format."""
+        """
+        Analyze inventory using PFEP and Inventory Dump data.
+        Applies formula logic as per provided Excel structure (A–L).
+        """
         if tolerance is None:
-            tolerance = st.session_state.get("admin_tolerance", 30)  # fallback
+            tolerance = st.session_state.get("admin_tolerance", 30)  # default tolerance %
         results = []
-        # Normalize and create lookup dictionaries (FIX: case match)
+        # Normalize and create lookup dictionaries
         pfep_dict = {str(item['Part_No']).strip().upper(): item for item in pfep_data}
         inventory_dict = {str(item['Part_No']).strip().upper(): item for item in current_inventory}
         for part_no, inventory_item in inventory_dict.items():
             pfep_item = pfep_dict.get(part_no)
             if not pfep_item:
-                continue
+                continue  # Skip unmatched parts
             try:
-                # Extract values safely
+                # Column A–F: From PFEP
+                part_desc = pfep_item.get('Description', '')
+                unit_price = float(pfep_item.get('unit_price', 0)) or 1.0
+                avg_per_day = self.safe_float_convert(pfep_item.get('AVG CONSUMPTION/DAY', 0))
+                rm_days = self.safe_float_convert(pfep_item.get('RM_IN_DAYS', 0))
+                rm_qty = self.safe_float_convert(pfep_item.get('RM_IN_QTY', 0))
+                # Column G: Inventory (sum across locations if needed)
                 current_qty = float(inventory_item.get('Current_QTY', 0))
-                stock_value = float(inventory_item.get('Current Inventory - VALUE', 0))
-                rm_qty = float(pfep_item.get('RM_IN_QTY', 0))
-                unit_price = float(pfep_item.get('unit_price', 0)) or 1.0  # Avoid division by zero
-                rm_days = pfep_item.get('RM_IN_DAYS', '')
-                avg_consumption_per_day = self.safe_float_convert(pfep_item.get('AVG CONSUMPTION/DAY', 0))
-                # Short/Excess Inventory calculation (FIX: multiplication, not division)
-                short_excess_qty = current_qty - rm_qty
-                value = unit_price * short_excess_qty 
-
-                # Status logic
-                if rm_qty > 0:
-                    variance_pct = ((current_qty - rm_qty) / rm_qty) * 100
-                else:
-                    variance_pct = 0
-                if abs(variance_pct) <= tolerance:
+                # Column H: Current Inventory Value = G × C
+                current_value = current_qty * unit_price
+                # Column I: Revised Norm Qty = F × (1 + tolerance %)
+                revised_norm_qty = rm_qty * (1 + tolerance / 100)
+                # Column J: Deviation Qty = G - I
+                deviation_qty = current_qty - revised_norm_qty
+                # Column K: Status logic
+                if abs(deviation_qty) <= 0.01 * revised_norm_qty:
                     status = 'Within Norms'
-                elif variance_pct > tolerance:
+                elif deviation_qty > 0:
                     status = 'Excess Inventory'
                 else:
                     status = 'Short Inventory'
-                # Build result
+                # Column L: Deviation Value = J × C
+                deviation_value = deviation_qty * unit_price
+
+                # Build output row
                 result = {
                     'PART NO': part_no,
-                    'PART DESCRIPTION': pfep_item.get('Description', ''),
+                    'PART DESCRIPTION': part_desc,
                     'Vendor Name': pfep_item.get('Vendor_Name', 'Unknown'),
                     'Vendor_Code': pfep_item.get('Vendor_Code', ''),
+                    'AVG CONSUMPTION/DAY': avg_per_day,
                     'RM IN DAYS': rm_days,
-                    'AVG CONSUMPTION/DAY': avg_consumption_per_day,
-                    'Inventory Norms - QTY': rm_qty,
+                    'RM Norm - In Qty': rm_qty,
+                    'Revised Norm Qty': revised_norm_qty,
                     'UNIT PRICE': unit_price,
                     'Current Inventory-QTY': current_qty,
-                    'Current Inventory - VALUE': stock_value,
-                    'SHORT/EXCESS INVENTORY': short_excess_qty,
-                    'VALUE(Unit Price* Short/Excess Inventory)': value,
-                    'INVENTORY REMARK STATUS': status,
-                    'Status': status,
+                    'Current Inventory - VALUE': current_value,
+                    'Stock Deviation Qty w.r.t Revised Norm': deviation_qty,
+                    'Stock Deviation Value': deviation_value,
+                    'Inventory Status': status
                 }
                 results.append(result)
             except Exception as e:
-                 st.warning(f"⚠️ Error analyzing part {part_no}: {e}")
-                 continue
-         # Show user if analysis result is empty
+                st.warning(f"⚠️ Error analyzing part {part_no}: {e}")
+                continue
         if not results:
-            st.error("❌ No analysis results were generated. Please check your data for mismatches, missing prices, or zero quantities.")
+            st.error("❌ No analysis results generated. Please check data for mismatches or missing fields.")
         return results
 
     def get_vendor_summary(self, processed_data):
