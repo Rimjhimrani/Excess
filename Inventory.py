@@ -1928,7 +1928,7 @@ class InventoryManagementSystem:
                 if not reorder_candidates.empty:
                     st.warning(f"📋 **Reorder Alert**: {len(reorder_candidates)} parts may need reordering soon")
                     # Display reorder table
-                    reorder_display = reorder_candidates[['PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 
+                    reorder_display = reorder_candidates[['PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty', 
                                                           'Current Inventory - VALUE']].copy()
                     reorder_display['Days to Reorder'] = np.random.randint(5, 30, len(reorder_display))  # Simulated
                     st.dataframe(reorder_display, use_container_width=True)
