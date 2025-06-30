@@ -1901,7 +1901,11 @@ class InventoryManagementSystem:
                 )
                 fig2.update_layout(
                     xaxis_title="Inventory Quantity",
-                    yaxis_title="Inventory Value (in ₹ Lakhs)"
+                    yaxis_title="Inventory Value (in ₹ Lakhs)",
+                    yaxis=dict(
+                        tickformat=',.0f',
+                        ticksuffix='L'
+                    )
                 )
                 st.plotly_chart(fig2, use_container_width=True)
 
