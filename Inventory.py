@@ -1896,7 +1896,7 @@ class InventoryManagementSystem:
                         'Short Inventory': '#F44336'     # Red
                     }
                 )
-                fig2.update_layout(
+                fig.update_layout(
                     xaxis_title="Inventory Quantity",
                     yaxis_title="Inventory Value"
                 )
