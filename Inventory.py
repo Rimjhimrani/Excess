@@ -1439,20 +1439,19 @@ class InventoryManagementSystem:
                 'count': len(filtered),
                 'value': filtered[inventory_value_col].sum() if inventory_value_col in filtered.columns else 0
             }
-        st.markdown("### Status Distribution")
-        # Use smaller column ratios and ensure they fit within the container
-        cols = st.columns([1, 1, 1, 1])  # Equal width columns that will fit in 70% container
+        # Display 4 columns
+        cols = st.columns([1, 1, 1, 1])
         with cols[0]:
-            normal = summary_data.get('Within Norms', {'count': 0, 'value': 0})
+            norm = status_values.get('Within Norms', {'count': 0, 'value': 0})
             st.markdown(f"""
             <div class="metric-card status-normal">
                 <div class="metric-label">🟢 Within Norms</div>
-                <div class="metric-value">{normal['count']} parts</div>
-                <div class="metric-delta">₹{normal['value']:,.0f}</div>
+                <div class="metric-value">{norm['count']} parts</div>
+                <div class="metric-delta">₹{norm['value']:,.0f}</div>
             </div>
             """, unsafe_allow_html=True)
         with cols[1]:
-            excess = summary_data.get('Excess Inventory', {'count': 0, 'value': 0})
+            excess = status_values.get('Excess Inventory', {'count': 0, 'value': 0})
             st.markdown(f"""
             <div class="metric-card status-excess">
                 <div class="metric-label">🔵 Excess Inventory</div>
@@ -1460,9 +1459,8 @@ class InventoryManagementSystem:
                 <div class="metric-delta">₹{excess['value']:,.0f}</div>
             </div>
             """, unsafe_allow_html=True)
-            
         with cols[2]:
-            short = summary_data.get('Short Inventory', {'count': 0, 'value': 0})
+            short = status_values.get('Short Inventory', {'count': 0, 'value': 0})
             st.markdown(f"""
             <div class="metric-card status-short">
                 <div class="metric-label">🔴 Short Inventory</div>
@@ -1470,7 +1468,6 @@ class InventoryManagementSystem:
                 <div class="metric-delta">₹{short['value']:,.0f}</div>
             </div>
             """, unsafe_allow_html=True)
-            
         with cols[3]:
             st.markdown(f"""
             <div class="metric-card status-total">
