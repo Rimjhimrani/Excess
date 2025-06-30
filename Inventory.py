@@ -1889,7 +1889,16 @@ class InventoryManagementSystem:
                     color='Status',
                     size='Current Inventory - VALUE',
                     hover_data=['PART NO', 'PART DESCRIPTION'],
-                    title="Top 20 Parts by Value - Quantity vs Value Analysis"
+                    title="Top 20 Parts by Value - Quantity vs Value Analysis",
+                    color_discrete_map={
+                        'Within Norms': '#4CAF50',       # Green
+                        'Excess Inventory': '#2196F3',   # Blue
+                        'Short Inventory': '#F44336'     # Red
+                    }
+                )
+                fig2.update_layout(
+                    xaxis_title="Inventory Quantity",
+                    yaxis_title="Inventory Value"
                 )
                 st.plotly_chart(fig, use_container_width=True)
             with tab3:
@@ -1952,12 +1961,20 @@ class InventoryManagementSystem:
     
         risk_matrix = df.groupby(['Risk_Level', 'Status']).agg({
             'Current Inventory - VALUE': 'sum',
-            'PART NO': 'count'
+            'PART NO': 'count
         }).reset_index()
+        # Add color ma
+        status_color_map = {
+            "Short Inventory": "#d62728",    # 🔴 Red
+            "Excess Inventory": "#1f77b4",   # 🔵 Blue
+            "Within Norms": "#2ca02c"        # 🟢 Green
+        }
         fig = px.sunburst(
             risk_matrix,
             path=['Risk_Level', 'Status'],
             values='Current Inventory - VALUE',
+            color='Status',  # Color by Status!
+            color_discrete_map=status_color_map,
             title="Risk Assessment by Value Impact"
         )
         st.plotly_chart(fig, use_container_width=True)
