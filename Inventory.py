@@ -2630,14 +2630,14 @@ class InventoryManagementSystem:
                 lambda row: f"{row['PART DESCRIPTION']}\n({row['PART NO']})",
                 axis=1
             )
-            # Build hover text
+            # ✅ Corrected inventory quantity field name
             chart_data['HOVER_TEXT'] = chart_data.apply(lambda row: (
                 f"Description: {row['PART DESCRIPTION']}<br>"
                 f"Part No: {row['PART NO']}<br>"
-                f"Qty: {row.get('Current Inventory-QTY', 'N/A')}<br>"
+                f"Qty: {row.get('Current Inventory - Qty', 'N/A')}<br>"
                 f"Value: ₹{row[value_col]:,.0f}"
             ), axis=1)
-            # Create bar chart with single color (blue)
+            # Create bar chart with fixed color
             fig1 = px.bar(
                 chart_data,
                 x='Part',
@@ -2645,13 +2645,13 @@ class InventoryManagementSystem:
                 title="Top 10 Parts by Stock Value"
             )
             fig1.update_traces(
-                marker_color='#c1dada',  # Set fixed color (blue)
+                marker_color='#c1dada',  # Your chosen fixed color
                 customdata=chart_data['HOVER_TEXT'],
                 hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>'
             )
             fig1.update_layout(
                 xaxis_tickangle=-45,
-                yaxis_title="Stock Value",
+                yaxis_title="Stock Value (in ₹ Lakhs)",
                 yaxis=dict(
                     tickformat=',.0f',
                     ticksuffix='L'
@@ -2663,8 +2663,7 @@ class InventoryManagementSystem:
             st.plotly_chart(fig1, use_container_width=True)
         else:
             st.warning("⚠️ Required columns for parts value chart not found.")
-
-
+            
         # ✅ 2. Inventory Status Breakdown (Pie)
         if 'Status' in df.columns:
             # 1) Identify columns
