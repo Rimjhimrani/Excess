@@ -1879,45 +1879,42 @@ class InventoryManagementSystem:
                 )
                 st.plotly_chart(fig, use_container_width=True)
             with tab2:
-                # ✅ Convert 'Current Inventory - VALUE' to lakhs for visualization
-                df['Value_Lakh'] = df['Current Inventory - VALUE'] / 100000
-                # 1️⃣ Value distribution analysis
-                value_ranges = pd.cut(df['Value_Lakh'], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
-                value_status = pd.crosstab(value_ranges, df['Status'])
+                df['VALUE_LAKH'] = df['CURRENT_INVENTORY_-_VALUE'] / 100000
+                # ✅ 1️⃣ Value Distribution Analysis (Bar Chart)
+                value_ranges = pd.cut(df['VALUE_LAKH'], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
+                value_status = pd.crosstab(value_ranges, df['STATUS'])
                 fig1 = px.bar(
                     value_status,
                     title="Status Distribution by Value Range (in ₹ Lakhs)",
                     color_discrete_map={
-                        'Within Norms': '#4CAF50',       # Green
-                        'Excess Inventory': '#2196F3',   # Blue
-                        'Short Inventory': '#F44336'     # Red
-                    }
+                        'Within Norms': '#4CAF50',
+                        'Excess Inventory': '#2196F3',
+                        'Short Inventory': '#F44336'
+                    },
+                    barmode='stack'
                 )
                 fig1.update_layout(yaxis_title="Number of Parts")
                 st.plotly_chart(fig1, use_container_width=True)
-                # 2️⃣ Top value contributors
-                top_value_parts = df.nlargest(20, 'Value_Lakh')
+                # ✅ 2️⃣ Top Value Contributors (Scatter Plot)
+                top_value_parts = df.nlargest(20, 'VALUE_LAKH')
                 fig2 = px.scatter(
                     top_value_parts,
-                    x='Current Inventory - Qty',
-                    y='Value_Lakh',
-                    color='Status',
-                    size='Value_Lakh',
-                    hover_data=['PART NO', 'PART DESCRIPTION'],
+                    x='CURRENT_INVENTORY_-_QTY',
+                    y='VALUE_LAKH',
+                    color='STATUS',
+                    size='VALUE_LAKH',
+                    hover_data=['PART_NO', 'PART_DESCRIPTION'],
                     title="Top 20 Parts by Value - Quantity vs Value Analysis",
                     color_discrete_map={
-                        'Within Norms': '#4CAF50',       # Green
-                        'Excess Inventory': '#2196F3',   # Blue
-                        'Short Inventory': '#F44336'     # Red
+                        'Within Norms': '#4CAF50',
+                        'Excess Inventory': '#2196F3',
+                        'Short Inventory': '#F44336'
                     }
                 )
                 fig2.update_layout(
                     xaxis_title="Inventory Quantity",
                     yaxis_title="Inventory Value (in ₹ Lakhs)",
-                    yaxis=dict(
-                        tickformat=',.0f',
-                        ticksuffix='L'
-                    )
+                    yaxis=dict(tickformat=',.0f', ticksuffix='L')
                 )
                 st.plotly_chart(fig2, use_container_width=True)
 
