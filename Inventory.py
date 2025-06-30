@@ -143,12 +143,11 @@ class InventoryAnalyzer:
         }
         
     def analyze_inventory(self, pfep_data, current_inventory, tolerance=None):
-        """
-        Analyze inventory using PFEP and Inventory Dump data.
+        """Analyze inventory using PFEP and Inventory Dump data.
         Applies formula logic as per provided Excel structure (A–L).
         """
         if tolerance is None:
-            tolerance = st.session_state.get("admin_tolerance", 30)  # default tolerance %
+            tolerance = st.session_state.get("admin_tolerance", 30)  # default tolerance 
         results = []
         # Normalize and create lookup dictionaries
         pfep_dict = {str(item['Part_No']).strip().upper(): item for item in pfep_data}
@@ -165,16 +164,15 @@ class InventoryAnalyzer:
                 avg_per_day = self.safe_float_convert(pfep_item.get('AVG CONSUMPTION/DAY', 0))
                 rm_days = self.safe_float_convert(pfep_item.get('RM_IN_DAYS', 0))
                 rm_qty = self.safe_float_convert(pfep_item.get('RM_IN_QTY', 0))
-                # Column G: Inventory (sum across locations if needed)
-                current_qty = float(inventory_item.get('Current_QTY', 0))
                 # Column H: Current Inventory Value = G × C
                 current_value = current_qty * unit_price
+
                 # Column I: Revised Norm Qty = F × (1 + tolerance %)
                 revised_norm_qty = rm_qty * (1 + tolerance / 100)
-            
+
                 # Column J: Deviation Qty = G - I
                 deviation_qty = current_qty - revised_norm_qty
-            
+
                 # Column K: Status logic
                 if abs(deviation_qty) <= 0.01 * revised_norm_qty:
                     status = 'Within Norms'
@@ -182,10 +180,9 @@ class InventoryAnalyzer:
                     status = 'Excess Inventory'
                 else:
                     status = 'Short Inventory'
-            
                 # Column L: Deviation Value = J × C
                 deviation_value = deviation_qty * unit_price
-            
+
                 # Build output row
                 result = {
                     'PART NO': part_no,
@@ -197,15 +194,15 @@ class InventoryAnalyzer:
                     'RM Norm - In Qty': rm_qty,
                     'Revised Norm Qty': revised_norm_qty,
                     'UNIT PRICE': unit_price,
-                    'Current Inventory-QTY': current_qty,
+                    'Current Inventory - Qty': current_qty,
                     'Current Inventory - VALUE': current_value,
-                    'Stock Deviation Qty w.r.t Revised Norm': deviation_qty,
+                    'SHORT/EXCESS INVENTORY': deviation_qty,  # Column J name restored
+                    'Stock Deviation Qty w.r.t Revised Norm': deviation_qty,  # For internal use
                     'Stock Deviation Value': deviation_value,
-                    'Status': status,  # Changed from 'Inventory Status' to 'Status'
-                    'INVENTORY REMARK STATUS': status  # Added this column that your other code expects
+                    'Status': status,
+                    'INVENTORY REMARK STATUS': status  # Maintained for legacy compatibility
                 }
                 results.append(result)
-            
             except Exception as e:
                 st.warning(f"⚠️ Error analyzing part {part_no}: {e}")
                 continue
