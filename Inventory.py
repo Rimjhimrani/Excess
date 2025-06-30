@@ -1879,7 +1879,7 @@ class InventoryManagementSystem:
                 )
                 st.plotly_chart(fig, use_container_width=True)
             with tab2:
-                df['VALUE_LAKH'] = df['Current Inventory -VALUE'] / 100000
+                df['VALUE_LAKH'] = df['Current Inventory - VALUE'] / 100000
                 # ✅ 1️⃣ Value Distribution Analysis (Bar Chart)
                 value_ranges = pd.cut(df['VALUE_LAKH'], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
                 value_status = pd.crosstab(value_ranges, df['STATUS'])
