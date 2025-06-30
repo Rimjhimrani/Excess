@@ -1405,17 +1405,22 @@ class InventoryManagementSystem:
         st.markdown('<div class="dashboard-container">', unsafe_allow_html=True)
         # DataFrame prep
         df = pd.DataFrame(analysis_results)
-        value_col = None
-        for col in ['Current Inventory - VALUE', 'Stock_Value', 'VALUE']:
-            if col in df.columns:
-                value_col = col
-                break
-        total_parts = len(df)
-        total_stock_value = df[value_col].sum() if value_col else 0
+        # Identify value and status columns
+        value_col = 'Stock Deviation Value'
         status_col = 'Status' if 'Status' in df.columns else 'INVENTORY REMARK STATUS'
-        short_value = df[df[status_col] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum() if 'VALUE(Unit Price* Short/Excess Inventory)' in df.columns else 0
-        excess_value = df[df[status_col] == 'Excess Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum() if 'VALUE(Unit Price* Short/Excess Inventory)' in df.columns else 0
-        # KPI Summary
+        # Compute KPI values safely
+        if not df.empty and value_col in df.columns and status_col in df.columns:
+            short_value = df[df[status_col] == 'Short Inventory'][value_col].sum()
+            excess_value = df[df[status_col] == 'Excess Inventory'][value_col].sum()
+        else:
+            short_value = 0
+            excess_value = 0
+        # Total values
+        total_parts = len(df)
+        inventory_value_col = next((col for col in [
+            'Current Inventory - VALUE', 'Stock_Value', 'VALUE'
+        ] if col in df.columns), None)
+        total_stock_value = df[inventory_value_col].sum() if inventory_value_col else 0
         st.markdown('<div class="highlight-box">', unsafe_allow_html=True)
         st.markdown(f"""
         ### 🎯 Key Inventory KPIs
