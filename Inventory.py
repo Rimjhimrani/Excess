@@ -2243,7 +2243,7 @@ class InventoryManagementSystem:
                     excess_df['VALUE(Unit Price* Short/Excess Inventory)'] = pd.to_numeric(
                         excess_df['VALUE(Unit Price* Short/Excess Inventory)'], errors='coerce'
                     ).fillna(0)
-                    excess_value = excess_df['VALUE(Unit Price* Short/Excess Inventory)'].sum()
+                    excess_value = excess_df['Stock Deviation Value'].sum()
                     # 3️⃣ Calculate savings and capital with configurable rates
                     CARRYING_COST_RATE = 0.10  # 10% carrying cost
                     RECOVERY_RATE = 0.70       # 70% capital recovery rate
