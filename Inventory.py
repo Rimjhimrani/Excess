@@ -2625,7 +2625,7 @@ class InventoryManagementSystem:
                 title="Top 10 Parts by Stock Value"
             )
             fig1.update_traces(
-                marker_color='#1f77b4',  # Set fixed color (blue)
+                marker_color='#556B2F',  # Set fixed color (blue)
                 customdata=chart_data['HOVER_TEXT'],
                 hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>'
             )
@@ -2720,13 +2720,9 @@ class InventoryManagementSystem:
                     x=vendor_col,
                     y='Value_Lakh',
                     title='Top 10 Vendors by Stock Value',
-                    color_discrete_map={
-                        "Excess Inventory": "#1f77b4",   # Blue
-                        "Short Inventory": "#d62728",    # Red
-                        "Within Norms": "#2ca02c"        # Green
-                    }
                 )
                 fig3.update_traces(
+                    marker_color='#9370DB',  # 🟪 Use single color (light purple)
                     customdata=vendor_data['HOVER_TEXT'],
                     hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
                     textposition='auto'
