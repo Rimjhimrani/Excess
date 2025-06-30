@@ -171,8 +171,10 @@ class InventoryAnalyzer:
                 current_value = current_qty * unit_price
                 # Column I: Revised Norm Qty = F × (1 + tolerance %)
                 revised_norm_qty = rm_qty * (1 + tolerance / 100)
+            
                 # Column J: Deviation Qty = G - I
                 deviation_qty = current_qty - revised_norm_qty
+            
                 # Column K: Status logic
                 if abs(deviation_qty) <= 0.01 * revised_norm_qty:
                     status = 'Within Norms'
@@ -180,9 +182,10 @@ class InventoryAnalyzer:
                     status = 'Excess Inventory'
                 else:
                     status = 'Short Inventory'
+            
                 # Column L: Deviation Value = J × C
                 deviation_value = deviation_qty * unit_price
-
+            
                 # Build output row
                 result = {
                     'PART NO': part_no,
@@ -198,9 +201,11 @@ class InventoryAnalyzer:
                     'Current Inventory - VALUE': current_value,
                     'Stock Deviation Qty w.r.t Revised Norm': deviation_qty,
                     'Stock Deviation Value': deviation_value,
-                    'Inventory Status': status
+                    'Status': status,  # Changed from 'Inventory Status' to 'Status'
+                    'INVENTORY REMARK STATUS': status  # Added this column that your other code expects
                 }
                 results.append(result)
+            
             except Exception as e:
                 st.warning(f"⚠️ Error analyzing part {part_no}: {e}")
                 continue
