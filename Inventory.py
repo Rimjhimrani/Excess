@@ -1680,7 +1680,7 @@ class InventoryManagementSystem:
             'Vendor_Code',
             'RM IN DAYS',
             'AVG CONSUMPTION/DAY',
-            'Inventory Norms - QTY',
+            'RM Norm - In Qty',
             'UNIT PRICE',
             'Current Inventory-QTY',
             'Current Inventory - VALUE',
@@ -2277,7 +2277,7 @@ class InventoryManagementSystem:
                         if col in top_excess.columns:
                             top_excess[col] = pd.to_numeric(top_excess[col], errors='coerce').fillna(0)
                     # Calculate excess quantity and optimization potential
-                    top_excess['Excess Qty'] = top_excess['Current Inventory - Qty'] - top_excess['Inventory Norms - QTY']
+                    top_excess['Excess Qty'] = top_excess['Current Inventory - Qty'] - top_excess['RM Norm - In Qty']
                     top_excess['Optimization Potential'] = top_excess['Excess Qty'] * top_excess['UNIT PRICE']
                     # Filter out items with zero or negative optimization potential
                     top_excess = top_excess[top_excess['Optimization Potential'] > 0]
