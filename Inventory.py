@@ -1961,7 +1961,7 @@ class InventoryManagementSystem:
     
         risk_matrix = df.groupby(['Risk_Level', 'Status']).agg({
             'Current Inventory - VALUE': 'sum',
-            'PART NO': 'count
+            'PART NO': 'count'
         }).reset_index()
         # Add color ma
         status_color_map = {
