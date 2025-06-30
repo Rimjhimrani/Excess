@@ -1938,64 +1938,76 @@ class InventoryManagementSystem:
     def display_executive_dashboard(self, analysis_results):
         """Executive level dashboard with KPIs"""
         st.header("👔 Executive Dashboard")
+        # Convert results to DataFrame
         df = pd.DataFrame(analysis_results)
-        # Key metrics ro
+        # Clean up column names just in case
+        df.columns = df.columns.str.strip()
+        # ✅ Define key columns based on your inventory analyzer output
+        required_cols = [
+            'Current Inventory - VALUE',
+            'Status',
+            'PART NO',
+            'Stock Deviation Value'
+        ]
+        for col in required_cols:
+            if col not in df.columns:
+                st.error(f"❌ Missing required column: {col}")
+                st.write("Available columns:", list(df.columns))
+                st.stop()
+        # 📊 KPI Row
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             total_value = df['Current Inventory - VALUE'].sum()
-            st.metric(
-                "Total Inventory Value",
-                f"₹{total_value:,.0f}",
-                delta=f"Analyzed: {len(df)} parts"
-            )
+            st.metric("Total Inventory Value", f"₹{total_value:,.0f}", delta=f"Analyzed: {len(df)} parts")
         with col2:
             efficiency = (df['Status'] == 'Within Norms').mean() * 100
-            st.metric(
-                "Inventory Efficiency",
-                f"{efficiency:.1f}%",
-                delta=f"{'Good' if efficiency > 70 else 'Needs Improvement'}"
-            )
+            status_quality = "✅ Good" if efficiency >= 70 else "⚠️ Needs Improvement"
+            st.metric("Inventory Efficiency", f"{efficiency:.1f}%", delta=status_quality)
         with col3:
             excess_value = df[df['Status'] == 'Excess Inventory']['Current Inventory - VALUE'].sum()
-            st.metric(
-                "Excess Inventory",
-                f"₹{excess_value:,.0f}",
-                delta=f"{(df['Status'] == 'Excess Inventory').sum()} parts"
-            )
+            excess_parts = (df['Status'] == 'Excess Inventory').sum()
+            st.metric("Excess Inventory", f"₹{excess_value:,.0f}", delta=f"{excess_parts} parts")
         with col4:
-            short_impact = abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum())
-            st.metric(
-                "Shortage Impact",
-                f"₹{short_impact:,.0f}",
-                delta=f"{(df['Status'] == 'Short Inventory').sum()} parts"
-            )
-        # Risk matrix
+            short_impact = abs(df[df['Status'] == 'Short Inventory']['Stock Deviation Value'].sum())
+            short_parts = (df['Status'] == 'Short Inventory').sum()
+            st.metric("Shortage Impact", f"₹{short_impact:,.0f}", delta=f"{short_parts} parts")
+        # 🎯 Risk Matrix
         st.subheader("🎯 Risk Assessment Matrix")
-        # Create risk categories
+        # Risk category tagging
         df['Risk_Level'] = 'Low'
-        df.loc[(df['Current Inventory - VALUE'] > 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'High'
-        df.loc[(df['Current Inventory - VALUE'] > 50000) & (df['Current Inventory - VALUE'] <= 100000) & (df['Status'] != 'Within Norms'), 'Risk_Level'] = 'Medium'
-    
+        df.loc[
+            (df['Current Inventory - VALUE'] > 100000) & (df['Status'] != 'Within Norms'),
+            'Risk_Level'
+        ] = 'High'
+        df.loc[
+            (df['Current Inventory - VALUE'] > 50000) & (df['Current Inventory - VALUE'] <= 100000) & (df['Status'] != 'Within Norms'),
+            'Risk_Level'
+        ] = 'Medium'
+
+        # Aggregate for Sunburst
         risk_matrix = df.groupby(['Risk_Level', 'Status']).agg({
             'Current Inventory - VALUE': 'sum',
             'PART NO': 'count'
-        }).reset_index()
-        # Add color ma
+        }).reset_index().rename(columns={'PART NO': 'Part Count'})
+
+        # 🌈 Color mapping
         status_color_map = {
-            "Short Inventory": "#d62728",    # 🔴 Red
-            "Excess Inventory": "#1f77b4",   # 🔵 Blue
-            "Within Norms": "#2ca02c"        # 🟢 Green
+            "Short Inventory": "#d62728",    # Red
+            "Excess Inventory": "#1f77b4",   # Blue
+            "Within Norms": "#2ca02c"        # Green
         }
+        # ☀️ Sunburst chart
         fig = px.sunburst(
             risk_matrix,
             path=['Risk_Level', 'Status'],
             values='Current Inventory - VALUE',
-            color='Status',  # Color by Status!
+            color='Status',
             color_discrete_map=status_color_map,
             title="Risk Assessment by Value Impact"
         )
+        fig.update_traces(textinfo='label+percent entry')
         st.plotly_chart(fig, use_container_width=True)
-        
+    
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
         st.header("📥 Export & Reporting Options")
