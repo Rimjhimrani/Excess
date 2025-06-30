@@ -2114,7 +2114,7 @@ class InventoryManagementSystem:
                     (df['Status'] == 'Short Inventory').sum(),
                     f"{(df['Status'] == 'Within Norms').mean() * 100:.1f}%",
                     f"₹{df[df['Status'] == 'Excess Inventory']['Current Inventory - VALUE'].sum():,.0f}",
-                    f"₹{abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum()):,.0f}"
+                    f"₹{abs(df[df['Status'] == 'Short Inventory']['Stock Deviation Value'].sum()):,.0f}"
                 ]
             }
             summary_df = pd.DataFrame(summary)
@@ -2228,7 +2228,7 @@ class InventoryManagementSystem:
             # Required columns
             required_cols = [
                 'Status', 'Current Inventory - VALUE', 'Current Inventory - Qty',
-                'Stock Deviation Value', 'UNIT PRICE', 'Inventory Norms - QTY'
+                'Stock Deviation Value', 'UNIT PRICE', 'RM Norm - In Qty'
             ]
             # Check if all required columns exist
             missing_cols = [col for col in required_cols if col not in df.columns]
@@ -2272,7 +2272,7 @@ class InventoryManagementSystem:
                     st.subheader("🎯 Top Optimization Candidates")
                     top_excess = excess_df.copy()
                     # Ensure numeric columns are properly converted
-                    numeric_cols = ['Current Inventory - Qty', 'Inventory Norms - QTY', 'UNIT PRICE']
+                    numeric_cols = ['Current Inventory - Qty', 'RM Norm - In Qty', 'UNIT PRICE']
                     for col in numeric_cols:
                         if col in top_excess.columns:
                             top_excess[col] = pd.to_numeric(top_excess[col], errors='coerce').fillna(0)
@@ -2286,7 +2286,7 @@ class InventoryManagementSystem:
                     if len(top_excess) > 0:
                         # Format the display dataframe
                         display_df = top_excess[[
-                            'PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 'Inventory Norms - QTY',
+                            'PART NO', 'PART DESCRIPTION', 'Current Inventory-QTY', 'RM Norm - In Qty',
                             'Excess Qty', 'UNIT PRICE', 'Optimization Potential'
                         ]].copy()
                         # Format monetary columns
