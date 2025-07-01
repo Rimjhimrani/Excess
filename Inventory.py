@@ -2715,13 +2715,13 @@ class InventoryManagementSystem:
                     st.plotly_chart(fig2, use_container_width=True)
                 else:
                     st.info("ℹ️ No status data available for pie chart.")
-             else:
-                 missing = []
-                 if not value_col: missing.append("value column")
-                 if not rm_days_col: missing.append("RM IN DAYS column")
-                 st.warning(f"⚠️ Cannot build status pie: missing {', '.join(missing)}.")
-         else:
-             st.warning("⚠️ Status column not found for status distribution chart.")
+            else:
+                missing = []
+                if not value_col: missing.append("value column")
+                if not rm_days_col: missing.append("RM IN DAYS column")
+                st.warning(f"⚠️ Cannot build status pie: missing {', '.join(missing)}.")
+        else:
+            st.warning("⚠️ Status column not found for status distribution chart.")
             
         # ✅ 3. Vendor vs Value (Fixed vendor_col definition)
         vendor_col = next((col for col in ['Vendor', 'Vendor Name', 'VENDOR'] if col in df.columns), None)
