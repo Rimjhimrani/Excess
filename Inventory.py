@@ -211,8 +211,8 @@ class InventoryAnalyzer:
                 continue
         if not results:
             st.error("❌ No analysis results generated. Please check data for mismatches or missing fields.")
-
-    return results
+        return results
+        
     def get_vendor_summary(self, processed_data):
         """Summarize inventory by vendor using actual Stock_Value field from the file."""
         from collections import defaultdict
