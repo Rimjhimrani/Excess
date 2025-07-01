@@ -1675,22 +1675,22 @@ class InventoryManagementSystem:
         # Define priority columns to show
         priority_columns = [
              # Part identification
-            PART NO,
-            PART DESCRIPTION,
-            Vendor Name,
-            Vendor_Code,
-            AVG CONSUMPTION/DAY,
-            RM IN DAYS,
-            RM Norm - In Qty,
-            Revised Norm Qty,
-            Lower Bound Qty,                # ✅ Added
-            Upper Bound Qty, 
-            UNIT PRICE,
-            Current Inventory - Qty,
-            Current Inventory - VALUE,
-            SHORT/EXCESS INVENTORY,
-            Stock Deviation Value,
-            INVENTORY REMARK STATUS
+            "PART NO",
+            "PART DESCRIPTION",
+            "Vendor Name",
+            "Vendor_Code",
+            "AVG CONSUMPTION/DAY",
+            "RM IN DAYS",
+            "RM Norm - In Qty",
+            "Revised Norm Qty",
+            "Lower Bound Qty",                # ✅ Added
+            "Upper Bound Qty", 
+            "UNIT PRICE",
+            "Current Inventory - Qty",
+            "Current Inventory - VALUE",
+            "SHORT/EXCESS INVENTORY",
+            "Stock Deviation Value",
+            "INVENTORY REMARK STATUS"
         ]
         # Select columns that exist in the dataframe
         available_columns = []
