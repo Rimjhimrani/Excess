@@ -144,10 +144,13 @@ class InventoryAnalyzer:
         
     def analyze_inventory(self, pfep_data, current_inventory, tolerance=None):
         """Analyze inventory using PFEP and Inventory Dump data.
-        Applies formula logic as per provided Excel structure (A–L).
+        Applies updated logic where:
+        - Short Inventory: < RM_IN_QTY × (1 - Tolerance%)
+        - Excess Inventory: > RM_IN_QTY × (1 + Tolerance%)
+        - Within Norms: between the above thresholds
         """
         if tolerance is None:
-            tolerance = st.session_state.get("admin_tolerance", 30)  # default tolerance 
+            tolerance = st.session_state.get("admin_tolerance", 30)  # default to 30%
         results = []
         # Normalize and create lookup dictionaries
         pfep_dict = {str(item['Part_No']).strip().upper(): item for item in pfep_data}
@@ -157,33 +160,33 @@ class InventoryAnalyzer:
             if not pfep_item:
                 continue  # Skip unmatched parts
             try:
-                # Column A–F: From PFEP
+                # From Inventory & PFEP
                 current_qty = float(inventory_item.get('Current_QTY', 0)) or 0.0
                 part_desc = pfep_item.get('Description', '')
                 unit_price = float(pfep_item.get('unit_price', 0)) or 1.0
                 avg_per_day = self.safe_float_convert(pfep_item.get('AVG CONSUMPTION/DAY', 0))
                 rm_days = self.safe_float_convert(pfep_item.get('RM_IN_DAYS', 0))
                 rm_qty = self.safe_float_convert(pfep_item.get('RM_IN_QTY', 0))
-                # Column H: Current Inventory Value = G × C
+                # Inventory value
                 current_value = current_qty * unit_price
+                # Norms with tolerance
+                lower_bound = rm_qty * (1 - tolerance / 100)
+                upper_bound = rm_qty * (1 + tolerance / 100)
 
-                # Column I: Revised Norm Qty = F × (1 + tolerance %)
-                revised_norm_qty = rm_qty * (1 + tolerance / 100)
-
-                # Column J: Deviation Qty = G - I
+                # Revised Norm shown for reference
+                revised_norm_qty = upper_bound  # you can rename if needed
+                # Deviation quantity and value
                 deviation_qty = current_qty - revised_norm_qty
-
-                # Column K: Status logic
-                if abs(deviation_qty) <= 0.01 * revised_norm_qty:
-                    status = 'Within Norms'
-                elif deviation_qty > 0:
-                    status = 'Excess Inventory'
-                else:
-                    status = 'Short Inventory'
-                # Column L: Deviation Value = J × C
                 deviation_value = deviation_qty * unit_price
 
-                # Build output row
+                # Status based on range
+                if current_qty < lower_bound:
+                    status = 'Short Inventory'
+                elif current_qty > upper_bound:
+                    status = 'Excess Inventory'
+                else:
+                    status = 'Within Norms'
+                # Final result per part
                 result = {
                     'PART NO': part_no,
                     'PART DESCRIPTION': part_desc,
@@ -196,11 +199,11 @@ class InventoryAnalyzer:
                     'UNIT PRICE': unit_price,
                     'Current Inventory - Qty': current_qty,
                     'Current Inventory - VALUE': current_value,
-                    'SHORT/EXCESS INVENTORY': deviation_qty,  # Column J name restored
-                    'Stock Deviation Qty w.r.t Revised Norm': deviation_qty,  # For internal use
+                    'SHORT/EXCESS INVENTORY': deviation_qty,
+                    'Stock Deviation Qty w.r.t Revised Norm': deviation_qty,
                     'Stock Deviation Value': deviation_value,
                     'Status': status,
-                    'INVENTORY REMARK STATUS': status  # Maintained for legacy compatibility
+                    'INVENTORY REMARK STATUS': status
                 }
                 results.append(result)
             except Exception as e:
@@ -208,8 +211,8 @@ class InventoryAnalyzer:
                 continue
         if not results:
             st.error("❌ No analysis results generated. Please check data for mismatches or missing fields.")
-        return results
 
+    return results
     def get_vendor_summary(self, processed_data):
         """Summarize inventory by vendor using actual Stock_Value field from the file."""
         from collections import defaultdict
