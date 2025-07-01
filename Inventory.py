@@ -2674,57 +2674,57 @@ class InventoryManagementSystem:
             st.warning("⚠️ Required columns for parts value chart not found.")
             
         # ✅ 2. Inventory Status Breakdown (Pie)
-        if 'Status' in df.columns:
-            # 1) Identify columns
-            value_col = next((c for c in ['Current Inventory - VALUE', 'Stock_Value', 'VALUE'] if c in df.columns), None)
-            rm_days_col = 'RM IN DAYS' if 'RM IN DAYS' in df.columns else None
-            if value_col and rm_days_col:
-                # 2) Build summary per status
-                summary_rows = []
-                for status, group in df.groupby('Status'):
-                    summary_rows.append({
-                        'Status': status,
-                        'Count': len(group),
-                        'Stock_Value': group[value_col].sum(),
-                        'Total_RM_Days': group[rm_days_col].sum()
-                    })
-                status_summary = pd.DataFrame(summary_rows)
-                if not status_summary.empty:
-                    fig2 = px.pie(
-                        status_summary,
-                        names='Status',
-                        values='Count',
-                        title='Inventory Status Distribution',
-                        hole=0.4,
-                        # map each status to its custom color:
-                        color_discrete_map={
-                            "Excess Inventory": "#2196F3",  # blue
-                            "Short Inventory":  "#F44336",  # red
-                            "Within Norms":      "#4CAF50"   # green
-                        }
-                    )
-                    # 3) Prepare hover text including Total RM IN DAYS
-                    custom_strings = status_summary.apply(lambda row: (
-                        f"<b>{row['Status']}</b><br>"
-                        f"Parts: {int(row['Count'])}<br>"
-                        f"Stock Value: ₹{row['Stock_Value']:,.0f}<br>"
-                        f"Total RM IN DAYS: {int(row['Total_RM_Days'])} days<br>"
-                        "<extra></extra>"
-                    ), axis=1)
-                    fig2.update_traces(
-                        customdata=custom_strings,
-                        hovertemplate='%{customdata}'
-                    )
-                    st.plotly_chart(fig2, use_container_width=True)
-                else:
-                    st.info("ℹ️ No status data available for pie chart.")
-            else:
-                missing = []
-                if not value_col: missing.append("value column")
-                if not rm_days_col: missing.append("RM IN DAYS column")
-                st.warning(f"⚠️ Cannot build status pie: missing {', '.join(missing)}.")
+        # Define custom color map for inventory status
+        status_color_map = {
+            'Within Norms': '#4CAF50',      # Green
+            'Excess Inventory': '#2196F3',  # Blue
+            'Short Inventory': '#F44336'    # Red
+        }
+        # Build chart only if status column is available
+        if value_col and 'PART NO' in df.columns and 'PART DESCRIPTION' in df.columns and 'Status' in df.columns:
+            chart_data = (
+                df[df[value_col] > 0]
+                .sort_values(by=value_col, ascending=False)
+                .head(10)
+                .copy()
+            )
+            chart_data['Value_Lakh'] = chart_data[value_col] / 100_000
+            chart_data['Part'] = chart_data.apply(
+                lambda row: f"{row['PART DESCRIPTION']}\n({row['PART NO']})", axis=1
+            )
+            chart_data['HOVER_TEXT'] = chart_data.apply(lambda row: (
+                f"Description: {row['PART DESCRIPTION']}<br>"
+                f"Part No: {row['PART NO']}<br>"
+                f"Qty: {row.get('Current Inventory - Qty', 'N/A')}<br>"
+                f"Value: ₹{row[value_col]:,.0f}<br>"
+                f"Status: {row.get('Status', 'N/A')}"
+            ), axis=1)
+            fig1 = px.bar(
+                chart_data,
+                x='Part',
+                y='Value_Lakh',
+                color='Status',  # ✅ color by status
+                color_discrete_map=status_color_map,
+                title="Top 10 Parts by Stock Value"
+            )
+            fig1.update_traces(
+                customdata=chart_data['HOVER_TEXT'],
+                hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>'
+            )
+            fig1.update_layout(
+                xaxis_tickangle=-45,
+                yaxis_title="Stock Value (in ₹ Lakhs)",
+                yaxis=dict(
+                    tickformat=',.0f',
+                    ticksuffix='L'
+                ),
+                xaxis=dict(
+                    tickfont=dict(size=10)
+                )
+            )
+            st.plotly_chart(fig1, use_container_width=True)
         else:
-            st.warning("⚠️ Status column not found for status distribution chart.")
+            st.warning("⚠️ Required columns for parts value chart not found.")
             
         # ✅ 3. Vendor vs Value (Fixed vendor_col definition)
         vendor_col = next((col for col in ['Vendor', 'Vendor Name', 'VENDOR'] if col in df.columns), None)
