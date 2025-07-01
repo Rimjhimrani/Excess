@@ -1853,6 +1853,7 @@ class InventoryManagementSystem:
                 values=status_counts.values,
                 names=status_counts.index,
                 title="Current Inventory Status Distribution",
+                color=status_counts.index, 
                 color_discrete_map={
                     'Within Norms': '#4CAF50',
                     'Excess Inventory': '#2196F3',
