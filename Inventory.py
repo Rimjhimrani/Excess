@@ -196,6 +196,8 @@ class InventoryAnalyzer:
                     'RM IN DAYS': rm_days,
                     'RM Norm - In Qty': rm_qty,
                     'Revised Norm Qty': revised_norm_qty,
+                    'Lower Bound Qty': lower_bound,                 # ✅ Added
+                    'Upper Bound Qty': upper_bound,  
                     'UNIT PRICE': unit_price,
                     'Current Inventory - Qty': current_qty,
                     'Current Inventory - VALUE': current_value,
@@ -1673,20 +1675,22 @@ class InventoryManagementSystem:
         # Define priority columns to show
         priority_columns = [
              # Part identification
-            'PART NO': part_no,
-            'PART DESCRIPTION': part_desc,
-            'Vendor Name': pfep_item.get('Vendor_Name', 'Unknown'),
-            'Vendor_Code': pfep_item.get('Vendor_Code', ''),
-            'AVG CONSUMPTION/DAY': avg_per_day,
-            'RM IN DAYS': rm_days,
-            'RM Norm - In Qty': rm_qty,
-            'Revised Norm Qty': revised_norm_qty,
-            'UNIT PRICE': unit_price,
-            'Current Inventory - Qty': current_qty,
-            'Current Inventory - VALUE': current_value,
-            'SHORT/EXCESS INVENTORY': deviation_qty,
-            'Stock Deviation Value': deviation_value,
-            'INVENTORY REMARK STATUS': status
+            PART NO,
+            PART DESCRIPTION,
+            Vendor Name,
+            Vendor_Code,
+            AVG CONSUMPTION/DAY,
+            RM IN DAYS,
+            RM Norm - In Qty,
+            Revised Norm Qty,
+            Lower Bound Qty,                # ✅ Added
+            Upper Bound Qty, 
+            UNIT PRICE,
+            Current Inventory - Qty,
+            Current Inventory - VALUE,
+            SHORT/EXCESS INVENTORY,
+            Stock Deviation Value,
+            INVENTORY REMARK STATUS
         ]
         # Select columns that exist in the dataframe
         available_columns = []
