@@ -143,56 +143,77 @@ class InventoryAnalyzer:
         }
         
     def analyze_inventory(self, pfep_data, current_inventory, tolerance=None):
+        """Analyze inventory using PFEP and Inventory Dump data.
+        Applies updated logic where:
+        - Short Inventory: < RM_IN_QTY × (1 - Tolerance%)
+        - Excess Inventory: > RM_IN_QTY × (1 + Tolerance%)
+        - Within Norms: between the above thresholds
+        """
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)  # default to 30%
-        pfep_dict = {str(item['Part_No']).strip().upper(): item for item in pfep_data}
-        inventory_dict = defaultdict(list)
-        # Group inventory entries by Part No (across time)
-        for item in current_inventory:
-            part_no = str(item['Part_No']).strip().upper()
-            inventory_dict[part_no].append(item)
         results = []
-        for part_no, entries in inventory_dict.items():
+        # Normalize and create lookup dictionaries
+        pfep_dict = {str(item['Part_No']).strip().upper(): item for item in pfep_data}
+        inventory_dict = {str(item['Part_No']).strip().upper(): item for item in current_inventory}
+        for part_no, inventory_item in inventory_dict.items():
             pfep_item = pfep_dict.get(part_no)
             if not pfep_item:
-                continue
+                continue  # Skip unmatched parts
             try:
+                # From Inventory & PFEP
+                current_qty = float(inventory_item.get('Current_QTY', 0)) or 0.0
                 part_desc = pfep_item.get('Description', '')
                 unit_price = float(pfep_item.get('unit_price', 0)) or 1.0
+                avg_per_day = self.safe_float_convert(pfep_item.get('AVG CONSUMPTION/DAY', 0))
+                rm_days = self.safe_float_convert(pfep_item.get('RM_IN_DAYS', 0))
                 rm_qty = self.safe_float_convert(pfep_item.get('RM_IN_QTY', 0))
+                # Inventory value
+                current_value = current_qty * unit_price
+                # Norms with tolerance
                 lower_bound = rm_qty * (1 - tolerance / 100)
                 upper_bound = rm_qty * (1 + tolerance / 100)
-                excess_count = 0
-                total_excess_value = 0.0
-                total_short_value = 0.0
-                for entry in entries:
-                    current_qty = float(entry.get('Current_QTY', 0)) or 0.0
-                    deviation_qty = current_qty - upper_bound
-                    deviation_value = deviation_qty * unit_price
-                    if current_qty > upper_bound:
-                        excess_count += 1
-                        total_excess_value += deviation_value
-                    elif current_qty < lower_bound:
-                        shortage_qty = lower_bound - current_qty
-                        short_value = shortage_qty * unit_price
-                        total_short_value += short_value
+
+                # Revised Norm shown for reference
+                revised_norm_qty = upper_bound  # you can rename if needed
+                # Deviation quantity and value
+                deviation_qty = current_qty - revised_norm_qty
+                deviation_value = deviation_qty * unit_price
+
+                # Status based on range
+                if current_qty < lower_bound:
+                    status = 'Short Inventory'
+                elif current_qty > upper_bound:
+                    status = 'Excess Inventory'
+                else:
+                    status = 'Within Norms'
+                # Final result per part
                 result = {
                     'PART NO': part_no,
                     'PART DESCRIPTION': part_desc,
                     'Vendor Name': pfep_item.get('Vendor_Name', 'Unknown'),
+                    'Vendor_Code': pfep_item.get('Vendor_Code', ''),
+                    'AVG CONSUMPTION/DAY': avg_per_day,
+                    'RM IN DAYS': rm_days,
+                    'RM Norm - In Qty': rm_qty,
+                    'Revised Norm Qty': revised_norm_qty,
+                    'Lower Bound Qty': lower_bound,                 # ✅ Added
+                    'Upper Bound Qty': upper_bound,  
                     'UNIT PRICE': unit_price,
-                    'Revised Norm Qty': upper_bound,
-                    'Excess Count': excess_count,
-                    'Total Excess Value': round(total_excess_value, 2),
-                    'Total Short Value': round(total_short_value, 2),
+                    'Current Inventory - Qty': current_qty,
+                    'Current Inventory - VALUE': current_value,
+                    'SHORT/EXCESS INVENTORY': deviation_qty,
+                    'Stock Deviation Qty w.r.t Revised Norm': deviation_qty,
+                    'Stock Deviation Value': deviation_value,
+                    'Status': status,
+                    'INVENTORY REMARK STATUS': status
                 }
                 results.append(result)
             except Exception as e:
-                st.warning(f"⚠️ Error processing part {part_no}: {e}")
+                st.warning(f"⚠️ Error analyzing part {part_no}: {e}")
                 continue
         if not results:
-            st.error("❌ No summary results generated. Please check data integrity.")
-        return results
+            st.error("❌ No analysis results generated. Please check data for mismatches or missing fields.")
+        return results in this i dont want total stock value i that the part how many times it is in excess it will in that and how much short it is coming by stock value not by total stock value
         
     def get_vendor_summary(self, processed_data):
         """Summarize inventory by vendor using actual Stock_Value field from the file."""
