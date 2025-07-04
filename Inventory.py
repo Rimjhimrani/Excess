@@ -399,9 +399,9 @@ class InventoryManagementSystem:
         return int(float_result)
             
     def create_top_parts_chart(self, data, status_filter, bar_color, key):
-       """
-       Top 10 parts chart by status — shows only deviation value (Excess or Short) in ₹ Lakhs.
-       """
+        """
+        Top 10 parts chart by status — shows only deviation value (Excess or Short) in ₹ Lakhs.
+        """
         df = pd.DataFrame(data)
         # ✅ Pick the correct column based on status
         if status_filter == "Excess Inventory":
