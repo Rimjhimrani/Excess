@@ -2780,33 +2780,20 @@ class InventoryManagementSystem:
             st.warning(f"⚠️ Vendor analysis chart cannot be displayed. Missing: {', '.join(missing_cols)}")
 
         # ✅ 4. Top 10 Parts by Inventory Status
-        try:
+         try:
             st.markdown("## 🧩 Top 10 Parts by Inventory Status")
             analyzer = self.analyzer
             ims = self
-            # ✅ Load data
-            pfep_data = st.session_state.get("pfep_data")
-            current_inventory = st.session_state.get("current_inventory")
-
-            if not pfep_data or not current_inventory:
-                st.warning("⚠️ PFEP or Inventory data not found. Please upload both datasets.")
-            else:
-                # ✅ Run inventory analysis
-                analysis_results = analyzer.analyze_inventory(pfep_data, current_inventory)
             for status, label, color, key in [
                 ("Excess Inventory", "🔵 Top 10 Excess Inventory Parts", analyzer.status_colors["Excess Inventory"], "excess_parts"),
                 ("Short Inventory", "🔴 Top 10 Short Inventory Parts", analyzer.status_colors["Short Inventory"], "short_parts"),
             ]:
                 st.subheader(label)
-                st.markdown(
-                    f'<div class="graph-description">Top 10 parts under "{status}" based on inventory value impact.</div>',
-                    unsafe_allow_html=True
-                )
-                # ✅ Create the chart
+                st.markdown(f'<div class="graph-description">Top 10 parts under "{status}" based on inventory value impact.</div>', unsafe_allow_html=True)
                 ims.create_top_parts_chart(analysis_results, status, color, key)
         except Exception as e:
-            st.error("❌ Error displaying Top Parts by Status")
-            st.code(str(e))
+                st.error("❌ Error displaying Top Parts by Status")
+                st.code(str(e))this is the code 
           
         # ✅ 5. Top 10 Vendors by Inventory Status (₹ Lakhs)
         try:
