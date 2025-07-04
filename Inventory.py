@@ -402,58 +402,56 @@ class InventoryManagementSystem:
         return int(float_result)
             
     def create_top_parts_chart(self, data, status_filter, bar_color, key):
-        """
-        Top 10 parts chart by status — shows only deviation value (Excess or Short) in ₹ Lakhs.
-        """
+        """Top 10 parts by deviation value (Excess or Short), shown in ₹ Lakhs"""
         df = pd.DataFrame(data)
-        # ✅ Pick the correct column based on status
+        # ✅ Determine correct value column
         if status_filter == "Excess Inventory":
             value_col = "Excess Value"
         elif status_filter == "Short Inventory":
             value_col = "Short Value"
         else:
-            st.warning("⚠️ Only 'Excess Inventory' or 'Short Inventory' supported.")
+            st.warning("❌ Invalid status filter.")
             return
-        if value_col not in df.columns or 'PART NO' not in df.columns:
+        # ✅ Column checks
+        required_cols = ['PART NO', 'PART DESCRIPTION', value_col, 'INVENTORY REMARK STATUS']
+        if not all(col in df.columns for col in required_cols):
             st.warning("⚠️ Required columns missing for top parts chart.")
+            st.write("Available columns:", df.columns.tolist())
             return
-        # ✅ Filter and sort
+        # ✅ Filter & process
         df = df[df['INVENTORY REMARK STATUS'] == status_filter]
         df = df[df[value_col] > 0]
         df = df.sort_values(by=value_col, ascending=False).head(10)
         if df.empty:
-            st.info(f"No data found for '{status_filter}' parts.")
+            st.info(f"No {status_filter} parts found with value > 0.")
             return
-        # ✅ Format for plotting
         df['Value_Lakh'] = df[value_col] / 100000
         df['PART_DESC_NO'] = df['PART DESCRIPTION'].astype(str) + " (" + df['PART NO'].astype(str) + ")"
         df['HOVER_TEXT'] = df.apply(lambda row: (
             f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
             f"Part No: {row.get('PART NO')}<br>"
-            f"{status_filter} Value: ₹{row[value_col]:,.0f}"
+            f"Deviation Value: ₹{row[value_col]:,.0f}"
         ), axis=1)
-        # ✅ Plot
+        # ✅ Build bar chart
         fig = px.bar(
             df,
             x='PART_DESC_NO',
             y='Value_Lakh',
-            color_discrete_sequence=[bar_color],
-            title=f"Top 10 Parts by {status_filter} Value (₹ in Lakhs)"
+            title=f"Top 10 Parts - {status_filter} by Deviation Value (₹ in Lakhs)",
+            color_discrete_sequence=[bar_color]
         )
         fig.update_traces(
-            hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-            customdata=df['HOVER_TEXT']
+            customdata=df['HOVER_TEXT'],
+            hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>'
         )
         fig.update_layout(
             xaxis_tickangle=-45,
-            yaxis_title=f"{status_filter} Value (₹ Lakhs)",
-            yaxis=dict(
-                tickformat=',.0f',
-                ticksuffix='L'
-            )
+            yaxis_title="Deviation Value (₹ Lakhs)",
+            yaxis=dict(tickformat=',.0f', ticksuffix='L'),
+            xaxis=dict(tickfont=dict(size=10))
         )
         st.plotly_chart(fig, use_container_width=True, key=key)
-    
+
     def authenticate_user(self):
         """Enhanced authentication system with better UX and user switching"""
         st.sidebar.markdown("### 🔐 Authentication")
