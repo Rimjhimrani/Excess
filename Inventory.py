@@ -213,8 +213,7 @@ class InventoryAnalyzer:
                 continue
         if not results:
             st.error("❌ No analysis results generated. Please check data for mismatches or missing fields.")
-        return results in this i dont want total stock value i that the part how many times it is in excess it will in that and how much short it is coming by stock value not by total stock value
-        
+        return results 
     def get_vendor_summary(self, processed_data):
         """Summarize inventory by vendor using actual Stock_Value field from the file."""
         from collections import defaultdict
