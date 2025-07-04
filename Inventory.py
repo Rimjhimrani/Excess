@@ -144,7 +144,7 @@ class InventoryAnalyzer:
         
     def analyze_inventory(self, pfep_data, current_inventory, tolerance=None):
         if tolerance is None:
-        tolerance = st.session_state.get("admin_tolerance", 30)  # default to 30%
+            tolerance = st.session_state.get("admin_tolerance", 30)  # default to 30%
         pfep_dict = {str(item['Part_No']).strip().upper(): item for item in pfep_data}
         inventory_dict = defaultdict(list)
         # Group inventory entries by Part No (across time)
