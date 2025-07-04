@@ -207,6 +207,9 @@ class InventoryAnalyzer:
                     'Status': status,
                     'INVENTORY REMARK STATUS': status
                 }
+                # ✅ Add these two lines
+                result['Excess Value'] = deviation_value if status == 'Excess Inventory' else 0
+                result['Short Value'] = abs(deviation_value) if status == 'Short Inventory' else 0
                 results.append(result)
             except Exception as e:
                 st.warning(f"⚠️ Error analyzing part {part_no}: {e}")
