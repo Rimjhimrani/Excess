@@ -2793,7 +2793,7 @@ class InventoryManagementSystem:
                 ims.create_top_parts_chart(analysis_results, status, color, key)
         except Exception as e:
             st.error("❌ Error displaying Top Parts by Status")
-            st.code(str(e))this is the code 
+            st.code(str(e))
           
         # ✅ 5. Top 10 Vendors by Inventory Status (₹ Lakhs)
         try:
