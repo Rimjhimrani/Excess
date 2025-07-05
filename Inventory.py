@@ -224,77 +224,120 @@ class InventoryAnalyzer:
             'short_parts': 0,
             'excess_parts': 0,
             'normal_parts': 0,
-            'total_value': 0.0
+            'total_value': 0.0,
+            'excess_value_above_norm': 0.0,  # New field for excess value above norm
+            'short_value_below_norm': 0.0    # New field for short value below norm
         })
         for item in processed_data:
             vendor = item.get('Vendor Name', 'Unknown')
             status = item.get('INVENTORY REMARK STATUS', 'Unknown')
             stock_value = item.get('Stock_Value') or item.get('Current Inventory - VALUE') or 0
+            # Get current quantity and norm values for calculating excess/short amounts
+            current_qty = item.get('Current Inventory - QTY', 0)
+            norm_qty = item.get('Norm', 0)
+            unit_price = 0
             try:
                 stock_value = float(stock_value)
+                current_qty = float(current_qty) if current_qty else 0
+                norm_qty = float(norm_qty) if norm_qty else 0
+                # Calculate unit price from stock value and current quantity
+                if current_qty > 0:
+                    unit_price = stock_value / current_qty
             except (ValueError, TypeError):
                 stock_value = 0.0
+                current_qty = 0.0
+                norm_qty = 0.0
+                unit_price = 0.0
             summary[vendor]['total_parts'] += 1
             summary[vendor]['total_value'] += stock_value
-            if status == "Short Inventory":  # Fixed status name
+            if status == "Short Inventory":
                 summary[vendor]['short_parts'] += 1
-            elif status == "Excess Inventory":  # Fixed status name
+                # Calculate value of shortage (norm - current) * unit_price
+                if norm_qty > current_qty and unit_price > 0:
+                    short_value = (norm_qty - current_qty) * unit_price
+                    summary[vendor]['short_value_below_norm'] += short_value
+            elif status == "Excess Inventory":
                 summary[vendor]['excess_parts'] += 1
+                # Calculate value of excess (current - norm) * unit_price
+                if current_qty > norm_qty and unit_price > 0:
+                    excess_value = (current_qty - norm_qty) * unit_price
+                    summary[vendor]['excess_value_above_norm'] += excess_value
             elif status == "Within Norms":
                 summary[vendor]['normal_parts'] += 1
-        # Fixed: Return statement moved outside the loop
         return summary
         
     def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color,value_format='lakhs'):
-        """Show top 10 vendors filtered by inventory remark status (short, excess, within norms)"""
+        """Show top 10 vendors filtered by inventory remark status showing only excess/short values above/below norm"""
         # Filter by inventory status
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
-        # Sum Stock Value by Vendor
+    
+        # Sum excess/short values by Vendor
         vendor_totals = {}
         for item in filtered:
             vendor = item.get('Vendor Name', 'Unknown')
             try:
-                # Fixed: Use 'item' instead of undefined 'row' variable
-                stock_value = item.get('Stock_Value', 0) or item.get('Current Inventory - VALUE', 0)
-                stock_value = float(stock_value) if stock_value else 0.0
+                current_qty = float(item.get('Current Inventory - QTY', 0) or 0)
+                norm_qty = float(item.get('Norm', 0) or 0)
+                stock_value = float(item.get('Stock_Value', 0) or item.get('Current Inventory - VALUE', 0) or 0)
+            
+                # Calculate unit price
+                unit_price = stock_value / current_qty if current_qty > 0 else 0
+            
+                # Calculate excess or short value based on status
+                if status_filter == "Excess Inventory" and current_qty > norm_qty:
+                    # Only the excess amount above norm
+                    excess_value = (current_qty - norm_qty) * unit_price
+                    vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + excess_value
+                
+                elif status_filter == "Short Inventory" and norm_qty > current_qty:
+                    # Only the short amount below norm
+                    short_value = (norm_qty - current_qty) * unit_price
+                    vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + short_value
+                elif status_filter == "Within Norms":
+                    # For within norms, show total stock value as usual
+                    vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + stock_value
             except (ValueError, TypeError):
-                stock_value = 0.0
-            # Use regular dictionary with get method instead of defaultdict
-            vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + stock_value
-        # Sort top 10 within this specific status (Fixed: changed from 5 to 10)
+                continue
+        # Sort top 10 within this specific status
         sorted_vendors = sorted(vendor_totals.items(), key=lambda x: x[1], reverse=True)[:10]
         if not sorted_vendors:
             st.info(f"No vendors found in '{status_filter}' status")
             return
         vendor_names = [v[0] for v in sorted_vendors]
+    
         # Handle different value formats
         if value_format == 'lakhs':
-            # Convert stock values to lakhs (divide by 100,000)
             stock_values = [v[1] / 100000 for v in sorted_vendors]
-            y_axis_title = "Stock Value (₹ Lakhs)"
+            y_axis_title = f"Value (₹ Lakhs)"
             hover_suffix = "L"
             tick_suffix = "L"
         elif value_format == 'crores':
-            # Convert stock values to crores (divide by 10,000,000)
             stock_values = [v[1] / 10000000 for v in sorted_vendors]
-            y_axis_title = "Stock Value (₹ Crores)"
+            y_axis_title = f"Value (₹ Crores)"
             hover_suffix = "Cr"
             tick_suffix = "Cr"
         else:
-            # Keep original values
             stock_values = [v[1] for v in sorted_vendors]
-            y_axis_title = "Stock Value (₹)"
+            y_axis_title = f"Value (₹)"
             hover_suffix = ""
             tick_suffix = ""
+        # Update y-axis title and hover template based on status
+        if status_filter == "Excess Inventory":
+            y_axis_title = y_axis_title.replace("Value", "Excess Value Above Norm")
+            hover_label = "Excess Value Above Norm"
+        elif status_filter == "Short Inventory":
+            y_axis_title = y_axis_title.replace("Value", "Short Value Below Norm")
+            hover_label = "Short Value Below Norm"
+        else:
+            hover_label = "Stock Value"
         # Plot chart
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=vendor_names, 
             y=stock_values, 
             marker_color=color,
-            # Add hover template to show values in appropriate format
             hovertemplate='<b>%{x}</b><br>' +
-            f'Stock Value: ₹%{{y:.1f}}{hover_suffix}<br>' +
+            f'{hover_label}: ₹%{{y:.1f}}{hover_suffix}<br>' +
             '<extra></extra>'
         ))
         fig.update_layout(
@@ -302,19 +345,12 @@ class InventoryAnalyzer:
             xaxis_title="Vendor",
             yaxis_title=y_axis_title,
             showlegend=False,
-            # Format y-axis appropriately
             yaxis=dict(
                 tickformat=".1f",
                 ticksuffix=tick_suffix
             )
         )
         st.plotly_chart(fig, use_container_width=True, key=chart_key)
-        
-    def safe_float_convert(self, value):
-        try:
-            return float(value)
-        except (ValueError, TypeError):
-            return 0.0
 
 class InventoryManagementSystem:
     """Main application class"""
@@ -2873,28 +2909,20 @@ class InventoryManagementSystem:
         # ✅ 5. Top 10 Vendors by Inventory Status (₹ Lakhs)
         try:
             st.markdown("## 🏢 Top Vendors by Inventory Status")
-            for status, title, key, color in [
-                ("Excess Inventory", "Top 10 Vendors - Excess Inventory", "excess_vendors", analyzer.status_colors["Excess Inventory"]),
-                ("Short Inventory", "Top 10 Vendors - Short Inventory", "short_vendors", analyzer.status_colors["Short Inventory"]),
-                ("Within Norms", "Top 10 Vendors - Within Norms", "normal_vendors", analyzer.status_colors["Within Norms"])
-            ]:
-                # Option 1: All positional arguments
-                analyzer.show_vendor_chart_by_status(
+            # Updated titles to reflect that we're showing excess/short values, not total values
+            chart_configs = [
+                ("Excess Inventory", "Top 10 Vendors - Excess Value Above Norm", "excess_vendors", self.status_colors["Excess Inventory"]),
+                ("Short Inventory", "Top 10 Vendors - Short Value Below Norm", "short_vendors", self.status_colors["Short Inventory"]),
+            ]
+            for status, title, key, color in chart_configs:
+                self.show_vendor_chart_by_status(
                     analysis_results,    # processed_data
                     status,             # status_filter
                     title,              # chart_title
                     key,                # chart_key
-                    color            # color
+                    color,              # color
+                    value_format="lakhs"  # or "crores" based on your preference
                 )
-                # Option 2: All keyword arguments (alternative)
-                # analyzer.show_vendor_chart_by_status(
-                #     processed_data=analysis_results,
-                #     status_filter=status,
-                #     chart_title=title,
-                #     chart_key=key,
-                #     color=color,
-                #     value_format="lakhs"
-                # )
         except Exception as e:
             st.error("❌ Error displaying Top Vendors by Status")
             st.code(str(e))
