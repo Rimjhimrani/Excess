@@ -273,6 +273,7 @@ class InventoryAnalyzer:
     
         # Sum excess/short values by Vendor
         vendor_totals = {}
+    
         for item in filtered:
             vendor = item.get('Vendor Name', 'Unknown')
             try:
@@ -293,6 +294,7 @@ class InventoryAnalyzer:
                     # Only the short amount below norm
                     short_value = (norm_qty - current_qty) * unit_price
                     vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + short_value
+                
                 elif status_filter == "Within Norms":
                     # For within norms, show total stock value as usual
                     vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + stock_value
@@ -304,7 +306,6 @@ class InventoryAnalyzer:
             st.info(f"No vendors found in '{status_filter}' status")
             return
         vendor_names = [v[0] for v in sorted_vendors]
-    
         # Handle different value formats
         if value_format == 'lakhs':
             stock_values = [v[1] / 100000 for v in sorted_vendors]
