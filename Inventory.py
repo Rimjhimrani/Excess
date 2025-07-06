@@ -361,12 +361,7 @@ class InventoryManagementSystem:
         self.analyzer = InventoryAnalyzer()
         self.persistence = DataPersistence()
         self.initialize_session_state()
-        self.status_colors = {
-            "Excess Inventory": "#F4A261",
-            "Short Inventory": "#E76F51",
-            "Within Norms": "#2A9D8F"
-        }
-    
+        
     def initialize_session_state(self):
         """Initialize session state variables"""
         if 'user_role' not in st.session_state:
