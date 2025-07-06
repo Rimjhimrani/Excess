@@ -2662,22 +2662,37 @@ class InventoryManagementSystem:
                 f"Value: ₹{row[value_col]:,.0f}<br>"
                 f"Status: {row['Inventory_Status']}"
             ), axis=1)
-            # Create bar chart with status-based colors
-            fig1 = px.bar(
-                chart_data,
-                x='Part',
-                y='Value_Lakh',
-                color='Inventory_Status',
-                color_discrete_map=color_map,
-                title="Top 10 Parts by Stock Value (Color-coded by Inventory Status)"
-            )
-            fig1.update_traces(
-                customdata=chart_data['HOVER_TEXT'],
-                hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>'
-            )
+            # Create a list of colors for each bar based on status
+            chart_data['Bar_Color'] = chart_data['Inventory_Status'].map(color_map)
+    
+            # Create bar chart with individual colors (not grouped by status)
+            fig1 = go.Figure()
+    
+            # Add bars one by one to maintain value-based sorting
+            for i, row in chart_data.iterrows():
+                fig1.add_trace(go.Bar(
+                    x=[row['Part']],
+                    y=[row['Value_Lakh']],
+                    name=row['Inventory_Status'],
+                    marker_color=row['Bar_Color'],
+                    customdata=[row['HOVER_TEXT']],
+                    hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+                    showlegend=False  # We'll add legend manually
+                ))
+            # Add legend traces (invisible bars just for legend)
+            for status, color in color_map.items():
+                fig1.add_trace(go.Bar(
+                    x=[None],
+                    y=[None],
+                    name=status,
+                    marker_color=color,
+                    showlegend=True
+                ))
             fig1.update_layout(
-                xaxis_tickangle=-45,
+                title="Top 10 Parts by Stock Value (Color-coded by Inventory Status)",
+                xaxis_title="Parts",
                 yaxis_title="Stock Value (in ₹ Lakhs)",
+                xaxis_tickangle=-45,
                 yaxis=dict(
                     tickformat=',.0f',
                     ticksuffix='L'
@@ -2697,6 +2712,7 @@ class InventoryManagementSystem:
             st.plotly_chart(fig1, use_container_width=True)
         else:
             st.warning("⚠️ Required columns for parts value chart not found.")
+
               
         # ✅ 3. Vendor vs Value (Fixed vendor_col definition)
         vendor_col = next((col for col in ['Vendor', 'Vendor Name', 'VENDOR'] if col in df.columns), None)
@@ -2756,22 +2772,37 @@ class InventoryManagementSystem:
                     f"Total Qty: {row['Total_Qty']:,.0f}<br>"
                     f"Status: {row['Vendor_Status']}"
                 ), axis=1)
-                fig2 = px.bar(
-                    vendor_df,
-                    x=vendor_col,
-                    y='Value_Lakh',
-                    color='Vendor_Status',
-                    color_discrete_map=color_map,
-                    title='Top 10 Vendors by Stock Value (Color-coded by Inventory Status)'
-                )
-                fig2.update_traces(
-                    customdata=vendor_df['HOVER_TEXT'],
-                    hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                    textposition='auto'
-                )
-                fig2.update_layout(
-                    xaxis_tickangle=-45,
+                # Create color list based on status
+                vendor_df['Bar_Color'] = vendor_df['Vendor_Status'].map(color_map)
+        
+                # Create bar chart with individual colors
+                fig3 = go.Figure()
+        
+                # Add bars one by one to maintain value-based sorting
+                for i, row in vendor_df.iterrows():
+                    fig3.add_trace(go.Bar(
+                        x=[row[vendor_col]],
+                        y=[row['Value_Lakh']],
+                        name=row['Vendor_Status'],
+                        marker_color=row['Bar_Color'],
+                        customdata=[row['HOVER_TEXT']],
+                        hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+                        showlegend=False  # We'll add legend manually
+                    ))
+                # Add legend traces (invisible bars just for legend)
+                for status, color in color_map.items():
+                    fig3.add_trace(go.Bar(
+                        x=[None],
+                        y=[None],
+                        name=status,
+                        marker_color=color,
+                        showlegend=True
+                    ))
+                fig3.update_layout(
+                    title='Top 10 Vendors by Stock Value (Color-coded by Inventory Status)',
+                    xaxis_title="Vendors",
                     yaxis_title="Inventory Value (in ₹ Lakhs)",
+                    xaxis_tickangle=-45,
                     yaxis=dict(
                         tickformat=',.0f',
                         ticksuffix='L'
@@ -2785,7 +2816,7 @@ class InventoryManagementSystem:
                         x=1
                     )
                 )
-                st.plotly_chart(fig2, use_container_width=True)
+                st.plotly_chart(fig3, use_container_width=True)
             else:
                 st.info("ℹ️ No valid vendor data found (all values are 0).")
         else:
