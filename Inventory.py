@@ -267,62 +267,52 @@ class InventoryAnalyzer:
         return summary
         
     def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color,value_format='lakhs'):
-        """Show top 10 vendors filtered by inventory remark status showing only excess/short values above/below norm"""
+        """Show top 10 vendors filtered by inventory status, based on deviation value (Excess/Short)"""
         # Filter by inventory status
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
-    
-        # Sum excess/short values by Vendor
         vendor_totals = {}
-    
         for item in filtered:
             vendor = item.get('Vendor Name', 'Unknown')
             try:
-                current_qty = float(item.get('Current Inventory - QTY', 0) or 0)
-                norm_qty = float(item.get('Norm', 0) or 0)
-                stock_value = float(item.get('Stock_Value', 0) or item.get('Current Inventory - VALUE', 0) or 0)
-            
+                current_qty = float(item.get('Current Inventory - Qty', 0) or 0)
+                norm_qty = float(item.get('Revised Norm Qty', 0) or 0)
+                stock_value = float(item.get('Current Inventory - VALUE', 0) or 0)
                 # Calculate unit price
                 unit_price = stock_value / current_qty if current_qty > 0 else 0
-            
-                # Calculate excess or short value based on status
+
+                # Calculate excess/short value
                 if status_filter == "Excess Inventory" and current_qty > norm_qty:
-                    # Only the excess amount above norm
                     excess_value = (current_qty - norm_qty) * unit_price
                     vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + excess_value
-                
                 elif status_filter == "Short Inventory" and norm_qty > current_qty:
-                    # Only the short amount below norm
                     short_value = (norm_qty - current_qty) * unit_price
                     vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + short_value
-                
                 elif status_filter == "Within Norms":
-                    # For within norms, show total stock value as usual
                     vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + stock_value
-            except (ValueError, TypeError):
+            except (ValueError, TypeError, ZeroDivisionError):
                 continue
-        # Sort top 10 within this specific status
         sorted_vendors = sorted(vendor_totals.items(), key=lambda x: x[1], reverse=True)[:10]
         if not sorted_vendors:
             st.info(f"No vendors found in '{status_filter}' status")
             return
         vendor_names = [v[0] for v in sorted_vendors]
-        # Handle different value formats
+        # Format values
         if value_format == 'lakhs':
             stock_values = [v[1] / 100000 for v in sorted_vendors]
-            y_axis_title = f"Value (₹ Lakhs)"
+            y_axis_title = "Value (₹ Lakhs)"
             hover_suffix = "L"
             tick_suffix = "L"
         elif value_format == 'crores':
             stock_values = [v[1] / 10000000 for v in sorted_vendors]
-            y_axis_title = f"Value (₹ Crores)"
+            y_axis_title = "Value (₹ Crores)"
             hover_suffix = "Cr"
             tick_suffix = "Cr"
         else:
             stock_values = [v[1] for v in sorted_vendors]
-            y_axis_title = f"Value (₹)"
+            y_axis_title = "Value (₹)"
             hover_suffix = ""
             tick_suffix = ""
-        # Update y-axis title and hover template based on status
+        # Customize axis label
         if status_filter == "Excess Inventory":
             y_axis_title = y_axis_title.replace("Value", "Excess Value Above Norm")
             hover_label = "Excess Value Above Norm"
@@ -334,8 +324,8 @@ class InventoryAnalyzer:
         # Plot chart
         fig = go.Figure()
         fig.add_trace(go.Bar(
-            x=vendor_names, 
-            y=stock_values, 
+            x=vendor_names,
+            y=stock_values,
             marker_color=color,
             hovertemplate='<b>%{x}</b><br>' +
             f'{hover_label}: ₹%{{y:.1f}}{hover_suffix}<br>' +
