@@ -2921,23 +2921,26 @@ class InventoryManagementSystem:
         # ✅ 5. Top 10 Vendors by Inventory Status (₹ Lakhs)
         try:
             st.markdown("## 🏢 Top Vendors by Inventory Status")
-            # Updated titles to reflect that we're showing excess/short values, not total values
+            # Define chart config: status → chart title, key, color
             chart_configs = [
                 ("Excess Inventory", "Top 10 Vendors - Excess Value Above Norm", "excess_vendors", self.status_colors["Excess Inventory"]),
                 ("Short Inventory", "Top 10 Vendors - Short Value Below Norm", "short_vendors", self.status_colors["Short Inventory"]),
             ]
+            # ✅ Loop through both excess and short charts
             for status, title, key, color in chart_configs:
-                self.show_vendor_chart_by_status(
-                    analysis_results,    # processed_data
-                    status,             # status_filter
-                    title,              # chart_title
-                    key,                # chart_key
-                    color,              # color
-                    value_format="lakhs"  # or "crores" based on your preference
+                # ✅ FIXED: Call method from analyzer, not self
+                self.analyzer.show_vendor_chart_by_status(
+                    processed_data=analysis_results,
+                    status_filter=status,
+                    chart_title=title,
+                    chart_key=key,
+                    bar_color=color,
+                    value_format="lakhs"  # can change to "crores" if needed
                 )
         except Exception as e:
             st.error("❌ Error displaying Top Vendors by Status")
             st.code(str(e))
+
         
 if __name__ == "__main__":
     app = InventoryManagementSystem()
