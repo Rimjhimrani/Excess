@@ -2924,7 +2924,7 @@ class InventoryManagementSystem:
                     status_filter=status,
                     chart_title=title,
                     chart_key=key,
-                    bar_color=color,
+                    color=color,
                     value_format="lakhs"  # can change to "crores" if needed
                 )
         except Exception as e:
