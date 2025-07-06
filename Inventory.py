@@ -1993,6 +1993,82 @@ class InventoryManagementSystem:
                     st.dataframe(reorder_display, use_container_width=True)
                 # Seasonal analysis placeholder
                 st.info("📊 **Seasonal Analysis**: Historical data integration required for advanced forecasting")
+                
+    def display_executive_dashboard(self, analysis_results):
+        """Executive level dashboard with KPIs"""
+        st.header("👔 Executive Dashboard")
+        # Convert analysis result to DataFrame
+        df = pd.DataFrame(analysis_results)
+        df.columns = df.columns.str.strip()
+
+        # ✅ Define internal-safe column names
+        value_col = 'Current Inventory - VALUE'
+        status_col = 'Status'
+        deviation_val_col = 'Stock Deviation Value'
+
+        # ✅ Check all required columns
+        required_cols = [value_col, status_col, 'PART NO', deviation_val_col]
+        for col in required_cols:
+            if col not in df.columns:
+                st.error(f"❌ Missing required column: {col}")
+                st.write("Available columns:", list(df.columns))
+                st.stop()
+        # 📊 KPI Summary
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            total_value = df[value_col].sum()
+            st.metric("Total Inventory Value", f"₹{total_value:,.0f}", delta=f"Analyzed: {len(df)} parts")
+        with col2:
+            efficiency = (df[status_col] == 'Within Norms').mean() * 100
+            status_note = "✅ Good" if efficiency >= 70 else "⚠️ Needs Improvement"
+            st.metric("Inventory Efficiency", f"{efficiency:.1f}%", delta=status_note)
+        with col3:
+            excess_parts = df[status_col] == 'Excess Inventory'
+            excess_value = df[excess_parts][value_col].sum()
+            st.metric("Excess Inventory", f"₹{excess_value:,.0f}", delta=f"{excess_parts.sum()} parts")
+        with col4:
+            short_parts = df[status_col] == 'Short Inventory'
+            short_impact = abs(df[short_parts][deviation_val_col].sum())
+            st.metric("Shortage Impact", f"₹{short_impact:,.0f}", delta=f"{short_parts.sum()} parts")
+        # 🎯 Risk Matrix Section
+        st.subheader("🎯 Risk Assessment Matrix")
+
+        # Risk tagging logic
+        df['Risk_Level'] = 'Low'
+        df.loc[(df[value_col] > 100000) & (df[status_col] != 'Within Norms'), 'Risk_Level'] = 'High'
+        df.loc[
+            (df[value_col] > 50000) & (df[value_col] <= 100000) & (df[status_col] != 'Within Norms'),
+            'Risk_Level'
+        ] = 'Medium'
+
+        # Prepare sunburst data
+        risk_matrix = (
+            df.groupby(['Risk_Level', status_col])
+            .agg({
+                value_col: 'sum',
+                'PART NO': 'count'
+            })
+            .reset_index()
+            .rename(columns={'PART NO': 'Part Count'})
+        )
+        # 🎨 Color mapping for Status
+        status_color_map = {
+            "Short Inventory": "#d62728",    # Red
+            "Excess Inventory": "#1f77b4",   # Blue
+            "Within Norms": "#2ca02c"        # Green
+        }
+
+        # ☀️ Sunburst Chart
+        fig = px.sunburst(
+            risk_matrix,
+            path=['Risk_Level', status_col],
+            values=value_col,
+            color=status_col,
+            color_discrete_map=status_color_map,
+            title="Risk Assessment by Value Impact"
+        )
+        fig.update_traces(textinfo='label+percent entry')
+        st.plotly_chart(fig, use_container_width=True)
 
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
