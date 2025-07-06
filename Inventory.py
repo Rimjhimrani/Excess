@@ -2821,38 +2821,74 @@ class InventoryManagementSystem:
         # ✅ 3. Vendor vs Value (Fixed vendor_col definition)
         vendor_col = next((col for col in ['Vendor', 'Vendor Name', 'VENDOR'] if col in df.columns), None)
         if vendor_col and value_col and vendor_col in df.columns:
+            # Get vendor data with additional metrics for status determination
             vendor_data = (
                 df[df[value_col] > 0]
-                .groupby(vendor_col)[value_col]
-                .sum()
-                .sort_values(ascending=False)
+                .groupby(vendor_col)
+                .agg({
+                    value_col: 'sum',
+                    'Current Inventory - Qty': 'sum',  # Total quantity per vendor
+                    'PART NO': 'count'  # Number of parts per vendor
+                })
+                .sort_values(by=value_col, ascending=False)
                 .head(10)
                 .reset_index()
             )
             if not vendor_data.empty:
                 vendor_data['Value_Lakh'] = vendor_data[value_col] / 100000  # Convert to ₹ Lakhs
+                # Determine status for each vendor (adjust logic as needed)
+                def determine_vendor_status(row):
+                    # Example logic - replace with your actual criteria
+                    avg_qty_per_part = row['Current Inventory - Qty'] / row['PART NO'] if row['PART NO'] > 0 else 0
+                    total_value_lakh = row[value_col] / 100000
+                    if total_value_lakh > 50:  # High value vendors
+                        return "Excess Inventory"
+                    elif avg_qty_per_part < 5:  # Low average quantity
+                        return "Short Inventory"
+                    else:
+                        return "Within Norms"
+                vendor_data['Status'] = vendor_data.apply(determine_vendor_status, axis=1)
+                # Create color mappin
+                color_map = {
+                    "Excess Inventory": "#2196F3",
+                    "Short Inventory": "#F44336", 
+                    "Within Norms": "#4CAF50"
+                }
+                # Enhanced hover text with status
                 vendor_data['HOVER_TEXT'] = vendor_data.apply(lambda row: (
                     f"Vendor: {row[vendor_col]}<br>"
-                    f"Inventory Value: ₹{row[value_col]:,.0f}"
+                    f"Inventory Value: ₹{row[value_col]:,.0f}<br>"
+                    f"Total Parts: {row['PART NO']}<br>"
+                    f"Total Qty: {row['Current Inventory - Qty']:,.0f}<br>"
+                    f"Status: {row['Status']}"
                 ), axis=1)
                 fig3 = px.bar(
                     vendor_data,
                     x=vendor_col,
                     y='Value_Lakh',
-                    title='Top 10 Vendors by Stock Value',
+                    color='Status',
+                    color_discrete_map=color_map,
+                    title='Top 10 Vendors by Stock Value'
                 )
                 fig3.update_traces(
-                    marker_color='#c1dada',  # 🟪 Use single color (light purple)
                     customdata=vendor_data['HOVER_TEXT'],
                     hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
                     textposition='auto'
                 )
                 fig3.update_layout(
                     xaxis_tickangle=-45,
-                    yaxis_title="Inventory Value",
+                    yaxis_title="Inventory Value (in ₹ Lakhs)",
                     yaxis=dict(
                         tickformat=',.0f',
                         ticksuffix='L'  # ✅ Show values like 150L instead of 15000000
+                    ),
+                    showlegend=True,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
                     )
                 )
                 st.plotly_chart(fig3, use_container_width=True)
