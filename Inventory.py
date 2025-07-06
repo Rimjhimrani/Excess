@@ -1994,82 +1994,6 @@ class InventoryManagementSystem:
                 # Seasonal analysis placeholder
                 st.info("📊 **Seasonal Analysis**: Historical data integration required for advanced forecasting")
 
-    def display_executive_dashboard(self, analysis_results):
-        """Executive level dashboard with KPIs"""
-        st.header("👔 Executive Dashboard")
-        # Convert analysis result to DataFrame
-        df = pd.DataFrame(analysis_results)
-        df.columns = df.columns.str.strip()
-
-        # ✅ Define internal-safe column names
-        value_col = 'Current Inventory - VALUE'
-        status_col = 'Status'
-        deviation_val_col = 'Stock Deviation Value'
-
-        # ✅ Check all required columns
-        required_cols = [value_col, status_col, 'PART NO', deviation_val_col]
-        for col in required_cols:
-            if col not in df.columns:
-                st.error(f"❌ Missing required column: {col}")
-                st.write("Available columns:", list(df.columns))
-                st.stop()
-        # 📊 KPI Summary
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            total_value = df[value_col].sum()
-            st.metric("Total Inventory Value", f"₹{total_value:,.0f}", delta=f"Analyzed: {len(df)} parts")
-        with col2:
-            efficiency = (df[status_col] == 'Within Norms').mean() * 100
-            status_note = "✅ Good" if efficiency >= 70 else "⚠️ Needs Improvement"
-            st.metric("Inventory Efficiency", f"{efficiency:.1f}%", delta=status_note)
-        with col3:
-            excess_parts = df[status_col] == 'Excess Inventory'
-            excess_value = df[excess_parts][value_col].sum()
-            st.metric("Excess Inventory", f"₹{excess_value:,.0f}", delta=f"{excess_parts.sum()} parts")
-        with col4:
-            short_parts = df[status_col] == 'Short Inventory'
-            short_impact = abs(df[short_parts][deviation_val_col].sum())
-            st.metric("Shortage Impact", f"₹{short_impact:,.0f}", delta=f"{short_parts.sum()} parts")
-        # 🎯 Risk Matrix Section
-        st.subheader("🎯 Risk Assessment Matrix")
-
-        # Risk tagging logic
-        df['Risk_Level'] = 'Low'
-        df.loc[(df[value_col] > 100000) & (df[status_col] != 'Within Norms'), 'Risk_Level'] = 'High'
-        df.loc[
-            (df[value_col] > 50000) & (df[value_col] <= 100000) & (df[status_col] != 'Within Norms'),
-            'Risk_Level'
-        ] = 'Medium'
-
-        # Prepare sunburst data
-        risk_matrix = (
-            df.groupby(['Risk_Level', status_col])
-            .agg({
-                value_col: 'sum',
-                'PART NO': 'count'
-            })
-            .reset_index()
-            .rename(columns={'PART NO': 'Part Count'})
-        )
-        # 🎨 Color mapping for Status
-        status_color_map = {
-            "Short Inventory": "#d62728",    # Red
-            "Excess Inventory": "#1f77b4",   # Blue
-            "Within Norms": "#2ca02c"        # Green
-        }
-
-        # ☀️ Sunburst Chart
-        fig = px.sunburst(
-            risk_matrix,
-            path=['Risk_Level', status_col],
-            values=value_col,
-            color=status_col,
-            color_discrete_map=status_color_map,
-            title="Risk Assessment by Value Impact"
-        )
-        fig.update_traces(textinfo='label+percent entry')
-        st.plotly_chart(fig, use_container_width=True)
-
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
         st.header("📥 Export & Reporting Options")
@@ -2680,6 +2604,7 @@ class InventoryManagementSystem:
         if df.empty:
             st.warning("⚠️ No data available for charts.")
             return
+            
         # ✅ 1. Top 10 Parts by Value - Check for multiple possible value columns
         value_col = None
         for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE']:
@@ -2701,22 +2626,46 @@ class InventoryManagementSystem:
                 lambda row: f"{row['PART DESCRIPTION']}\n({row['PART NO']})",
                 axis=1
             )
+            # Determine status for each part (you'll need to adjust this logic based on your criteria)
+            # Example logic - replace with your actual status determination logic
+            def determine_status(row):
+                # Add your logic here to determine inventory status
+                # This is just an example - replace with your actual logic
+                qty = row.get('Current Inventory - Qty', 0)
+                if qty > 100:  # Example threshold
+                    return "Excess Inventory"
+                elif qty < 10:  # Example threshold
+                    return "Short Inventory"
+                else:
+                    return "Within Norms"
+            chart_data['Status'] = chart_data.apply(determine_status, axis=1)
+            # Create color mapping
+            color_map = {
+                "Excess Inventory": "#2196F3",
+                "Short Inventory": "#F44336", 
+                "Within Norms": "#4CAF50"
+            }
+            # Map colors to each bar
+            chart_data['Color'] = chart_data['Status'].map(color_map)
             # ✅ Corrected inventory quantity field name
             chart_data['HOVER_TEXT'] = chart_data.apply(lambda row: (
                 f"Description: {row['PART DESCRIPTION']}<br>"
                 f"Part No: {row['PART NO']}<br>"
                 f"Qty: {row.get('Current Inventory - Qty', 'N/A')}<br>"
-                f"Value: ₹{row[value_col]:,.0f}"
+                f"Value: ₹{row[value_col]:,.0f}<br>"
+                f"Status: {row['Status']}"
             ), axis=1)
-            # Create bar chart with fixed color
+            # Create bar chart with status-based colors
             fig1 = px.bar(
                 chart_data,
                 x='Part',
                 y='Value_Lakh',
+                color='Status',
+                color_discrete_map=color_map,
                 title="Top 10 Parts by Stock Value"
             )
+    
             fig1.update_traces(
-                marker_color='#c1dada',  # Your chosen fixed color
                 customdata=chart_data['HOVER_TEXT'],
                 hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>'
             )
@@ -2729,6 +2678,14 @@ class InventoryManagementSystem:
                 ),
                 xaxis=dict(
                     tickfont=dict(size=10)
+                ),
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1
                 )
             )
             st.plotly_chart(fig1, use_container_width=True)
