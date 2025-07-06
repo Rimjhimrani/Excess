@@ -267,82 +267,85 @@ class InventoryAnalyzer:
         return summary
         
     def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color,value_format='lakhs'):
-        """Show top 10 vendors filtered by inventory status, based on deviation value (Excess/Short)"""
+        """Show top 10 vendors by deviation value and count of excess/short parts."""
         # Filter by inventory status
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
         vendor_totals = {}
+        vendor_counts = {}
         for item in filtered:
             vendor = item.get('Vendor Name', 'Unknown')
             try:
                 current_qty = float(item.get('Current Inventory - Qty', 0) or 0)
                 norm_qty = float(item.get('Revised Norm Qty', 0) or 0)
                 stock_value = float(item.get('Current Inventory - VALUE', 0) or 0)
-                # Calculate unit price
-                unit_price = stock_value / current_qty if current_qty > 0 else 0
-
-                # Calculate excess/short value
+                unit_price = float(item.get('UNIT PRICE', 0) or 0)
+                if unit_price == 0 and current_qty > 0:
+                    unit_price = stock_value / current_qty
                 if status_filter == "Excess Inventory" and current_qty > norm_qty:
-                    excess_value = (current_qty - norm_qty) * unit_price
-                    vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + excess_value
+                    deviation_value = (current_qty - norm_qty) * unit_price
+                    vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + deviation_value
+                    vendor_counts[vendor] = vendor_counts.get(vendor, 0) + 1
                 elif status_filter == "Short Inventory" and norm_qty > current_qty:
-                    short_value = (norm_qty - current_qty) * unit_price
-                    vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + short_value
-                elif status_filter == "Within Norms":
-                    vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + stock_value
+                    deviation_value = (norm_qty - current_qty) * unit_price
+                    vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + deviation_value
+                    vendor_counts[vendor] = vendor_counts.get(vendor, 0) + 1
             except (ValueError, TypeError, ZeroDivisionError):
                 continue
-        sorted_vendors = sorted(vendor_totals.items(), key=lambda x: x[1], reverse=True)[:10]
-        if not sorted_vendors:
-            st.info(f"No vendors found in '{status_filter}' status")
+        if not vendor_totals:
+            st.info(f"No vendors found in '{status_filter}' status.")
             return
-        vendor_names = [v[0] for v in sorted_vendors]
-        # Format values
+        # Combine totals and counts
+        combined = [
+            (vendor, vendor_totals[vendor], vendor_counts.get(vendor, 0))
+            for vendor in vendor_totals
+        ]
+        # Sort and take top 10 by value
+        top_vendors = sorted(combined, key=lambda x: x[1], reverse=True)[:10]
+        vendor_names = [v[0] for v in top_vendors]
+        raw_values = [v[1] for v in top_vendors]
+        counts = [v[2] for v in top_vendors]
+        # Value formatting
         if value_format == 'lakhs':
-            stock_values = [v[1] / 100000 for v in sorted_vendors]
+            values = [v / 100000 for v in raw_values]
             y_axis_title = "Value (₹ Lakhs)"
             hover_suffix = "L"
             tick_suffix = "L"
         elif value_format == 'crores':
-            stock_values = [v[1] / 10000000 for v in sorted_vendors]
+            values = [v / 10000000 for v in raw_values]
             y_axis_title = "Value (₹ Crores)"
             hover_suffix = "Cr"
             tick_suffix = "Cr"
         else:
-            stock_values = [v[1] for v in sorted_vendors]
+            values = raw_values
             y_axis_title = "Value (₹)"
             hover_suffix = ""
             tick_suffix = ""
-        # Customize axis label
         if status_filter == "Excess Inventory":
             y_axis_title = y_axis_title.replace("Value", "Excess Value Above Norm")
-            hover_label = "Excess Value Above Norm"
+            hover_label = "Excess Value"
         elif status_filter == "Short Inventory":
             y_axis_title = y_axis_title.replace("Value", "Short Value Below Norm")
-            hover_label = "Short Value Below Norm"
+            hover_label = "Short Value"
         else:
             hover_label = "Stock Value"
-        # Plot chart
+        # Create chart
         fig = go.Figure()
         fig.add_trace(go.Bar(
             x=vendor_names,
-            y=stock_values,
+            y=values,
             marker_color=color,
-            hovertemplate='<b>%{x}</b><br>' +
-            f'{hover_label}: ₹%{{y:.1f}}{hover_suffix}<br>' +
-            '<extra></extra>'
+            text=[f"{hover_label}: ₹{v:,.0f}{hover_suffix}<br>Parts: {c}" for v, c in zip(values, counts)],
+            hovertemplate='<b>%{x}</b><br>%{text}<extra></extra>',
         ))
         fig.update_layout(
             title=chart_title,
             xaxis_title="Vendor",
             yaxis_title=y_axis_title,
             showlegend=False,
-            yaxis=dict(
-                tickformat=".1f",
-                ticksuffix=tick_suffix
-            )
+            yaxis=dict(tickformat=".1f", ticksuffix=tick_suffix),
         )
         st.plotly_chart(fig, use_container_width=True, key=chart_key)
-        
+
     def safe_float_convert(self, value, default=0.0):
         try:
             return float(value)
