@@ -367,7 +367,7 @@ class InventoryManagementSystem:
         self.analyzer = InventoryAnalyzer()
         self.persistence = DataPersistence()
         self.initialize_session_state()
-         self.status_colors = {
+        self.status_colors = {
             'Within Norms': '#4CAF50',    # Green
             'Excess Inventory': '#2196F3', # Blue
             'Short Inventory': '#F44336'   # Red
