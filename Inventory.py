@@ -352,6 +352,12 @@ class InventoryAnalyzer:
             )
         )
         st.plotly_chart(fig, use_container_width=True, key=chart_key)
+        
+    def safe_float_convert(self, value, default=0.0):
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return default
 
 class InventoryManagementSystem:
     """Main application class"""
