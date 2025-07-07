@@ -2005,24 +2005,26 @@ class InventoryManagementSystem:
                     excess_inventory = df[df['Status'] == 'Excess Inventory'].copy()
                     if not excess_inventory.empty:
                         st.error(f"🚨 **Excess Inventory Alert**: {len(excess_inventory)} parts have excess stock")
-                        # Calculate excess reorder point metrics
+                        # Calculate excess reorder metrics
                         excess_inventory['Excess_Qty'] = excess_inventory['Current Inventory - Qty'] - (
                             excess_inventory['Current Inventory - Qty'] * 0.7  # Assuming 70% as optimal level
                         )
                         excess_inventory['Excess_Value_Lakh'] = (excess_inventory['Excess_Qty'] * 
                                                                  excess_inventory['Current Inventory - VALUE'] / 
                                                                  excess_inventory['Current Inventory - Qty']) / 100000
-                        excess_inventory['Reorder_Point'] = excess_inventory['Current Inventory - Qty'] * 0.3  # 30% of current as reorder point
+                        excess_inventory['Reorder_Days'] = np.random.randint(60, 180, len(excess_inventory))  # Days until next reorder needed
                         excess_inventory['Action_Required'] = np.where(
                             excess_inventory['Excess_Value_Lakh'] > 1, 'Urgent', 'Monitor'
                         )
-                        # Display excess reorder point table
+                
+                        # Display excess reorder days table
                         excess_display = excess_inventory[['PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty', 
-                                                           'Excess_Qty', 'Excess_Value_Lakh', 'Reorder_Point', 
+                                                           'Excess_Qty', 'Excess_Value_Lakh', 'Reorder_Days', 
                                                            'Action_Required']].copy()
                         excess_display.columns = ['Part No', 'Description', 'Current Qty', 'Excess Qty', 
-                                                  'Excess Value (₹L)', 'Suggested Reorder Point', 'Action']
+                                                  'Excess Value (₹L)', 'Days Until Reorder', 'Action']
                         st.dataframe(excess_display, use_container_width=True)
+                
                         # Summary metrics for excess inventory
                         total_excess_value = excess_inventory['Excess_Value_Lakh'].sum()
                         urgent_actions = len(excess_inventory[excess_inventory['Action_Required'] == 'Urgent'])
@@ -2039,15 +2041,14 @@ class InventoryManagementSystem:
                 forecasting_df['Predicted_Demand'] = np.random.randint(10, 500, len(forecasting_df))  # Simulated
                 forecasting_df['Lead_Time_Days'] = np.random.randint(7, 45, len(forecasting_df))  # Simulated
                 forecasting_df['Safety_Stock'] = forecasting_df['Current Inventory - Qty'] * 0.2  # 20% safety stock
-                forecasting_df['Optimal_Reorder_Point'] = (
-                    forecasting_df['Predicted_Demand'] * forecasting_df['Lead_Time_Days'] / 30 + 
-                    forecasting_df['Safety_Stock']
-                )
+                forecasting_df['Optimal_Reorder_Days'] = (
+                    forecasting_df['Current Inventory - Qty'] / forecasting_df['Predicted_Demand'] * 30
+                ).round(0)  # Days until reorder needed based on consumption rate
                 forecasting_df['Reorder_Recommendation'] = np.where(
-                    forecasting_df['Current Inventory - Qty'] <= forecasting_df['Optimal_Reorder_Point'],
+                    forecasting_df['Optimal_Reorder_Days'] <= forecasting_df['Lead_Time_Days'],
                     'Reorder Now',
                     np.where(
-                        forecasting_df['Current Inventory - Qty'] <= forecasting_df['Optimal_Reorder_Point'] * 1.5,
+                        forecasting_df['Optimal_Reorder_Days'] <= forecasting_df['Lead_Time_Days'] * 1.5,
                         'Monitor Closely',
                         'Sufficient Stock'
                     )
@@ -2055,11 +2056,11 @@ class InventoryManagementSystem:
                 # Display comprehensive table
                 comprehensive_display = forecasting_df[[
                     'PART NO', 'PART DESCRIPTION', 'Status', 'Current Inventory - Qty',
-                    'Predicted_Demand', 'Optimal_Reorder_Point', 'Safety_Stock', 'Reorder_Recommendation'
+                    'Predicted_Demand', 'Optimal_Reorder_Days', 'Lead_Time_Days', 'Reorder_Recommendation'
                 ]].copy()
                 comprehensive_display.columns = [
                     'Part No', 'Description', 'Current Status', 'Current Qty',
-                    'Predicted Monthly Demand', 'Optimal Reorder Point', 'Safety Stock', 'Recommendation'
+                    'Predicted Monthly Demand', 'Days Until Reorder', 'Lead Time (Days)', 'Recommendation'
                 ]
                 # Add color coding for recommendations
                 def color_recommendation(val):
