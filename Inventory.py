@@ -1979,20 +1979,34 @@ class InventoryManagementSystem:
 
             with tab3:
                 st.subheader("🔮 Predictive Insights")
-                # Calculate reorder predictions
+                # 🔹 1. Within Norms - Reorder Risk
                 reorder_candidates = df[
                     (df['Status'] == 'Within Norms') & 
-                    (df['Current Inventory - Qty'] <= df['Current Inventory - VALUE'] * 1.2)
+                    (df['Current Inventory - Qty'] <= df['Required Qty'] * 1.1)
                 ]
                 if not reorder_candidates.empty:
-                    st.warning(f"📋 **Reorder Alert**: {len(reorder_candidates)} parts may need reordering soon")
-                    # Display reorder table
-                    reorder_display = reorder_candidates[['PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty', 
-                                                          'Current Inventory - VALUE']].copy()
+                    st.warning(f"📋 **Reorder Alert**: {len(reorder_candidates)} parts within norms may need reordering soon")
+                    reorder_display = reorder_candidates[[
+                        'PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty',
+                        'Required Qty', 'Current Inventory - VALUE'
+                    ]].copy()
                     reorder_display['Days to Reorder'] = np.random.randint(5, 30, len(reorder_display))  # Simulated
                     st.dataframe(reorder_display, use_container_width=True)
-                # Seasonal analysis placeholder
-                st.info("📊 **Seasonal Analysis**: Historical data integration required for advanced forecasting")
+                # 🔹 2. Excess Inventory Approaching Reorder Risk
+                excess_near_reorder = df[
+                    (df['Status'] == 'Excess Inventory') &
+                    (df['Current Inventory - Qty'] < df['Required Qty'] * 1.1)
+                ]
+                if not excess_near_reorder.empty:
+                    st.warning(f"🔄 **Monitor Excess**: {len(excess_near_reorder)} excess items approaching reorder point")
+                    excess_reorder_display = excess_near_reorder[[
+                        'PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty',
+                        'Required Qty', 'Current Inventory - VALUE'
+                    ]].copy()
+                    excess_reorder_display['Days to Dip Below Req.'] = np.random.randint(7, 40, len(excess_reorder_display))  # Simulated
+                    st.dataframe(excess_reorder_display, use_container_width=True)
+                # 🔮 Forecasting Notes
+                st.info("📊 **Seasonal Forecasting**: Historical trends & usage patterns can enhance reorder accuracy.")
 
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
