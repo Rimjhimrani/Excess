@@ -2181,7 +2181,7 @@ class InventoryManagementSystem:
         
         with tab1:
             st.subheader("🚨 Immediate Action Required")
-            # Critical shortages
+            # Critical shortage
             critical_shortages = df[
                 (df['Status'] == 'Short Inventory') & 
                 (df['Current Inventory - VALUE'] > 50000)
@@ -2196,13 +2196,27 @@ class InventoryManagementSystem:
                         with col2:
                             st.write(f"Value: ₹{part['Current Inventory - VALUE']:,.0f}")
                         with col3:
-                            shortage = part['Current Inventory - VALUE'] - part['Current Inventory - Qty']
-                            st.write(f"Need: {shortage} units")
+                            # Calculate shortage in rupees
+                            # Assuming you have a unit price column or can calculate it
+                            if 'Current Inventory - Qty' in df.columns and part['Current Inventory - Qty'] > 0:
+                                unit_price = part['Current Inventory - VALUE'] / part['Current Inventory - Qty']
+                                # If you have a target/required quantity column, use it. Otherwise, estimate shortage
+                                if 'Required Qty' in df.columns:
+                                    shortage_qty = part['Required Qty'] - part['Current Inventory - Qty']
+                                else:
+                                    # Estimate shortage as a percentage of current inventory
+                                    shortage_qty = part['Current Inventory - Qty'] * 0.3  # 30% more needed
+                                shortage_value = shortage_qty * unit_price
+                                st.write(f"Need: ₹{shortage_value:,.0f}")
+                            else:
+                                st.write("Need: Data unavailable")
+                                
             # Excess inventory actions
             excess_items = df[
                 (df['Status'] == 'Excess Inventory') & 
                 (df['Current Inventory - VALUE'] > 100000)
             ].sort_values('Current Inventory - VALUE', ascending=False)
+        
             if not excess_items.empty:
                 st.warning(f"🟡 **Consider**: {len(excess_items)} high-value excess items for reallocation")
                 
