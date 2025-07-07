@@ -2028,9 +2028,6 @@ class InventoryManagementSystem:
                         # Summary metrics for excess inventory
                         total_excess_value = excess_inventory['Excess_Value_Lakh'].sum()
                         urgent_actions = len(excess_inventory[excess_inventory['Action_Required'] == 'Urgent'])
-                
-                        st.metric("Total Excess Value", f"₹{total_excess_value:.2f} L")
-                        st.metric("Urgent Actions Required", urgent_actions)
                     else:
                         st.success("✅ No excess inventory detected")
                 # Combined Forecasting Table
