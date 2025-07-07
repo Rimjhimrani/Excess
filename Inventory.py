@@ -2190,7 +2190,7 @@ class InventoryManagementSystem:
                 st.error(f"🔴 **URGENT**: {len(critical_shortages)} high-value parts critically short!")
                 for idx, part in critical_shortages.head(5).iterrows():
                     with st.container():
-                        col1, col2, col3 = st.columns([3, 2, 2])
+                        col1, col2, col3, col4 = st.columns([3, 2, 2, 2])
                         with col1:
                             st.write(f"**{part['PART NO']}** - {part['PART DESCRIPTION'][:50]}...")
                         with col2:
@@ -2210,6 +2210,15 @@ class InventoryManagementSystem:
                                 st.write(f"Need: ₹{shortage_value:,.0f}")
                             else:
                                 st.write("Need: Data unavailable")
+                        with col4:
+                            if 'Current Inventory - Qty' in df.columns:
+                                if 'Required Qty' in df.columns:
+                                    shortage_qty = part['Required Qty'] - part['Current Inventory - Qty']
+                                else:
+                                    shortage_qty = part['Current Inventory - Qty'] * 0.3
+                                st.write(f"Qty: {shortage_qty:,.0f}")
+                            else:
+                                st.write("Qty: N/A")
                                 
             # Excess inventory actions
             excess_items = df[
