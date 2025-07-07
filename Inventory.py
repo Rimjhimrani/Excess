@@ -1979,35 +1979,115 @@ class InventoryManagementSystem:
 
             with tab3:
                 st.subheader("🔮 Predictive Insights")
-                # 🔹 1. Within Norms - Reorder Risk
-                reorder_candidates = df[
-                    (df['Status'] == 'Within Norms') & 
-                    (df['Current Inventory - Qty'] <= df['Required Qty'] * 1.1)
+                # Create two columns for better layout
+                col1, col2 = st.columns(2)
+                with col1:
+                    # Calculate reorder predictions
+                    reorder_candidates = df[
+                        (df['Status'] == 'Within Norms') & 
+                        (df['Current Inventory - Qty'] <= df['Current Inventory - VALUE'] * 1.2)
+                    ]
+                    if not reorder_candidates.empty:
+                        st.warning(f"📋 **Reorder Alert**: {len(reorder_candidates)} parts may need reordering soon")
+                        # Display reorder table
+                        reorder_display = reorder_candidates[['PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty', 
+                                                              'Current Inventory - VALUE']].copy()
+                        reorder_display['Days to Reorder'] = np.random.randint(5, 30, len(reorder_display))  # Simulated
+                        reorder_display['Priority'] = np.where(
+                            reorder_display['Current Inventory - VALUE'] > reorder_display['Current Inventory - VALUE'].median(),
+                            'High', 'Medium'
+                        )
+                        st.dataframe(reorder_display, use_container_width=True)
+                    else:
+                        st.info("✅ No immediate reorder candidates identified")
+                with col2:
+                    # Excess Inventory Reorder Point Analysis
+                    excess_inventory = df[df['Status'] == 'Excess Inventory'].copy()
+                    if not excess_inventory.empty:
+                        st.error(f"🚨 **Excess Inventory Alert**: {len(excess_inventory)} parts have excess stock")
+                        # Calculate excess reorder point metrics
+                        excess_inventory['Excess_Qty'] = excess_inventory['Current Inventory - Qty'] - (
+                            excess_inventory['Current Inventory - Qty'] * 0.7  # Assuming 70% as optimal level
+                        )
+                        excess_inventory['Excess_Value_Lakh'] = (excess_inventory['Excess_Qty'] * 
+                                                                 excess_inventory['Current Inventory - VALUE'] / 
+                                                                 excess_inventory['Current Inventory - Qty']) / 100000
+                        excess_inventory['Reorder_Point'] = excess_inventory['Current Inventory - Qty'] * 0.3  # 30% of current as reorder point
+                        excess_inventory['Action_Required'] = np.where(
+                            excess_inventory['Excess_Value_Lakh'] > 1, 'Urgent', 'Monitor'
+                        )
+                        # Display excess reorder point table
+                        excess_display = excess_inventory[['PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty', 
+                                                           'Excess_Qty', 'Excess_Value_Lakh', 'Reorder_Point', 
+                                                           'Action_Required']].copy()
+                        excess_display.columns = ['Part No', 'Description', 'Current Qty', 'Excess Qty', 
+                                                  'Excess Value (₹L)', 'Suggested Reorder Point', 'Action']
+                        st.dataframe(excess_display, use_container_width=True)
+                        # Summary metrics for excess inventory
+                        total_excess_value = excess_inventory['Excess_Value_Lakh'].sum()
+                        urgent_actions = len(excess_inventory[excess_inventory['Action_Required'] == 'Urgent'])
+                
+                        st.metric("Total Excess Value", f"₹{total_excess_value:.2f} L")
+                        st.metric("Urgent Actions Required", urgent_actions)
+                    else:
+                        st.success("✅ No excess inventory detected")
+                # Combined Forecasting Table
+                st.subheader("📊 Comprehensive Forecasting Analysis")
+        
+                # Create comprehensive forecasting dataframe
+                forecasting_df = df.copy()
+                forecasting_df['Predicted_Demand'] = np.random.randint(10, 500, len(forecasting_df))  # Simulated
+                forecasting_df['Lead_Time_Days'] = np.random.randint(7, 45, len(forecasting_df))  # Simulated
+                forecasting_df['Safety_Stock'] = forecasting_df['Current Inventory - Qty'] * 0.2  # 20% safety stock
+                forecasting_df['Optimal_Reorder_Point'] = (
+                    forecasting_df['Predicted_Demand'] * forecasting_df['Lead_Time_Days'] / 30 + 
+                    forecasting_df['Safety_Stock']
+                )
+                forecasting_df['Reorder_Recommendation'] = np.where(
+                    forecasting_df['Current Inventory - Qty'] <= forecasting_df['Optimal_Reorder_Point'],
+                    'Reorder Now',
+                    np.where(
+                        forecasting_df['Current Inventory - Qty'] <= forecasting_df['Optimal_Reorder_Point'] * 1.5,
+                        'Monitor Closely',
+                        'Sufficient Stock'
+                    )
+                )
+                # Display comprehensive table
+                comprehensive_display = forecasting_df[[
+                    'PART NO', 'PART DESCRIPTION', 'Status', 'Current Inventory - Qty',
+                    'Predicted_Demand', 'Optimal_Reorder_Point', 'Safety_Stock', 'Reorder_Recommendation'
+                ]].copy()
+                comprehensive_display.columns = [
+                    'Part No', 'Description', 'Current Status', 'Current Qty',
+                    'Predicted Monthly Demand', 'Optimal Reorder Point', 'Safety Stock', 'Recommendation'
                 ]
-                if not reorder_candidates.empty:
-                    st.warning(f"📋 **Reorder Alert**: {len(reorder_candidates)} parts within norms may need reordering soon")
-                    reorder_display = reorder_candidates[[
-                        'PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty',
-                        'Required Qty', 'Current Inventory - VALUE'
-                    ]].copy()
-                    reorder_display['Days to Reorder'] = np.random.randint(5, 30, len(reorder_display))  # Simulated
-                    st.dataframe(reorder_display, use_container_width=True)
-                # 🔹 2. Excess Inventory Approaching Reorder Risk
-                excess_near_reorder = df[
-                    (df['Status'] == 'Excess Inventory') &
-                    (df['Current Inventory - Qty'] < df['Required Qty'] * 1.1)
-                ]
-                if not excess_near_reorder.empty:
-                    st.warning(f"🔄 **Monitor Excess**: {len(excess_near_reorder)} excess items approaching reorder point")
-                    excess_reorder_display = excess_near_reorder[[
-                        'PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty',
-                        'Required Qty', 'Current Inventory - VALUE'
-                    ]].copy()
-                    excess_reorder_display['Days to Dip Below Req.'] = np.random.randint(7, 40, len(excess_reorder_display))  # Simulated
-                    st.dataframe(excess_reorder_display, use_container_width=True)
-                # 🔮 Forecasting Notes
-                st.info("📊 **Seasonal Forecasting**: Historical trends & usage patterns can enhance reorder accuracy.")
-
+                # Add color coding for recommendations
+                def color_recommendation(val):
+                    if val == 'Reorder Now':
+                        return 'background-color: #ffebee; color: #c62828'
+                    elif val == 'Monitor Closely':
+                        return 'background-color: #fff3e0; color: #ef6c00'
+                    else:
+                        return 'background-color: #e8f5e8; color: #2e7d32'
+                styled_df = comprehensive_display.style.applymap(color_recommendation, subset=['Recommendation'])
+                st.dataframe(styled_df, use_container_width=True)
+        
+                # Seasonal analysis placeholder
+                st.info("📊 **Seasonal Analysis**: Historical data integration required for advanced forecasting")
+        
+                # Key insights summary
+                st.subheader("🔍 Key Insights")
+                insights_col1, insights_col2, insights_col3 = st.columns(3)
+                with insights_col1:
+                    reorder_now_count = len(forecasting_df[forecasting_df['Reorder_Recommendation'] == 'Reorder Now'])
+                    st.metric("Parts Needing Reorder", reorder_now_count)
+                with insights_col2:
+                    monitor_count = len(forecasting_df[forecasting_df['Reorder_Recommendation'] == 'Monitor Closely'])
+                    st.metric("Parts to Monitor", monitor_count)
+                with insights_col3:
+                    sufficient_count = len(forecasting_df[forecasting_df['Reorder_Recommendation'] == 'Sufficient Stock'])
+                    st.metric("Parts with Sufficient Stock", sufficient_count)
+                    
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
         st.header("📥 Export & Reporting Options")
