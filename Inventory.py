@@ -450,7 +450,7 @@ class InventoryManagementSystem:
     
         # ✅ Check required columns with flexible matching
         required_columns = ['PART NO', 'Stock Deviation Value', 'INVENTORY REMARK STATUS']
-    
+        current_stock_col = 'Current Inventory - VALUE'
         # Try to find current stock value column (it might have different names)
         current_stock_cols = [col for col in df.columns if 'CURRENT' in col.upper() and 'STOCK' in col.upper() and 'VALUE' in col.upper()]
         if not current_stock_cols:
