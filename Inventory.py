@@ -441,130 +441,114 @@ class InventoryManagementSystem:
         return int(float_result)
             
     def create_top_parts_chart(self, data, status_filter, bar_color, key):
-        """Top 10 parts chart by status — shows CURRENT vs TARGET NORM comparison"""
+        """Top 10 parts chart by status — shows EXCESS/SHORT VALUE vs NORM VALUE comparison"""
         df = pd.DataFrame(data)
-    
-        # ✅ Debug: Show available columns
-        st.write("🔍 **Available columns in DataFrame:**")
-        st.write(list(df.columns))
-    
-        # ✅ Check required columns with flexible matching
-        required_columns = ['PART NO', 'Stock Deviation Value', 'INVENTORY REMARK STATUS']
-        current_stock_col = 'Current Inventory - VALUE'
-        # Try to find current stock value column (it might have different names)
-        current_stock_cols = [col for col in df.columns if 'CURRENT' in col.upper() and 'STOCK' in col.upper() and 'VALUE' in col.upper()]
-        if not current_stock_cols:
-            # Try alternative column names
-            current_stock_cols = [col for col in df.columns if any(keyword in col.upper() for keyword in ['STOCK VALUE', 'CURRENT VALUE', 'INVENTORY VALUE', 'STOCK AMOUNT'])]
-        if current_stock_cols:
-            current_stock_col = current_stock_cols[0]
-            st.write(f"✅ Found current stock column: '{current_stock_col}'")
-        else:
-            st.error("❌ Cannot find current stock value column. Please check column names.")
-            st.write("Looking for columns containing: 'CURRENT STOCK VALUE', 'STOCK VALUE', 'CURRENT VALUE', 'INVENTORY VALUE', 'STOCK AMOUNT'")
-            return
-        # Check other required columns
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            st.warning(f"⚠️ Required columns missing: {', '.join(missing_columns)}")
+        # ✅ Check required columns
+        if 'PART NO' not in df.columns or 'Stock Deviation Value' not in df.columns:
+            st.warning("⚠️ Required columns missing for top parts chart.")
             return
         # ✅ Filter by status
         df = df[df['INVENTORY REMARK STATUS'] == status_filter]
     
         if status_filter == "Excess Inventory":
-            # For excess inventory, show only positive deviation values
+            # For excess inventory, show only positive deviation values (excess amount)
             df = df[df['Stock Deviation Value'] > 0]
             df = df.sort_values(by='Stock Deviation Value', ascending=False).head(10)
-            chart_title = "Top 10 Excess Inventory Parts: Current vs Target Norm (₹ Lakhs)"
-            y_title = "Value (₹ Lakhs)"
+            chart_title = "Top 10 Excess Inventory Parts - Norm vs Actual (₹ in Lakhs)"
+            y_title = "Inventory Value (₹ Lakhs)"
         elif status_filter == "Short Inventory":
-            # For short inventory, show only negative deviation values
+            # For short inventory, show absolute value of negative deviation
             df = df[df['Stock Deviation Value'] < 0]
             df['Abs_Deviation_Value'] = abs(df['Stock Deviation Value'])
             df = df.sort_values(by='Abs_Deviation_Value', ascending=False).head(10)
-            chart_title = "Top 10 Short Inventory Parts: Current vs Target Norm (₹ Lakhs)"
-            y_title = "Value (₹ Lakhs)"
+            chart_title = "Top 10 Short Inventory Parts - Norm vs Actual (₹ in Lakhs)"
+            y_title = "Inventory Value (₹ Lakhs)"
         else:
             st.info(f"No chart available for '{status_filter}' status.")
             return
         if df.empty:
             st.info(f"No data found for '{status_filter}' parts.")
             return
-        # ✅ Calculate target norm value (current stock - deviation = target)
-        df['Target_Norm_Value'] = df[current_stock_col] - df['Stock Deviation Value']
-    
-        # ✅ Prepare chart data in lakhs
-        df['Current_Value_Lakh'] = df[current_stock_col] / 100000
-        df['Target_Norm_Lakh'] = df['Target_Norm_Value'] / 100000
-        df['Deviation_Lakh'] = df['Stock Deviation Value'] / 100000
-    
-        # Create part description with number
+        # ✅ Prepare chart data with norm vs actual comparison
+        if status_filter == "Excess Inventory":
+            # Calculate norm value (current stock value - excess)
+            df['Current_Stock_Value'] = df['CURRENT STOCK VALUE'] if 'CURRENT STOCK VALUE' in df.columns else 0
+            df['Norm_Value'] = df['Current_Stock_Value'] - df['Stock Deviation Value']
+            df['Excess_Value'] = df['Stock Deviation Value']
+            # Convert to lakhs
+            df['Norm_Value_Lakh'] = df['Norm_Value'] / 100000
+            df['Current_Value_Lakh'] = df['Current_Stock_Value'] / 100000
+            df['Deviation_Value_Lakh'] = df['Excess_Value'] / 100000
+        else:  # Short Inventory
+            # Calculate what the stock value should be (current + shortage)
+            df['Current_Stock_Value'] = df['CURRENT STOCK VALUE'] if 'CURRENT STOCK VALUE' in df.columns else 0
+            df['Norm_Value'] = df['Current_Stock_Value'] + df['Abs_Deviation_Value']
+            df['Shortage_Value'] = df['Abs_Deviation_Value']
+        
+            # Convert to lakhs
+            df['Norm_Value_Lakh'] = df['Norm_Value'] / 100000
+            df['Current_Value_Lakh'] = df['Current_Stock_Value'] / 100000
+            df['Deviation_Value_Lakh'] = df['Shortage_Value'] / 100000
+        # Prepare labels and hover text
         df['PART_DESC_NO'] = df['PART DESCRIPTION'].astype(str) + " (" + df['PART NO'].astype(str) + ")"
     
-        # ✅ Create grouped bar chart data
-        chart_data = []
-        for _, row in df.iterrows():
-            part_name = row['PART_DESC_NO']
-            # Current value
-            chart_data.append({
-                'Part': part_name,
-                'Type': 'Current Stock',
-                'Value': row['Current_Value_Lakh'],
-                'Color': '#FF6B6B' if status_filter == "Excess Inventory" else '#4ECDC4'
-            })
-            # Target norm value
-            chart_data.append({
-                'Part': part_name,
-                'Type': 'Target Norm',
-                'Value': row['Target_Norm_Lakh'],
-                'Color': '#45B7D1'
-            })
-        chart_df = pd.DataFrame(chart_data)
+        if status_filter == "Excess Inventory":
+            df['HOVER_TEXT_NORM'] = df.apply(lambda row: (
+                f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
+                f"Part No: {row.get('PART NO')}<br>"
+                f"Norm Value: ₹{row['Norm_Value']:,.0f}<br>"
+                f"Type: Within Norm Limit"
+            ), axis=1)
+        
+            df['HOVER_TEXT_CURRENT'] = df.apply(lambda row: (
+                f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
+                f"Part No: {row.get('PART NO')}<br>"
+                f"Current Value: ₹{row['Current_Stock_Value']:,.0f}<br>"
+                f"Excess Value: ₹{row['Excess_Value']:,.0f}<br>"
+                f"Type: Current Stock (Excess)"
+            ), axis=1)
+        else:  # Short Inventory
+            df['HOVER_TEXT_NORM'] = df.apply(lambda row: (
+                f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
+                f"Part No: {row.get('PART NO')}<br>"
+                f"Required Value: ₹{row['Norm_Value']:,.0f}<br>"
+                f"Type: Required Norm Level"
+            ), axis=1)
+        
+            df['HOVER_TEXT_CURRENT'] = df.apply(lambda row: (
+                f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
+                f"Part No: {row.get('PART NO')}<br>"
+                f"Current Value: ₹{row['Current_Stock_Value']:,.0f}<br>"
+                f"Shortage Value: ₹{row['Shortage_Value']:,.0f}<br>"
+                f"Type: Current Stock (Short)"
+            ), axis=1)
+        fig = go.Figure()
+        # Add norm value bars
+        fig.add_trace(go.Bar(
+            x=df['PART_DESC_NO'],
+            y=df['Norm_Value_Lakh'],
+            name='Norm Value' if status_filter == "Excess Inventory" else 'Required Value',
+            marker_color='#4CAF50',  # Green for norm
+            hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+            customdata=df['HOVER_TEXT_NORM']
+        ))
+        # Add current value bars
+        fig.add_trace(go.Bar(
+            x=df['PART_DESC_NO'],
+            y=df['Current_Value_Lakh'],
+            name='Current Value',
+            marker_color=bar_color,
+            hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+            customdata=df['HOVER_TEXT_CURRENT']
+        ))
     
-        # ✅ Build grouped bar chart
-        fig = px.bar(
-            chart_df,
-            x='Part',
-            y='Value',
-            color='Type',
-            color_discrete_map={
-                'Current Stock': '#FF6B6B' if status_filter == "Excess Inventory" else '#4ECDC4',
-                'Target Norm': '#45B7D1'
-            },
-            title=chart_title,
-            barmode='group'
-        )
-    
-        # ✅ Add deviation annotations
-        for i, (_, row) in enumerate(df.iterrows()):
-            deviation_text = f"₹{abs(row['Stock Deviation Value']):,.0f}"
-            if status_filter == "Excess Inventory":
-                annotation_text = f"Excess: {deviation_text}"
-                annotation_color = "red"
-            else:
-                annotation_text = f"Short: {deviation_text}"
-                annotation_color = "orange"
-            # Add annotation above the higher bar
-            max_value = max(row['Current_Value_Lakh'], row['Target_Norm_Lakh'])
-            fig.add_annotation(
-                x=i,
-                y=max_value + (max_value * 0.05),  # 5% above the highest bar
-                text=annotation_text,
-                showarrow=False,
-                font=dict(size=10, color=annotation_color),
-                bgcolor="rgba(255,255,255,0.8)",
-                bordercolor=annotation_color,
-                borderwidth=1
-            )
-        # ✅ Update hover templates
-        fig.update_traces(
-            hovertemplate='<b>%{x}</b><br>%{fullData.name}: ₹%{y:.1f}L<br><extra></extra>'
-        )
-    
-        # ✅ Update layout
+        # ✅ Update chart formatting
         fig.update_layout(
-            xaxis_tickangle=-45,
+            title=chart_title,
+            xaxis_title="Part Description (Part No)",
             yaxis_title=y_title,
+            xaxis_tickangle=-45,
+            barmode='group',  # Side-by-side bars
             yaxis=dict(
                 tickformat=',.1f',
                 ticksuffix='L'
@@ -576,18 +560,17 @@ class InventoryManagementSystem:
                 xanchor="right",
                 x=1
             ),
-            height=600
+            height=600,
+            showlegend=True
         )
         st.plotly_chart(fig, use_container_width=True, key=key)
     
-        # ✅ Add summary table
-        st.subheader("📊 Detailed Comparison")
-        summary_df = df[['PART NO', 'PART DESCRIPTION', 'Current_Value_Lakh', 'Target_Norm_Lakh', 'Deviation_Lakh']].copy()
-        summary_df.columns = ['Part No', 'Description', 'Current (₹L)', 'Target Norm (₹L)', 'Deviation (₹L)']
-        summary_df['Current (₹L)'] = summary_df['Current (₹L)'].round(2)
-        summary_df['Target Norm (₹L)'] = summary_df['Target Norm (₹L)'].round(2)
-        summary_df['Deviation (₹L)'] = summary_df['Deviation (₹L)'].round(2)
-    
+        # ✅ Add summary table showing the comparison
+        st.subheader(f"📊 Summary - {status_filter}")
+        summary_df = df[['PART NO', 'PART DESCRIPTION', 'Current_Value_Lakh', 'Norm_Value_Lakh', 'Deviation_Value_Lakh']].copy()
+        summary_df.columns = ['Part No', 'Part Description', 'Current Value (₹L)', 'Norm Value (₹L)', 
+                              'Excess Value (₹L)' if status_filter == "Excess Inventory" else 'Shortage Value (₹L)']
+        summary_df = summary_df.round(2)
         st.dataframe(summary_df, use_container_width=True)
 
     def authenticate_user(self):
@@ -3030,132 +3013,80 @@ class InventoryManagementSystem:
                 
         # ✅ 4. Top 10 Parts by Inventory Status
         try:
-            st.markdown("## 🧩 Top 10 Parts: Current vs Target Norm")
+            st.markdown("## 🧩 Top 10 Parts by Inventory Status")
             # Check if required columns exist
-            required_cols = ['PART NO', 'Stock Deviation Value', 'INVENTORY REMARK STATUS']
-        
-            # Find current stock column dynamically
-            current_stock_cols = [col for col in df.columns if 'CURRENT' in col.upper() and 'STOCK' in col.upper() and 'VALUE' in col.upper()]
-            if not current_stock_cols:
-                current_stock_cols = [col for col in df.columns if any(keyword in col.upper() for keyword in ['STOCK VALUE', 'CURRENT VALUE', 'INVENTORY VALUE', 'STOCK AMOUNT'])]
-            if not current_stock_cols:
-                st.error("❌ Cannot find current stock value column. Available columns:")
-                st.write(list(df.columns))
+            if 'PART NO' not in df.columns or 'Stock Deviation Value' not in df.columns:
+                st.warning("⚠️ Required columns missing for top parts chart.")
                 return
-            current_stock_col = current_stock_cols[0]
-            st.info(f"ℹ️ Using column '{current_stock_col}' for current stock values")
-        
-            missing_cols = [col for col in required_cols if col not in df.columns]
-            if missing_cols:
-                st.warning(f"⚠️ Required columns missing: {', '.join(missing_cols)}")
-                return
-        
             # Define status colors
             status_colors = {
-                "Excess Inventory": {"current": "#FF6B6B", "target": "#45B7D1"},
-                "Short Inventory": {"current": "#4ECDC4", "target": "#45B7D1"}
+                "Excess Inventory": "#2196F3",
+                "Short Inventory": "#F44336"
             }
-        
-            for status, label in [
-                ("Excess Inventory", "🔴 Top 10 Excess Inventory Parts"),
-                ("Short Inventory", "🟡 Top 10 Short Inventory Parts"),
+            for status, label, color in [
+                ("Excess Inventory", "🔵 Top 10 Excess Inventory Parts", status_colors["Excess Inventory"]),
+                ("Short Inventory", "🔴 Top 10 Short Inventory Parts", status_colors["Short Inventory"]),
             ]:
                 st.subheader(label)
                 if status == "Excess Inventory":
-                    st.markdown(f'<div class="graph-description">Comparison of current stock value vs target norm for top 10 excess inventory parts.</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="graph-description">Top 10 parts with highest excess inventory value (₹ above allowed norm).</div>', unsafe_allow_html=True)
                 else:
-                    st.markdown(f'<div class="graph-description">Comparison of current stock value vs target norm for top 10 shortage parts.</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="graph-description">Top 10 parts with highest shortage value (₹ below required norm).</div>', unsafe_allow_html=True)
                 # Filter by status
                 status_df = df[df['INVENTORY REMARK STATUS'] == status]
-            
                 if status == "Excess Inventory":
+                    # For excess inventory, show only positive deviation values (excess amount)
                     status_df = status_df[status_df['Stock Deviation Value'] > 0]
                     status_df = status_df.sort_values(by='Stock Deviation Value', ascending=False).head(10)
-                else:  # Short Inventory
+                    chart_title = "Top 10 Excess Inventory Parts (₹ Excess Value in Lakhs)"
+                    y_title = "Excess Inventory Value (₹ Lakhs)"
+                elif status == "Short Inventory":
+                    # For short inventory, show absolute value of negative deviation
                     status_df = status_df[status_df['Stock Deviation Value'] < 0]
                     status_df['Abs_Deviation_Value'] = abs(status_df['Stock Deviation Value'])
                     status_df = status_df.sort_values(by='Abs_Deviation_Value', ascending=False).head(10)
+                    chart_title = "Top 10 Short Inventory Parts (₹ Shortage Value in Lakhs)"
+                    y_title = "Shortage Value (₹ Lakhs)"
                 if status_df.empty:
                     st.info(f"No data found for '{status}' parts.")
                     continue
-                # Calculate target norm value
-                status_df['Target_Norm_Value'] = status_df[current_stock_col] - status_df['Stock Deviation Value']
-            
-                # Convert to lakhs
-                status_df['Current_Value_Lakh'] = status_df[current_stock_col] / 100000
-                status_df['Target_Norm_Lakh'] = status_df['Target_Norm_Value'] / 100000
-            
-                # Prepare data for grouped bar chart
-                chart_data = []
-                for _, row in status_df.iterrows():
-                    part_desc = f"{row['PART DESCRIPTION']} ({row['PART NO']})"
-                    chart_data.extend([
-                        {
-                            'Part': part_desc,
-                            'Type': 'Current Stock',
-                            'Value': row['Current_Value_Lakh'],
-                            'Original_Value': row[current_stock_col]
-                        },
-                        {
-                            'Part': part_desc,
-                            'Type': 'Target Norm',
-                            'Value': row['Target_Norm_Lakh'],
-                            'Original_Value': row['Target_Norm_Value']
-                        }
-                    ])
-                    chart_df = pd.DataFrame(chart_data)
-                    # Create grouped bar chart
-                    fig = px.bar(
-                        chart_df,
-                        x='Part',
-                        y='Value',
-                        color='Type',
-                        color_discrete_map={
-                            'Current Stock': status_colors[status]["current"],
-                            'Target Norm': status_colors[status]["target"]
-                        },
-                        title=f"Current vs Target Norm - {status} Parts (₹ Lakhs)",
-                        barmode='group'
+                # Prepare chart data
+                if status == "Excess Inventory":
+                    status_df['Value_Lakh'] = status_df['Stock Deviation Value'] / 100000  # Excess value in lakhs
+                    hover_value = status_df['Stock Deviation Value']
+                else:  # Short Inventory
+                    status_df['Value_Lakh'] = status_df['Abs_Deviation_Value'] / 100000  # Shortage value in lakhs
+                    hover_value = status_df['Abs_Deviation_Value']
+                status_df['PART_DESC_NO'] = status_df['PART DESCRIPTION'].astype(str) + " (" + status_df['PART NO'].astype(str) + ")"
+                status_df['HOVER_TEXT'] = status_df.apply(lambda row: (
+                    f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
+                    f"Part No: {row.get('PART NO')}<br>"
+                    f"{'Excess' if status == 'Excess Inventory' else 'Shortage'} Value: ₹{hover_value.loc[row.name]:,.0f}"
+                ), axis=1)
+                # Build chart
+                fig = px.bar(
+                    status_df,
+                    x='PART_DESC_NO',
+                    y='Value_Lakh',
+                    color_discrete_sequence=[color],
+                    title=chart_title
+                )
+                # Update chart formatting
+                fig.update_traces(
+                    hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+                    customdata=status_df['HOVER_TEXT']
+                )
+                fig.update_layout(
+                    xaxis_tickangle=-45,
+                    yaxis_title=y_title,
+                    yaxis=dict(
+                        tickformat=',.1f',
+                        ticksuffix='L'
                     )
-                    # Update layout
-                    fig.update_layout(
-                        xaxis_tickangle=-45,
-                        yaxis_title="Value (₹ Lakhs)",
-                        yaxis=dict(
-                            tickformat=',.1f',
-                            ticksuffix='L'
-                        ),
-                        legend=dict(
-                            orientation="h",
-                            yanchor="bottom",
-                            y=1.02,
-                            xanchor="right",
-                            x=1
-                        ),
-                        height=600
-                    )
-                    # Update hover template
-                    fig.update_traces(
-                        hovertemplate='<b>%{x}</b><br>%{fullData.name}: ₹%{y:.1f}L<br><extra></extra>'
-                    )
-            
-                    st.plotly_chart(fig, use_container_width=True, key=f"{status.lower().replace(' ', '_')}_comparison")
-            
-                    # Add summary metrics
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        total_current = status_df[current_stock_col].sum()
-                        st.metric("Total Current Stock", f"₹{total_current/100000:.1f}L")
-                    with col2:
-                        total_target = status_df['Target_Norm_Value'].sum()
-                        st.metric("Total Target Norm", f"₹{total_target/100000:.1f}L")
-                    with col3:
-                        total_deviation = status_df['Stock Deviation Value'].sum()
-                        deviation_label = "Total Excess" if status == "Excess Inventory" else "Total Shortage"
-                        st.metric(deviation_label, f"₹{abs(total_deviation)/100000:.1f}L")
-                    st.markdown("---")
+                )
+                st.plotly_chart(fig, use_container_width=True, key=f"{status.lower().replace(' ', '_')}_parts")
         except Exception as e:
-            st.error("❌ Error displaying Parts Comparison Chart")
+            st.error("❌ Error displaying Top Parts by Status")
             st.code(str(e))
           
         # ✅ 5. Top 10 Vendors by Inventory Status (₹ Lakhs)
@@ -3181,7 +3112,6 @@ class InventoryManagementSystem:
             st.error("❌ Error displaying Top Vendors by Status")
             st.code(str(e))
 
-        
 if __name__ == "__main__":
     app = InventoryManagementSystem()
     app.run()  # This runs the full dashboard
