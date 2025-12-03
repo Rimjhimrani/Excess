@@ -152,16 +152,15 @@ class InventoryManagementSystem:
         if 'user_role' not in st.session_state: st.session_state.user_role = None
         if 'admin_tolerance' not in st.session_state: st.session_state.admin_tolerance = 30
         
-        keys_default_none = [
-            'persistent_bom_data', 'persistent_bom_locked', 
-            'persistent_inventory_data', 'persistent_inventory_locked',
-            'persistent_analysis_results'
-        ]
-        for key in keys_default_none:
-            if key not in st.session_state: st.session_state[key] = None
+        # Initialize Persistent Data Keys if they don't exist
+        if 'persistent_bom_data' not in st.session_state: st.session_state.persistent_bom_data = None
+        # Default Locked to False (not None) to avoid logic errors
+        if 'persistent_bom_locked' not in st.session_state: st.session_state.persistent_bom_locked = False
+        
+        if 'persistent_inventory_data' not in st.session_state: st.session_state.persistent_inventory_data = None
+        if 'persistent_analysis_results' not in st.session_state: st.session_state.persistent_analysis_results = None
             
-        if 'bom_filenames' not in st.session_state or st.session_state.bom_filenames is None:
-            st.session_state.bom_filenames = []
+        if 'bom_filenames' not in st.session_state: st.session_state.bom_filenames = []
 
     def safe_float_convert(self, value):
         try: return float(value)
@@ -236,9 +235,9 @@ class InventoryManagementSystem:
         bom_locked = st.session_state.get('persistent_bom_locked', False)
         
         if bom_locked:
-            st.warning("🔒 BOM Data is Locked.")
+            st.success("🔒 BOM Data is Locked.")
             bom_data = self.persistence.load_data_from_session_state('persistent_bom_data')
-            st.info(f"Loaded {len(bom_data) if bom_data else 0} BOM Files.")
+            st.info(f"Loaded {len(bom_data) if bom_data else 0} BOM Files. Users can now process inventory.")
             
             if st.button("🔓 Unlock Data"):
                 st.session_state.persistent_bom_locked = False
@@ -418,22 +417,18 @@ class InventoryManagementSystem:
                     st.rerun()
         else:
             st.sidebar.success(f"Logged in as {st.session_state.user_role}")
-            # --- FIXED LOGOUT LOGIC ---
+            
+            # --- FIX: SAFE LOGOUT ---
             if st.sidebar.button("Logout"):
-                # Define keys we MUST keep to avoid deleting BOM data
-                keys_to_keep = [
-                    'persistent_bom_data', 
-                    'persistent_bom_locked', 
-                    'bom_filenames', 
-                    'admin_tolerance'
-                ]
+                # We do NOT delete session state keys anymore. 
+                # We simply reset the User-Specific data and the Role.
+                # The Admin Data (BOMs) is preserved.
                 
-                # Iterate and delete everything else
-                for key in list(st.session_state.keys()):
-                    if key not in keys_to_keep:
-                        del st.session_state[key]
+                # Clear Analysis Results (User specific)
+                st.session_state.persistent_analysis_results = None
+                st.session_state.persistent_inventory_data = None
                 
-                # Explicitly set role to None
+                # Reset Role
                 st.session_state.user_role = None
                 st.rerun()
 
