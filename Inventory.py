@@ -58,40 +58,58 @@ class InventoryAnalyzer:
             return default
 
     def analyze_inventory(self, master_data, current_inventory, tolerance=None):
+        """
+        Master Data comes from BOM (Has Part No, Description, Vendor, Calculated Consumption).
+        Current Inventory comes from User Upload (Has Part No, Qty, Value).
+        """
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)
             
         results = []
+        # Index Inventory by Part No for fast lookup
         inventory_dict = {str(item['Part_No']).strip().upper(): item for item in current_inventory}
         
+        # Iterate through BOM Parts (The Master List)
         for master_item in master_data:
             part_no = str(master_item.get('Part_No')).strip().upper()
+            
+            # 1. Match with Inventory
             inventory_item = inventory_dict.get(part_no, {})
             
+            # Get Inventory Data
             current_qty = float(inventory_item.get('Current_QTY', 0)) or 0.0
             stock_value_from_file = float(inventory_item.get('Current Inventory - VALUE', 0)) or 0.0
             
+            # 2. Get Master Data (From BOM)
             part_desc = master_item.get('Description', '')
-            unit_price = self.safe_float_convert(master_item.get('unit_price', 0))
+            # IMPORTANT: Fetch Vendor from BOM data
+            vendor_name = master_item.get('Vendor_Name', 'Unknown') 
             
-            # Fallback logic for Unit Price
+            # Unit Price Logic: Try BOM first, then calculate from Inventory
+            unit_price = self.safe_float_convert(master_item.get('unit_price', 0))
             if unit_price == 0 and current_qty > 0 and stock_value_from_file > 0:
                 unit_price = stock_value_from_file / current_qty
             elif unit_price == 0:
-                unit_price = 1.0 
+                unit_price = 1.0 # Default if price completely missing
                 
             rm_days = self.safe_float_convert(master_item.get('RM_IN_DAYS', 7.0))
             avg_per_day = self.safe_float_convert(master_item.get('AVG CONSUMPTION/DAY', 0))
             
-            rm_qty = avg_per_day * rm_days
+            # 3. Calculate Norms
+            rm_qty = avg_per_day * rm_days # Norm Qty (Consumption * Days)
+            
+            # Calculate Value
             current_value = stock_value_from_file if stock_value_from_file > 0 else (current_qty * unit_price)
             
+            # Norms with tolerance
             lower_bound = rm_qty * (1 - tolerance / 100)
             upper_bound = rm_qty * (1 + tolerance / 100)
             
+            # Deviation
             deviation_qty = current_qty - upper_bound
             deviation_value = deviation_qty * unit_price
 
+            # Determine Status
             if current_qty < lower_bound:
                 status = 'Short Inventory'
             elif current_qty > upper_bound:
@@ -99,10 +117,11 @@ class InventoryAnalyzer:
             else:
                 status = 'Within Norms'
 
+            # 4. Build Result
             results.append({
                 'PART NO': part_no,
                 'PART DESCRIPTION': part_desc,
-                'Vendor Name': master_item.get('Vendor_Name', 'Unknown'),
+                'Vendor Name': vendor_name, # Ensured from BOM
                 'AVG CONSUMPTION/DAY': avg_per_day,
                 'RM IN DAYS': rm_days,
                 'RM Norm - In Qty': rm_qty,
@@ -124,8 +143,12 @@ class InventoryAnalyzer:
         vendor_totals = {}
         for item in filtered:
             vendor = item.get('Vendor Name', 'Unknown')
+            # Skip unknown vendors in charts to keep it clean
+            if vendor == 'Unknown': continue
+            
             val = abs(item.get('Stock Deviation Value', 0))
             vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + val
+            
         if not vendor_totals: return
 
         top_vendors = sorted(vendor_totals.items(), key=lambda x: x[1], reverse=True)[:10]
@@ -166,16 +189,18 @@ class InventoryManagementSystem:
         except: return 0.0
 
     def standardize_bom_data(self, df):
+        """Standardize BOM. Explicitly looks for Vendor Column."""
         if df is None or df.empty: return []
         df.columns = [str(col).strip().lower() for col in df.columns]
         
         map_cols = {
-            'part_no': ['part no', 'part_no', 'part_number', 'material'],
+            'part_no': ['part no', 'part_no', 'part_number', 'material', 'item code'],
             'desc': ['part description', 'description', 'desc', 'material description'],
-            'qty': ['qty/veh', 'qty', 'quantity', 'usage', 'qty per veh', 'qty - 1', 'qty-1'],
+            'qty': ['qty/veh', 'qty', 'quantity', 'usage', 'qty per veh', 'qty - 1'],
             'price': ['unit price', 'price', 'rate'],
-            'vendor': ['vendor', 'supplier'],
-            'rm_days': ['rm days', 'inventory days']
+            # Comprehensive Vendor Mapping
+            'vendor': ['vendor', 'vendor name', 'supplier', 'source', 'vendor_name'],
+            'rm_days': ['rm days', 'inventory days', 'norm days']
         }
         
         final_map = {}
@@ -194,7 +219,8 @@ class InventoryManagementSystem:
                 'Description': str(row.get(final_map.get('desc'), '')).strip(),
                 'Qty_Per_Veh': self.safe_float_convert(row[final_map['qty']]),
                 'unit_price': self.safe_float_convert(row.get(final_map.get('price'), 0.0)),
-                'Vendor_Name': str(row.get(final_map.get('vendor'), 'Unknown')),
+                # Capture Vendor here
+                'Vendor_Name': str(row.get(final_map.get('vendor'), 'Unknown')).strip(),
                 'RM_IN_DAYS': self.safe_float_convert(row.get(final_map.get('rm_days'), 7.0))
             }
             if item['Part_No'] and item['Part_No'].lower() not in ['nan', 'none', '']:
@@ -202,6 +228,7 @@ class InventoryManagementSystem:
         return data
 
     def standardize_current_inventory(self, df):
+        """Standardize Inventory. Does NOT need Vendor column."""
         if df is None or df.empty: return []
         df.columns = [str(col).strip().lower() for col in df.columns]
         
@@ -246,7 +273,7 @@ class InventoryManagementSystem:
                 st.rerun()
         else:
             st.markdown("### Upload Bill of Materials (BOM)")
-            st.markdown("Upload **1 to 5** BOM files. Must contain: **Part No, Part Desc, Qty/Veh**")
+            st.markdown("Upload **1 to 5** BOM files. Required columns: **Part No, Qty/Veh**. Recommended: **Vendor Name, Price**.")
             uploaded_files = st.file_uploader("Select BOM Files", type=['xlsx', 'xls', 'csv'], accept_multiple_files=True)
             
             if uploaded_files:
@@ -296,7 +323,6 @@ class InventoryManagementSystem:
         production_inputs = {}
         cols = st.columns(len(bom_data))
         
-        # Ensure bom_names length matches bom_data
         if len(bom_names) < len(bom_data):
             bom_names.extend([f"BOM {i+1}" for i in range(len(bom_names), len(bom_data))])
 
@@ -315,7 +341,10 @@ class InventoryManagementSystem:
                     std_inventory = self.standardize_current_inventory(df_inv)
                     self.persistence.save_data_to_session_state('persistent_inventory_data', std_inventory)
                     
+                    # --- CORE MATCHING LOGIC ---
                     master_parts_map = {}
+                    
+                    # Loop through ALL BOMs to build Master List
                     for idx, bom_list in enumerate(bom_data):
                         daily_prod = production_inputs.get(idx, 0)
                         for item in bom_list:
@@ -324,18 +353,22 @@ class InventoryManagementSystem:
                             consumption = qty_per_veh * daily_prod
                             
                             if p_no not in master_parts_map:
+                                # Create Master Record from BOM Item
                                 master_parts_map[p_no] = {
                                     'Part_No': p_no,
                                     'Description': item['Description'],
-                                    'Vendor_Name': item['Vendor_Name'],
-                                    'Vendor_Code': '',
+                                    # FETCH VENDOR FROM BOM HERE
+                                    'Vendor_Name': item.get('Vendor_Name', 'Unknown'),
                                     'unit_price': item['unit_price'],
                                     'RM_IN_DAYS': item['RM_IN_DAYS'],
                                     'AVG CONSUMPTION/DAY': 0.0
                                 }
+                            # Accumulate Consumption
                             master_parts_map[p_no]['AVG CONSUMPTION/DAY'] += consumption
                             
                     generated_master_data = list(master_parts_map.values())
+                    
+                    # Analyze: Pass Master Data (with Vendor) and Inventory (without Vendor)
                     results = self.analyzer.analyze_inventory(generated_master_data, std_inventory)
                     self.persistence.save_data_to_session_state('persistent_analysis_results', results)
                     st.success("✅ Analysis Complete!")
@@ -343,7 +376,7 @@ class InventoryManagementSystem:
                 except Exception as e:
                     st.error(f"❌ Error processing inventory: {e}")
 
-        # Fix: Load actual data instead of wrapper dict
+        # Display results
         loaded_results = self.persistence.load_data_from_session_state('persistent_analysis_results')
         if loaded_results:
             self.display_comprehensive_analysis(loaded_results)
@@ -357,9 +390,8 @@ class InventoryManagementSystem:
         st.header("📊 Executive Summary Dashboard")
         df = pd.DataFrame(analysis_results)
         
-        # Double check column existence
         if 'Current Inventory - VALUE' not in df.columns:
-            st.error("Missing column: 'Current Inventory - VALUE' in analysis results.")
+            st.error("Data integrity error: Missing Value column.")
             return
 
         col1, col2, col3, col4 = st.columns(4)
