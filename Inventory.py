@@ -7,7 +7,6 @@ from datetime import datetime
 import logging
 import io
 import re
-from typing import Any
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,13 +23,11 @@ st.set_page_config(
 # Custom CSS
 st.markdown("""
 <style>
-.graph-description { background-color: #f0f2f6; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-style: italic; border-left: 4px solid #1f77b4; }
 .metric-container { background-color: #ffffff; padding: 20px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
 .status-card { padding: 15px; border-radius: 8px; margin: 10px 0; }
 .status-excess { background-color: #ffebee; border-left: 4px solid #f44336; }
 .status-short { background-color: #fff3e0; border-left: 4px solid #ff9800; }
 .status-normal { background-color: #e8f5e8; border-left: 4px solid #4caf50; }
-.success-box { background-color: #d4edda; border: 1px solid #c3e6cb; border-radius: 5px; padding: 15px; margin: 10px 0; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -45,18 +42,8 @@ class DataPersistence:
         if key in st.session_state and isinstance(st.session_state[key], dict):
             return st.session_state[key].get('data')
         return None
-    
-    @staticmethod
-    def get_data_timestamp(key):
-        if key in st.session_state and isinstance(st.session_state[key], dict):
-            return st.session_state[key].get('timestamp')
-        return None
 
 class InventoryAnalyzer:
-    """Enhanced inventory analysis"""
-    def __init__(self):
-        self.debug = False
-
     def safe_float_convert(self, value, default=0.0):
         try:
             if isinstance(value, str):
@@ -66,7 +53,7 @@ class InventoryAnalyzer:
         except (ValueError, TypeError):
             return default
 
-    def analyze_inventory(self, pfep_data, current_inventory, tolerance=None):
+    def analyze_inventory(self, master_data, current_inventory, tolerance=None):
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)
         
@@ -74,23 +61,21 @@ class InventoryAnalyzer:
         # Create lookup dictionary for Inventory
         inventory_dict = {str(item['Part_No']).strip().upper(): item for item in current_inventory}
         
-        # We iterate through PFEP as the Master List
-        for pfep_item in pfep_data:
-            part_no = str(pfep_item.get('Part_No')).strip().upper()
+        # Iterate through the Generated Master Data (from BOMs)
+        for master_item in master_data:
+            part_no = str(master_item.get('Part_No')).strip().upper()
             
             # Get Inventory Data (or defaults if missing)
             inv_item = inventory_dict.get(part_no, {})
             current_qty = float(inv_item.get('Current_QTY', 0)) or 0.0
             
-            # Get PFEP Data
-            # NOTE: AVG CONSUMPTION and RM_IN_QTY might have been updated by BOM calculation
-            avg_per_day = self.safe_float_convert(pfep_item.get('AVG CONSUMPTION/DAY', 0))
-            rm_days = self.safe_float_convert(pfep_item.get('RM_IN_DAYS', 0))
+            # Master Data details
+            avg_per_day = self.safe_float_convert(master_item.get('AVG CONSUMPTION/DAY', 0))
+            rm_days = self.safe_float_convert(master_item.get('RM_IN_DAYS', 7)) # Default 7 days if not in BOM
+            unit_price = self.safe_float_convert(master_item.get('unit_price', 1.0)) # Default 1.0 if not in BOM
             
-            # Recalculate RM Norm in Qty based on (potentially updated) Consumption * RM Days
+            # Calculate Norms
             rm_qty = avg_per_day * rm_days
-            
-            unit_price = self.safe_float_convert(pfep_item.get('unit_price', 0)) or 1.0
             
             # Calculation
             current_value = current_qty * unit_price
@@ -111,13 +96,11 @@ class InventoryAnalyzer:
 
             results.append({
                 'PART NO': part_no,
-                'PART DESCRIPTION': pfep_item.get('Description', ''),
-                'Vendor Name': pfep_item.get('Vendor_Name', 'Unknown'),
-                'Vendor_Code': pfep_item.get('Vendor_Code', ''),
+                'PART DESCRIPTION': master_item.get('Description', ''),
+                'Vendor Name': master_item.get('Vendor_Name', 'Unknown'),
                 'AVG CONSUMPTION/DAY': avg_per_day,
                 'RM IN DAYS': rm_days,
-                'RM Norm - In Qty': revised_norm_qty, # This is the dynamically calculated norm
-                'Revised Norm Qty': revised_norm_qty,
+                'RM Norm - In Qty': revised_norm_qty, 
                 'Lower Bound Qty': lower_bound,
                 'Upper Bound Qty': upper_bound,
                 'UNIT PRICE': unit_price,
@@ -130,33 +113,6 @@ class InventoryAnalyzer:
             
         return results
 
-    def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='lakhs'):
-        filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
-        vendor_totals = {}
-        
-        for item in filtered:
-            vendor = item.get('Vendor Name', 'Unknown')
-            val = item.get('Stock Deviation Value', 0)
-            # For charts, we usually want absolute magnitude
-            if status_filter == "Short Inventory" and val < 0: val = abs(val)
-            vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + val
-            
-        if not vendor_totals: return
-
-        top_vendors = sorted(vendor_totals.items(), key=lambda x: x[1], reverse=True)[:10]
-        names = [v[0] for v in top_vendors]
-        raw_vals = [v[1] for v in top_vendors]
-        
-        factor = 100000 if value_format == 'lakhs' else 1
-        vals = [v/factor for v in raw_vals]
-
-        fig = go.Figure(go.Bar(
-            x=names, y=vals, marker_color=color,
-            text=[f"{v:.1f}" for v in vals]
-        ))
-        fig.update_layout(title=chart_title, yaxis_title=f"Value ({value_format})")
-        st.plotly_chart(fig, use_container_width=True, key=chart_key)
-
 class InventoryManagementSystem:
     def __init__(self):
         self.analyzer = InventoryAnalyzer()
@@ -165,12 +121,10 @@ class InventoryManagementSystem:
 
     def initialize_session_state(self):
         if 'user_role' not in st.session_state: st.session_state.user_role = None
-        # Persistent Data Keys
+        
         self.persistent_keys = [
-            'persistent_pfep_data', 'persistent_pfep_locked',
-            'persistent_inventory_data', 'persistent_inventory_locked',
+            'persistent_inventory_data', 
             'persistent_analysis_results',
-            # New Keys for BOM
             'persistent_bom_data', 'persistent_bom_locked', 'bom_names'
         ]
         for key in self.persistent_keys:
@@ -185,55 +139,19 @@ class InventoryManagementSystem:
         except:
             return 0.0
 
-    def standardize_pfep_data(self, df):
-        # Basic standardization logic
-        # Expects: Part No, Description, Vendor, RM Days, Unit Price
-        # AVG CONSUMPTION will be overwritten by BOM logic later
-        data = []
-        df.columns = [str(col).strip().lower() for col in df.columns]
-        
-        # Mappings
-        map_cols = {
-            'part_no': ['part_no', 'part no', 'material', 'item code'],
-            'desc': ['description', 'desc', 'part description'],
-            'rm_days': ['rm_in_days', 'rm days', 'inventory days'],
-            'price': ['unit_price', 'price', 'rate', 'unit price'],
-            'vendor': ['vendor_name', 'vendor', 'supplier']
-        }
-        
-        # Find columns
-        final_map = {}
-        for k, v_list in map_cols.items():
-            for v in v_list:
-                if v in df.columns:
-                    final_map[k] = v
-                    break
-        
-        if 'part_no' not in final_map:
-            st.error("PFEP must have a Part No column")
-            return []
-
-        for _, row in df.iterrows():
-            data.append({
-                'Part_No': str(row[final_map['part_no']]).strip(),
-                'Description': str(row.get(final_map.get('desc'), '')).strip(),
-                'RM_IN_DAYS': self.safe_float_convert(row.get(final_map.get('rm_days'), 7)),
-                'unit_price': self.safe_float_convert(row.get(final_map.get('price'), 1.0)),
-                'Vendor_Name': str(row.get(final_map.get('vendor'), 'Unknown')),
-                # Initialize calculated fields
-                'AVG CONSUMPTION/DAY': 0.0, 
-                'RM_IN_QTY': 0.0
-            })
-        return data
-
     def standardize_bom_data(self, df):
-        # BOM Needs: Part No, Part Desc, Qty/Veh
+        # We now look for extended fields in BOM since PFEP is gone
         data = []
         df.columns = [str(col).strip().lower() for col in df.columns]
         
         map_cols = {
             'part_no': ['part no', 'part_no', 'material', 'child part'],
-            'qty': ['qty/veh', 'qty', 'quantity', 'usage', 'qty per veh']
+            'desc': ['part desc', 'description', 'part description', 'material description'],
+            'qty': ['qty/veh', 'qty', 'quantity', 'usage', 'qty per veh'],
+            # Optional fields that might be in BOM now
+            'price': ['unit price', 'price', 'rate'],
+            'vendor': ['vendor', 'supplier'],
+            'rm_days': ['rm days', 'inventory days', 'norm days']
         }
         
         final_map = {}
@@ -244,13 +162,18 @@ class InventoryManagementSystem:
                     break
                     
         if 'part_no' not in final_map or 'qty' not in final_map:
-            st.error("BOM File must have 'Part No' and 'Qty/Veh' columns.")
+            st.error(f"BOM File missing required columns: Part No or Qty/Veh.")
             return None
 
         for _, row in df.iterrows():
             data.append({
                 'Part_No': str(row[final_map['part_no']]).strip(),
-                'Qty_Per_Veh': self.safe_float_convert(row[final_map['qty']])
+                'Description': str(row.get(final_map.get('desc'), '')).strip(),
+                'Qty_Per_Veh': self.safe_float_convert(row[final_map['qty']]),
+                # Optional fields with defaults
+                'unit_price': self.safe_float_convert(row.get(final_map.get('price'), 1.0)),
+                'Vendor_Name': str(row.get(final_map.get('vendor'), 'Unknown')),
+                'RM_IN_DAYS': self.safe_float_convert(row.get(final_map.get('rm_days'), 7)) # Default 7 days
             })
         return data
 
@@ -281,112 +204,79 @@ class InventoryManagementSystem:
             })
         return data
 
-    # ---------------- ADMIN: BOM & PFEP MANAGEMENT ----------------
+    # ---------------- ADMIN: ONLY BOM UPLOAD ----------------
     def admin_data_management(self):
-        st.header("🔧 Admin Dashboard - Master Data")
+        st.header("🔧 Admin Dashboard")
+        st.subheader("Upload Bill of Materials (BOM)")
+        st.info("Upload BOMs containing: Part No, Description, Qty/Veh. (Optional: Price, Vendor, RM Days)")
         
-        # Tabs for PFEP and BOM
-        tab_pfep, tab_bom = st.tabs(["📄 PFEP Master", "🔩 BOM Configuration"])
-
-        # --- PFEP SECTION ---
-        with tab_pfep:
-            st.subheader("1. Upload PFEP Master")
-            pfep_locked = st.session_state.get('persistent_pfep_locked', False)
+        bom_locked = st.session_state.get('persistent_bom_locked', False)
+        
+        if bom_locked:
+            st.success("✅ BOM Configuration is Locked.")
+            stored_boms = st.session_state.get('persistent_bom_data', [])
+            st.write(f"📁 {len(stored_boms)} BOM files loaded.")
+            if st.button("Unlock BOMs"):
+                st.session_state.persistent_bom_locked = False
+                st.session_state.persistent_bom_data = None
+                st.rerun()
+        else:
+            st.markdown("Upload **Min 1** and **Max 5** BOM files.")
+            bom_files = st.file_uploader("Select BOM Files", type=['xlsx', 'csv'], accept_multiple_files=True)
             
-            if pfep_locked:
-                st.success("✅ PFEP Data is Locked.")
-                if st.button("Unlock PFEP"):
-                    st.session_state.persistent_pfep_locked = False
-                    st.rerun()
-            else:
-                pfep_file = st.file_uploader("Upload PFEP (Excel/CSV)", type=['xlsx', 'csv'])
-                if pfep_file:
-                    df = pd.read_csv(pfep_file) if pfep_file.name.endswith('.csv') else pd.read_excel(pfep_file)
-                    std_data = self.standardize_pfep_data(df)
-                    if std_data:
-                        self.persistence.save_data_to_session_state('persistent_pfep_data', std_data)
-                        st.success(f"Loaded {len(std_data)} parts.")
-                        if st.button("Save & Lock PFEP"):
-                            st.session_state.persistent_pfep_locked = True
-                            st.rerun()
-
-        # --- BOM SECTION (NEW REQUIREMENT) ---
-        with tab_bom:
-            st.subheader("2. Upload Bill of Materials (BOM)")
-            bom_locked = st.session_state.get('persistent_bom_locked', False)
-            
-            if bom_locked:
-                st.success("✅ BOM Configuration is Locked.")
-                stored_boms = st.session_state.get('persistent_bom_data', [])
-                st.info(f"{len(stored_boms)} BOMs Configured.")
-                if st.button("Unlock BOMs"):
-                    st.session_state.persistent_bom_locked = False
-                    st.session_state.persistent_bom_data = None
-                    st.rerun()
-            else:
-                st.markdown("Upload between **1 and 5** BOM files.")
-                bom_files = st.file_uploader("Select BOM Files", type=['xlsx', 'csv'], accept_multiple_files=True)
-                
-                if bom_files:
-                    if len(bom_files) > 5:
-                        st.error("Maximum 5 BOM files allowed.")
-                    else:
-                        st.write(f"Selected {len(bom_files)} files.")
+            if bom_files:
+                if len(bom_files) > 5:
+                    st.error("Maximum 5 BOM files allowed.")
+                else:
+                    st.write(f"Selected {len(bom_files)} files.")
+                    
+                    if st.button("Process & Lock BOMs"):
+                        all_boms = []
+                        bom_names = []
                         
-                        # Process on button click
-                        if st.button("Process & Lock BOMs"):
-                            all_boms = []
-                            bom_names = []
-                            
-                            valid = True
-                            for f in bom_files:
-                                try:
-                                    df = pd.read_csv(f) if f.name.endswith('.csv') else pd.read_excel(f)
-                                    bom_data = self.standardize_bom_data(df)
-                                    if bom_data:
-                                        all_boms.append(bom_data)
-                                        bom_names.append(f.name)
-                                    else:
-                                        valid = False
-                                        break
-                                except Exception as e:
-                                    st.error(f"Error reading {f.name}: {str(e)}")
+                        valid = True
+                        for f in bom_files:
+                            try:
+                                df = pd.read_csv(f) if f.name.endswith('.csv') else pd.read_excel(f)
+                                bom_data = self.standardize_bom_data(df)
+                                if bom_data:
+                                    all_boms.append(bom_data)
+                                    bom_names.append(f.name)
+                                else:
                                     valid = False
-                            
-                            if valid and len(all_boms) > 0:
-                                self.persistence.save_data_to_session_state('persistent_bom_data', all_boms)
-                                st.session_state.bom_names = bom_names
-                                st.session_state.persistent_bom_locked = True
-                                st.success("✅ BOMs processed and locked successfully!")
-                                st.rerun()
+                                    break
+                            except Exception as e:
+                                st.error(f"Error reading {f.name}: {str(e)}")
+                                valid = False
+                        
+                        if valid and len(all_boms) > 0:
+                            self.persistence.save_data_to_session_state('persistent_bom_data', all_boms)
+                            st.session_state.bom_names = bom_names
+                            st.session_state.persistent_bom_locked = True
+                            st.success("✅ BOMs processed and locked successfully!")
+                            st.rerun()
 
     # ---------------- USER: PRODUCTION & INVENTORY ----------------
     def user_view(self):
-        st.header("🏭 User Dashboard - Production & Inventory")
+        st.header("🏭 User Dashboard")
         
-        # Check Admin Logic
-        pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
         boms_data = self.persistence.load_data_from_session_state('persistent_bom_data')
         bom_names = st.session_state.get('bom_names', [])
         
-        if not pfep_data or not boms_data:
-            st.error("⚠️ Admin has not locked PFEP or BOM data yet.")
+        if not boms_data:
+            st.error("⚠️ Admin has not uploaded and locked BOM data yet.")
             return
 
         # 1. Daily Production Input (Dynamic)
         st.subheader("1. Daily Production Plan")
-        st.markdown("Enter the planned production quantity for each BOM model.")
+        st.markdown("Enter the daily production quantity for each BOM model.")
         
         production_inputs = {}
-        
-        # Create columns based on number of BOMs
         cols = st.columns(len(boms_data))
         
+        # Display inputs dynamically based on uploaded BOMs
         for idx, (bom, name) in enumerate(zip(boms_data, bom_names)):
             with cols[idx]:
-                # Default label
-                default_label = f"BOM {idx+1}: {name}"
-                # User can rename (simulated by just text input here, or we accept the label matches the file)
                 prod_qty = st.number_input(f"Qty/Veh ({name})", min_value=0, value=0, key=f"prod_{idx}")
                 production_inputs[idx] = prod_qty
 
@@ -400,44 +290,40 @@ class InventoryManagementSystem:
             std_inventory = self.standardize_current_inventory(df_inv)
             self.persistence.save_data_to_session_state('persistent_inventory_data', std_inventory)
             
-            # B. Calculate Consumption based on BOMs + Production Input
-            # Logic: For every part in PFEP, look at all BOMs. 
-            # Total Consumption = Sum(BOM_Qty_Per_Veh * User_Daily_Prod)
+            # B. Generate Master Data from BOMs + Production Input
+            # We aggregate all BOMs into a single "Part Consumption Map"
             
-            # Create a map for aggregated consumption
-            part_consumption_map = {}
+            master_parts = {} # Key: Part_No, Value: {Details + Total Consumption}
             
             for idx, bom_list in enumerate(boms_data):
                 daily_prod = production_inputs.get(idx, 0)
-                if daily_prod > 0:
-                    for item in bom_list:
-                        p_no = item['Part_No']
-                        qty_per = item['Qty_Per_Veh']
-                        consumption = qty_per * daily_prod
-                        
-                        part_consumption_map[p_no] = part_consumption_map.get(p_no, 0) + consumption
+                
+                for item in bom_list:
+                    p_no = item['Part_No']
+                    qty_per_veh = item['Qty_Per_Veh']
+                    
+                    # Calculate daily consumption for this specific BOM
+                    consumption = qty_per_veh * daily_prod
+                    
+                    if p_no not in master_parts:
+                        # First time seeing this part, initialize it
+                        master_parts[p_no] = {
+                            'Part_No': p_no,
+                            'Description': item['Description'],
+                            'Vendor_Name': item['Vendor_Name'],
+                            'unit_price': item['unit_price'],
+                            'RM_IN_DAYS': item['RM_IN_DAYS'],
+                            'AVG CONSUMPTION/DAY': 0.0
+                        }
+                    
+                    # Add consumption (if part exists in multiple BOMs, we sum it up)
+                    master_parts[p_no]['AVG CONSUMPTION/DAY'] += consumption
             
-            # C. Update PFEP Data with calculated consumption
-            # We create a COPY of PFEP data to not corrupt the master for other sessions/re-runs
-            updated_pfep = []
-            for item in pfep_data:
-                new_item = item.copy()
-                p_no = str(item['Part_No']).strip()
-                
-                # Get calculated consumption
-                # Note: keys in map might need normalization
-                # Try exact match first
-                calc_cons = part_consumption_map.get(p_no, 0.0)
-                
-                # Update item
-                new_item['AVG CONSUMPTION/DAY'] = calc_cons
-                # Recalculate RM_IN_QTY (Norm) inside analyzer, but good to set here too
-                new_item['RM_IN_QTY'] = calc_cons * new_item.get('RM_IN_DAYS', 0)
-                
-                updated_pfep.append(new_item)
+            # Convert dict back to list for analyzer
+            generated_master_data = list(master_parts.values())
             
-            # D. Run Analysis
-            results = self.analyzer.analyze_inventory(updated_pfep, std_inventory)
+            # C. Run Analysis
+            results = self.analyzer.analyze_inventory(generated_master_data, std_inventory)
             self.persistence.save_data_to_session_state('persistent_analysis_results', results)
             st.success("Analysis Complete!")
             st.rerun()
@@ -453,7 +339,7 @@ class InventoryManagementSystem:
         
         # Summary Metrics
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Total Parts", len(df))
+        c1.metric("Total Parts (From BOMs)", len(df))
         c2.metric("Total Value", f"₹{df['Current Inventory - VALUE'].sum():,.0f}")
         c3.metric("Excess Value", f"₹{df[df['Status']=='Excess Inventory']['Stock Deviation Value'].sum():,.0f}")
         c4.metric("Shortage Value", f"₹{abs(df[df['Status']=='Short Inventory']['Stock Deviation Value'].sum()):,.0f}")
@@ -470,12 +356,21 @@ class InventoryManagementSystem:
                          color_discrete_map={'Within Norms':'#4CAF50', 'Excess Inventory':'#2196F3', 'Short Inventory':'#F44336'})
             st.plotly_chart(fig)
             
-            st.subheader("Top Shortages (Value)")
-            short = df[df['Status']=='Short Inventory'].sort_values(by='Stock Deviation Value') # Negative values
-            if not short.empty:
-                short['AbsValue'] = short['Stock Deviation Value'].abs()
-                fig_short = px.bar(short.head(10), x='PART NO', y='AbsValue', title="Top 10 Shortages")
-                st.plotly_chart(fig_short)
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("Top Excess (Value)")
+                excess = df[df['Status']=='Excess Inventory'].sort_values(by='Stock Deviation Value', ascending=False).head(10)
+                if not excess.empty:
+                    fig_excess = px.bar(excess, x='PART NO', y='Stock Deviation Value', title="Top 10 Excess Items")
+                    st.plotly_chart(fig_excess, use_container_width=True)
+            
+            with col2:
+                st.subheader("Top Shortages (Value)")
+                short = df[df['Status']=='Short Inventory'].sort_values(by='Stock Deviation Value').head(10)
+                if not short.empty:
+                    short['AbsValue'] = short['Stock Deviation Value'].abs()
+                    fig_short = px.bar(short, x='PART NO', y='AbsValue', title="Top 10 Shortage Items")
+                    st.plotly_chart(fig_short, use_container_width=True)
 
         with t3:
             csv = df.to_csv(index=False).encode('utf-8')
@@ -483,15 +378,15 @@ class InventoryManagementSystem:
 
     def run(self):
         st.title("🏭 Intelligent Inventory System")
-        st.caption("With BOM-based Dynamic Consumption Calculation")
+        st.caption("BOM-Driven Analysis | Password: 'admin'")
         
-        # Authentication / Role Switching
+        # Authentication
         with st.sidebar:
             st.header("Login")
             role = st.selectbox("Role", ["Select", "Admin", "User"])
             if role == "Admin":
                 pwd = st.text_input("Password", type="password")
-                if pwd == "admin": # Simple check
+                if pwd == "admin": 
                     st.session_state.user_role = "Admin"
                 elif pwd:
                     st.error("Wrong Password")
@@ -509,7 +404,7 @@ class InventoryManagementSystem:
             self.user_view()
             self.display_results()
         else:
-            st.info("Please select a role from the sidebar. (Admin Pwd: 'admin')")
+            st.info("Please select a role from the sidebar.")
 
 if __name__ == "__main__":
     app = InventoryManagementSystem()
