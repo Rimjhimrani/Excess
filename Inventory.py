@@ -73,6 +73,8 @@ class InventoryAnalyzer:
             
             part_desc = master_item.get('Description', '')
             unit_price = self.safe_float_convert(master_item.get('unit_price', 0))
+            
+            # Fallback logic for Unit Price
             if unit_price == 0 and current_qty > 0 and stock_value_from_file > 0:
                 unit_price = stock_value_from_file / current_qty
             elif unit_price == 0:
@@ -148,7 +150,6 @@ class InventoryManagementSystem:
         if 'user_role' not in st.session_state: st.session_state.user_role = None
         if 'admin_tolerance' not in st.session_state: st.session_state.admin_tolerance = 30
         
-        # Initialize keys safely
         keys_default_none = [
             'persistent_bom_data', 'persistent_bom_locked', 
             'persistent_inventory_data', 'persistent_inventory_locked',
@@ -157,7 +158,6 @@ class InventoryManagementSystem:
         for key in keys_default_none:
             if key not in st.session_state: st.session_state[key] = None
             
-        # Initialize keys that should be lists
         if 'bom_filenames' not in st.session_state or st.session_state.bom_filenames is None:
             st.session_state.bom_filenames = []
 
@@ -282,7 +282,6 @@ class InventoryManagementSystem:
     def user_inventory_upload(self):
         st.header("📦 Inventory Analysis")
         bom_data = self.persistence.load_data_from_session_state('persistent_bom_data')
-        # Robustly handle potential None
         bom_names = st.session_state.get('bom_filenames') or []
         is_locked = st.session_state.get('persistent_bom_locked', False)
         
@@ -297,7 +296,7 @@ class InventoryManagementSystem:
         production_inputs = {}
         cols = st.columns(len(bom_data))
         
-        # Ensure bom_names length matches bom_data to avoid zipping errors
+        # Ensure bom_names length matches bom_data
         if len(bom_names) < len(bom_data):
             bom_names.extend([f"BOM {i+1}" for i in range(len(bom_names), len(bom_data))])
 
@@ -344,14 +343,25 @@ class InventoryManagementSystem:
                 except Exception as e:
                     st.error(f"❌ Error processing inventory: {e}")
 
-        if st.session_state.get('persistent_analysis_results'):
-            self.display_comprehensive_analysis(st.session_state.persistent_analysis_results)
+        # Fix: Load actual data instead of wrapper dict
+        loaded_results = self.persistence.load_data_from_session_state('persistent_analysis_results')
+        if loaded_results:
+            self.display_comprehensive_analysis(loaded_results)
 
     def display_comprehensive_analysis(self, analysis_results):
+        if not analysis_results:
+            st.warning("No analysis results to display.")
+            return
+
         st.markdown("---")
         st.header("📊 Executive Summary Dashboard")
         df = pd.DataFrame(analysis_results)
         
+        # Double check column existence
+        if 'Current Inventory - VALUE' not in df.columns:
+            st.error("Missing column: 'Current Inventory - VALUE' in analysis results.")
+            return
+
         col1, col2, col3, col4 = st.columns(4)
         with col1: st.metric("Total Parts (In BOMs)", len(df))
         with col2: st.metric("Total Inventory Value", f"₹{df['Current Inventory - VALUE'].sum():,.0f}")
