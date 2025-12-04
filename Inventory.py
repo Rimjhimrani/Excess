@@ -182,6 +182,7 @@ class InventoryAnalyzer:
     def analyze_inventory(self, boms_data, inventory_data, production_plan, tolerance=None):
         """
         Analyze inventory using Dynamic Norms (BOM * Production Plan) vs Actual Inventory.
+        UPDATED: Only analyzes parts found in BOTH BOM and Inventory.
         """
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)
@@ -195,8 +196,11 @@ class InventoryAnalyzer:
         # Inventory file contains 'Current_QTY' and 'Current Inventory - VALUE'
         inventory_dict = {str(item['Part_No']).strip().upper(): item for item in inventory_data}
         
-        # Get all unique part numbers involved
-        all_parts = set(required_parts_dict.keys()) | set(inventory_dict.keys())
+        # ---------------------------------------------------------
+        # UPDATED LOGIC HERE: INTERSECTION ONLY
+        # Only take parts that exist in BOTH requirements AND inventory
+        # ---------------------------------------------------------
+        all_parts = set(required_parts_dict.keys()) & set(inventory_dict.keys())
 
         for part_no in all_parts:
             try:
@@ -217,9 +221,6 @@ class InventoryAnalyzer:
                 unit_price = 0.0
                 if current_qty > 0:
                     unit_price = current_value / current_qty
-                # If unit price is missing from inventory but needed for a Short part (where qty=0),
-                # we might be missing price info. In a real scenario, price should come from a Master Price List.
-                # Here we default to 0 or try to infer.
                 
                 # Bounds
                 lower_bound = rm_qty_norm * (1 - tolerance / 100)
