@@ -5,521 +5,733 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 import logging
+import pickle
+import base64
+import uuid
+import io
 import re
 from typing import Union, Any, Optional, List, Dict
-import io
+from decimal import Decimal, InvalidOperation
+from collections import Counter
+from collections import defaultdict
 
-# ... [Keep your existing Imports, Logging, and CSS setup] ...
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Set page configuration
+st.set_page_config(
+    page_title="Inventory Management System",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for better styling
+st.markdown("""
+<style>
+.graph-description {
+    background-color: #f0f2f6;
+    padding: 10px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    font-style: italic;
+    border-left: 4px solid #1f77b4;
+}
+.metric-container {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.status-card {
+    padding: 15px;
+    border-radius: 8px;
+    margin: 10px 0;
+}
+.status-excess {
+    background-color: #ffebee;
+    border-left: 4px solid #f44336;
+}
+.status-short {
+    background-color: #fff3e0;
+    border-left: 4px solid #ff9800;
+}
+.status-normal {
+    background-color: #e8f5e8;
+    border-left: 4px solid #4caf50;
+}
+.success-box {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 5px;
+    padding: 15px;
+    margin: 10px 0;
+}
+.lock-button {
+    background-color: #28a745;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    border: none;
+    font-weight: bold;
+}
+.switch-user-button {
+    background-color: #007bff;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 5px;
+    border: none;
+    font-weight: bold;
+    margin: 5px 0;
+}
+</style>
+""", unsafe_allow_html=True)
+
+class DataPersistence:
+    """Handle data persistence across sessions"""
+    
+    @staticmethod
+    def save_data_to_session_state(key, data):
+        """Save data with timestamp to session state"""
+        st.session_state[key] = {
+            'data': data,
+            'timestamp': datetime.now(),
+            'saved': True
+        }
+    
+    @staticmethod
+    def load_data_from_session_state(key):
+        """Load data from session state if it exists"""
+        if key in st.session_state and isinstance(st.session_state[key], dict):
+            return st.session_state[key].get('data')
+        return None
+    
+    @staticmethod
+    def is_data_saved(key):
+        """Check if data is saved"""
+        if key in st.session_state and isinstance(st.session_state[key], dict):
+            return st.session_state[key].get('saved', False)
+        return False
+    
+    @staticmethod
+    def get_data_timestamp(key):
+        """Get data timestamp"""
+        if key in st.session_state and isinstance(st.session_state[key], dict):
+            return st.session_state[key].get('timestamp')
+        return None
 
 class InventoryAnalyzer:
-    """Enhanced inventory analysis with BOM-based logic"""
+    """Enhanced inventory analysis with BOM and Daily Production logic"""
     
     def __init__(self):
         self.debug = False
-        self.persistence = None # Will be set by main app
         self.status_colors = {
-            'Within Norms': '#4CAF50',
-            'Excess Inventory': '#2196F3',
-            'Short Inventory': '#F44336'
+            'Within Norms': '#4CAF50',    # Green
+            'Excess Inventory': '#2196F3', # Blue
+            'Short Inventory': '#F44336'   # Red
         }
 
     def safe_float_convert(self, value, default=0.0):
         try:
-            return float(value)
+            if value is None: return default
+            if isinstance(value, (int, float)): return float(value)
+            # Clean string
+            clean = str(value).strip().replace(',', '').replace('₹', '').replace('$', '').replace('%', '')
+            if not clean: return default
+            return float(clean)
         except (ValueError, TypeError):
             return default
 
     def calculate_dynamic_norms(self, boms_data, production_plan):
         """
         Calculate total required quantity for every part based on BOMs and Production Plan.
-        Returns a dictionary keyed by Part_No containing the summed requirement.
+        Formula: Sum(Qty_Per_Vehicle_in_BOM * Daily_Production_for_BOM)
         """
         master_requirements = {}
 
         # Iterate through every uploaded BOM
-        for bom_name, bom_df in boms_data.items():
+        for bom_name, bom_rows in boms_data.items():
             # Get the user-inputted production count for this BOM
             production_count = production_plan.get(bom_name, 0)
             
             if production_count > 0:
-                for item in bom_df:
+                for item in bom_rows:
                     part_no = str(item['Part_No']).strip().upper()
-                    qty_per_veh = self.safe_float_convert(item['Qty_Veh'])
+                    qty_per_veh = self.safe_float_convert(item.get('Qty_Veh', 0))
                     
-                    # Calculate required quantity for this BOM
+                    # Calculate required quantity for this BOM based on daily plan
                     total_req_for_bom = qty_per_veh * production_count
                     
                     if part_no in master_requirements:
                         master_requirements[part_no]['RM_IN_QTY'] += total_req_for_bom
-                        # Append Aggregate name for reference
+                        # Track which vehicle aggregates use this part
                         if bom_name not in master_requirements[part_no]['Aggregates']:
                             master_requirements[part_no]['Aggregates'].append(bom_name)
                     else:
                         master_requirements[part_no] = {
                             'Part_No': part_no,
                             'Description': item.get('Description', ''),
-                            'RM_IN_QTY': total_req_for_bom,
+                            'RM_IN_QTY': total_req_for_bom, # This is the Norm
                             'Aggregates': [bom_name],
-                            'Vendor_Name': item.get('Vendor_Name', 'Unknown'), # Optional if in BOM
                             'Vendor_Code': item.get('Vendor_Code', ''),
+                            'Vendor_Name': item.get('Vendor_Name', 'Unknown')
                         }
         return master_requirements
 
     def analyze_inventory(self, boms_data, inventory_data, production_plan, tolerance=None):
         """
-        Analyze inventory against BOM-based requirements.
+        Analyze inventory using Dynamic Norms (BOM * Production Plan) vs Actual Inventory.
         """
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)
 
-        # 1. Calculate Dynamic Norms (The "Required" List)
+        # 1. Calculate Dynamic Norms (The Requirement)
         required_parts_dict = self.calculate_dynamic_norms(boms_data, production_plan)
         
         results = []
         
-        # 2. Normalize Inventory Data
-        # We assume Inventory Data contains the Unit Price info (derived from Value/Qty)
+        # 2. Normalize Inventory Data Dictionary
+        # Inventory file contains 'Current_QTY' and 'Current Inventory - VALUE'
         inventory_dict = {str(item['Part_No']).strip().upper(): item for item in inventory_data}
         
-        # Get all unique part numbers from both lists
+        # Get all unique part numbers involved
         all_parts = set(required_parts_dict.keys()) | set(inventory_dict.keys())
 
         for part_no in all_parts:
             try:
-                # Get Data from Sources
+                # Get Data
                 req_data = required_parts_dict.get(part_no, {})
                 inv_data = inventory_dict.get(part_no, {})
                 
-                # Basic Details
+                # Basic info
                 part_desc = inv_data.get('Description') or req_data.get('Description') or "Unknown"
+                vendor_name = inv_data.get('Vendor_Name') or req_data.get('Vendor_Name') or "Unknown"
                 
                 # Quantities
-                rm_qty = float(req_data.get('RM_IN_QTY', 0)) # This is our Target/Norm
+                rm_qty_norm = float(req_data.get('RM_IN_QTY', 0)) # Calculated Norm
                 current_qty = float(inv_data.get('Current_QTY', 0))
                 
-                # Financials (Derive Unit Price from Inventory if possible)
+                # Financials: Derive Unit Price from Inventory Data if possible
                 current_value = float(inv_data.get('Current Inventory - VALUE', 0))
                 unit_price = 0.0
                 if current_qty > 0:
                     unit_price = current_value / current_qty
+                # If unit price is missing from inventory but needed for a Short part (where qty=0),
+                # we might be missing price info. In a real scenario, price should come from a Master Price List.
+                # Here we default to 0 or try to infer.
                 
-                # Norms with tolerance
-                lower_bound = rm_qty * (1 - tolerance / 100)
-                upper_bound = rm_qty * (1 + tolerance / 100)
-                
-                # Deviation
-                # Logic: If Short, how much needed to reach Norm? If Excess, how much over Norm?
+                # Bounds
+                lower_bound = rm_qty_norm * (1 - tolerance / 100)
+                upper_bound = rm_qty_norm * (1 + tolerance / 100)
+
+                # Deviation Analysis
                 deviation_qty = 0
+                deviation_value = 0
                 status = 'Within Norms'
-                
+
                 if current_qty < lower_bound:
                     status = 'Short Inventory'
-                    deviation_qty = lower_bound - current_qty # Quantity needed
-                    deviation_value = deviation_qty * unit_price * -1 # Negative value for shortage
+                    # Shortage quantity relative to the Norm (or Lower Bound depending on policy)
+                    # Usually: Shortage = Norm - Current
+                    deviation_qty = lower_bound - current_qty 
+                    deviation_value = deviation_qty * unit_price * -1 # Negative to indicate shortage cost impact
                 elif current_qty > upper_bound:
                     status = 'Excess Inventory'
-                    deviation_qty = current_qty - upper_bound # Quantity excess
+                    deviation_qty = current_qty - upper_bound
                     deviation_value = deviation_qty * unit_price
-                else:
-                    deviation_value = 0
-
-                # Construct Result
+                
+                # Create Result Record
                 result = {
                     'PART NO': part_no,
                     'PART DESCRIPTION': part_desc,
-                    'Vendor Name': inv_data.get('Vendor_Code', 'Unknown'), # Use Inventory Vendor info
+                    'Vendor Name': vendor_name,
+                    'Vendor_Code': inv_data.get('Vendor_Code', ''),
                     'Used In Aggregates': ", ".join(req_data.get('Aggregates', [])),
-                    'RM Norm - In Qty': rm_qty,
-                    'Revised Norm Qty': upper_bound, # Visualization helper
+                    
+                    'RM Norm - In Qty': rm_qty_norm,
                     'Lower Bound Qty': lower_bound,
                     'Upper Bound Qty': upper_bound,
+                    
                     'UNIT PRICE': unit_price,
                     'Current Inventory - Qty': current_qty,
                     'Current Inventory - VALUE': current_value,
-                    'Stock Deviation Value': deviation_value,
-                    'VALUE(Unit Price* Short/Excess Inventory)': deviation_value,
+                    
+                    'Stock Deviation Qty': deviation_qty,
+                    'Stock Deviation Value': deviation_value, # For charts
+                    'VALUE(Unit Price* Short/Excess Inventory)': deviation_value, # For consistency
+                    
                     'Status': status,
                     'INVENTORY REMARK STATUS': status
                 }
                 results.append(result)
             except Exception as e:
-                # logging.error(f"Error analyzing {part_no}: {e}")
+                # logger.error(f"Error analyzing part {part_no}: {e}")
                 continue
                 
         return results
 
-    # ... [Keep get_vendor_summary and show_vendor_chart_by_status as they were] ...
     def get_vendor_summary(self, processed_data):
-        # (Same as before, ensure it handles missing Vendor Names gracefully)
-        return super().get_vendor_summary(processed_data) if hasattr(super(), 'get_vendor_summary') else self._local_vendor_summary(processed_data)
-
-    def _local_vendor_summary(self, processed_data):
-        # Internal backup if inheritance is tricky in copy-paste
-        from collections import defaultdict
-        summary = defaultdict(lambda: {'total_parts':0, 'short_parts':0, 'excess_parts':0, 'normal_parts':0, 'total_value':0.0})
+        """Summarize inventory by vendor"""
+        summary = defaultdict(lambda: {
+            'total_parts': 0,
+            'short_parts': 0,
+            'excess_parts': 0,
+            'normal_parts': 0,
+            'total_value': 0.0
+        })
         for item in processed_data:
             vendor = item.get('Vendor Name', 'Unknown')
             status = item.get('Status', 'Unknown')
             val = item.get('Current Inventory - VALUE', 0)
+            
             summary[vendor]['total_parts'] += 1
             summary[vendor]['total_value'] += val
-            if status == "Short Inventory": summary[vendor]['short_parts'] += 1
-            elif status == "Excess Inventory": summary[vendor]['excess_parts'] += 1
-            elif status == "Within Norms": summary[vendor]['normal_parts'] += 1
+            
+            if status == "Short Inventory":
+                summary[vendor]['short_parts'] += 1
+            elif status == "Excess Inventory":
+                summary[vendor]['excess_parts'] += 1
+            else:
+                summary[vendor]['normal_parts'] += 1
         return summary
-    
+        
     def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='lakhs'):
-        # (Paste the exact previous implementation of this method here)
-        # Using the logic from previous response
+        """Show top 10 vendors by deviation value"""
+        # Filter by status
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
-        if not filtered: return
         
         vendor_totals = {}
         for item in filtered:
             vendor = item.get('Vendor Name', 'Unknown')
-            val = abs(item.get('Stock Deviation Value', 0)) # Use deviation value
+            # Use absolute deviation value (Excess amount or Shortage amount)
+            val = abs(item.get('Stock Deviation Value', 0))
             vendor_totals[vendor] = vendor_totals.get(vendor, 0) + val
             
-        # Top 10
-        top_vendors = sorted(vendor_totals.items(), key=lambda x: x[1], reverse=True)[:10]
-        if not top_vendors: return
-        
-        vendors, values = zip(*top_vendors)
+        if not vendor_totals:
+            st.info(f"No vendors found for {status_filter}.")
+            return
+
+        # Sort top 10
+        sorted_vendors = sorted(vendor_totals.items(), key=lambda x: x[1], reverse=True)[:10]
+        vendors = [x[0] for x in sorted_vendors]
+        values = [x[1] for x in sorted_vendors]
         
         # Formatting
-        display_values = [v/100000 for v in values] if value_format == 'lakhs' else values
-        
+        if value_format == 'lakhs':
+            plot_values = [v/100000 for v in values]
+            y_title = "Value (₹ Lakhs)"
+            text_fmt = [f"{v:.2f}L" for v in plot_values]
+        else:
+            plot_values = values
+            y_title = "Value (₹)"
+            text_fmt = [f"{v:,.0f}" for v in plot_values]
+
         fig = go.Figure(go.Bar(
-            x=vendors, y=display_values, marker_color=color,
-            text=[f"{v:.1f}L" for v in display_values], textposition='auto'
+            x=vendors,
+            y=plot_values,
+            marker_color=color,
+            text=text_fmt,
+            textposition='auto'
         ))
-        fig.update_layout(title=chart_title, yaxis_title="Value (Lakhs)")
+        
+        fig.update_layout(
+            title=chart_title,
+            xaxis_title="Vendor",
+            yaxis_title=y_title
+        )
         st.plotly_chart(fig, use_container_width=True, key=chart_key)
 
 
 class InventoryManagementSystem:
-    # ... [Keep __init__, initialize_session_state, safe_helpers] ...
+    """Main Application Controller"""
     
     def __init__(self):
         self.debug = True
         self.analyzer = InventoryAnalyzer()
         self.persistence = DataPersistence()
         self.initialize_session_state()
-        self.status_colors = {
-            'Within Norms': '#4CAF50',
-            'Excess Inventory': '#2196F3',
-            'Short Inventory': '#F44336'
-        }
-
-    def initialize_session_state(self):
-        if 'user_role' not in st.session_state: st.session_state.user_role = None
-        if 'user_preferences' not in st.session_state:
-            st.session_state.user_preferences = {'default_tolerance': 30, 'chart_theme': 'plotly'}
         
-        # UPDATED KEYS FOR BOM
+    def initialize_session_state(self):
+        """Initialize session state variables"""
+        if 'user_role' not in st.session_state:
+            st.session_state.user_role = None
+        
+        if 'user_preferences' not in st.session_state:
+            st.session_state.user_preferences = {
+                'default_tolerance': 30,
+                'chart_theme': 'plotly'
+            }
+        
+        # Persistent Data Keys for BOM System
         self.persistent_keys = [
-            'persistent_boms_data', # Dict of BOMs
+            'persistent_boms_data',    # Stores multiple BOMs: {'ModelA': [rows], 'ModelB': [rows]}
             'persistent_boms_locked',
             'persistent_inventory_data', 
             'persistent_inventory_locked',
             'persistent_analysis_results',
-            'production_plan' # User input
+            'production_plan'          # Stores user input for daily production
         ]
+        
         for key in self.persistent_keys:
-            if key not in st.session_state: st.session_state[key] = None
+            if key not in st.session_state:
+                st.session_state[key] = None
 
-    # ... [Keep authenticate_user] ...
+    def safe_float_convert(self, value):
+        return self.analyzer.safe_float_convert(value)
+
+    def authenticate_user(self):
+        """Authentication and Role Switching"""
+        st.sidebar.markdown("### 🔐 Authentication")
+        
+        if st.session_state.user_role is None:
+            role = st.sidebar.selectbox("Select Role", ["Select Role", "Admin", "User"])
+            
+            if role == "Admin":
+                st.markdown("**Admin Login**")
+                password = st.sidebar.text_input("Password", type="password")
+                if st.sidebar.button("Login"):
+                    if password == "Agilomatrix@123": # Change as needed
+                        st.session_state.user_role = "Admin"
+                        st.rerun()
+                    else:
+                        st.sidebar.error("Invalid Password")
+            
+            elif role == "User":
+                if st.sidebar.button("Enter as User"):
+                    st.session_state.user_role = "User"
+                    st.rerun()
+        else:
+            st.sidebar.success(f"Logged in as: **{st.session_state.user_role}**")
+            
+            self.display_data_status()
+            
+            if st.session_state.user_role == "Admin":
+                if st.sidebar.button("Switch to User View"):
+                    st.session_state.user_role = "User"
+                    st.rerun()
+            
+            if st.sidebar.button("Logout"):
+                st.session_state.clear()
+                st.rerun()
 
     def display_data_status(self):
-        """Display current data loading status in sidebar (Updated for BOMs)"""
+        """Display status of loaded data"""
         st.sidebar.markdown("---")
-        st.sidebar.markdown("### 📊 Data Status")
         
-        # Check persistent BOM data
-        boms_data = self.persistence.load_data_from_session_state('persistent_boms_data')
-        boms_locked = st.session_state.get('persistent_boms_locked', False)
+        # BOM Status
+        boms = self.persistence.load_data_from_session_state('persistent_boms_data')
+        bom_locked = st.session_state.get('persistent_boms_locked', False)
         
-        if boms_data:
-            bom_count = len(boms_data)
-            lock_icon = "🔒" if boms_locked else "🔓"
-            st.sidebar.success(f"✅ BOM Data: {bom_count} Aggregates {lock_icon}")
+        if boms:
+            st.sidebar.success(f"✅ BOMs: {len(boms)} Aggregates Loaded {'🔒' if bom_locked else '🔓'}")
         else:
-            st.sidebar.error("❌ BOM Data: Not loaded")
-        
-        # Check persistent inventory data
-        inventory_data = self.persistence.load_data_from_session_state('persistent_inventory_data')
-        if inventory_data:
-            st.sidebar.success(f"✅ Inventory: {len(inventory_data)} parts")
+            st.sidebar.error("❌ BOMs: Not Loaded")
+            
+        # Inventory Status
+        inv = self.persistence.load_data_from_session_state('persistent_inventory_data')
+        if inv:
+            st.sidebar.success(f"✅ Inventory: {len(inv)} Parts Loaded")
         else:
-            st.sidebar.error("❌ Inventory: Not loaded")
+            st.sidebar.error("❌ Inventory: Not Loaded")
 
     def standardize_bom_data(self, df, aggregate_name):
-        """Standardize BOM columns (Part No, Desc, Qty/Veh)"""
+        """Standardize uploaded BOM files"""
         if df is None or df.empty: return []
         
-        # Clean column names
+        # Lowercase columns for matching
         df.columns = [str(col).strip().lower() for col in df.columns]
         
-        # Mappings
+        # Column Mappings
         col_map = {
-            'part_no': ['part no', 'part_no', 'part number', 'material', 'item code'],
-            'description': ['part description', 'description', 'desc', 'material description'],
-            'qty_veh': ['qty/veh', 'qty per veh', 'quantity', 'qty', 'usage'],
-            # Optional
-            'vendor_code': ['vendor code', 'vendor'],
-            'vendor_name': ['vendor name']
+            'part_no': ['part no', 'part_no', 'part number', 'item code', 'material'],
+            'description': ['description', 'part description', 'material description', 'desc'],
+            'qty_veh': ['qty/veh', 'qty per veh', 'qty', 'quantity', 'usage', 'qty_veh'],
+            'vendor_code': ['vendor code', 'vendor_code'],
+            'vendor_name': ['vendor name', 'vendor_name']
         }
         
-        found_map = {}
-        for target, alts in col_map.items():
-            for alt in alts:
-                if alt in df.columns:
-                    found_map[target] = alt
+        # Find columns
+        found = {}
+        for target, aliases in col_map.items():
+            for alias in aliases:
+                if alias in df.columns:
+                    found[target] = alias
                     break
         
-        if 'part_no' not in found_map or 'qty_veh' not in found_map:
-            st.error(f"❌ BOM '{aggregate_name}' missing required columns (Part No, Qty/Veh).")
+        if 'part_no' not in found or 'qty_veh' not in found:
+            st.error(f"❌ File for '{aggregate_name}' is missing required columns: 'Part No' or 'Qty/Veh'.")
+            return []
+            
+        std_data = []
+        for _, row in df.iterrows():
+            try:
+                p_no = str(row[found['part_no']]).strip()
+                if not p_no or p_no.lower() == 'nan': continue
+                
+                item = {
+                    'Part_No': p_no,
+                    'Description': str(row.get(found.get('description'), '')).strip(),
+                    'Qty_Veh': self.safe_float_convert(row[found['qty_veh']]),
+                    'Vendor_Code': str(row.get(found.get('vendor_code'), '')).strip(),
+                    'Vendor_Name': str(row.get(found.get('vendor_name'), '')).strip(),
+                    'Aggregate': aggregate_name
+                }
+                std_data.append(item)
+            except Exception:
+                continue
+        return std_data
+
+    def standardize_current_inventory(self, df):
+        """Standardize User Inventory File"""
+        if df is None or df.empty: return []
+        
+        df.columns = [str(col).strip().lower() for col in df.columns]
+        
+        col_map = {
+            'part_no': ['part no', 'part_no', 'material', 'item code'],
+            'current_qty': ['current stock', 'stock', 'qty', 'current_qty', 'quantity', 'unrestricted'],
+            'value': ['value', 'amount', 'total value', 'stock value', 'current inventory - value'],
+            'desc': ['description', 'material description'],
+            'vendor': ['vendor', 'vendor name']
+        }
+        
+        found = {}
+        for target, aliases in col_map.items():
+            for alias in aliases:
+                if alias in df.columns:
+                    found[target] = alias
+                    break
+        
+        if 'part_no' not in found or 'current_qty' not in found:
+            st.error("❌ Inventory file missing 'Part No' or 'Qty' columns.")
             return []
 
         std_data = []
         for _, row in df.iterrows():
             try:
-                p_no = str(row[found_map['part_no']]).strip()
+                p_no = str(row[found['part_no']]).strip()
                 if not p_no or p_no.lower() == 'nan': continue
+                
+                val = 0.0
+                if 'value' in found:
+                    val = self.safe_float_convert(row[found['value']])
                 
                 item = {
                     'Part_No': p_no,
-                    'Description': str(row.get(found_map.get('description'), '')).strip(),
-                    'Qty_Veh': self.safe_float_convert(row[found_map['qty_veh']]),
-                    'Aggregate': aggregate_name,
-                    'Vendor_Code': str(row.get(found_map.get('vendor_code'), '')).strip(),
-                    'Vendor_Name': str(row.get(found_map.get('vendor_name'), '')).strip(),
+                    'Current_QTY': self.safe_float_convert(row[found['current_qty']]),
+                    'Current Inventory - VALUE': val,
+                    'Description': str(row.get(found.get('desc'), '')).strip(),
+                    'Vendor_Name': str(row.get(found.get('vendor'), '')).strip()
                 }
                 std_data.append(item)
-            except Exception: continue
-            
+            except Exception:
+                continue
         return std_data
 
     def admin_data_management(self):
-        """Admin Interface for BOM Uploads"""
+        """Admin Interface"""
         st.header("🔧 Admin Dashboard - BOM Management")
         
-        # Tolerance Setting
+        # Tolerance
         if "admin_tolerance" not in st.session_state: st.session_state.admin_tolerance = 30
         st.session_state.admin_tolerance = st.selectbox(
-            "Analysis Tolerance (+/- %)", [0, 10, 20, 30, 40, 50], 
+            "Set Analysis Tolerance (+/- %)", 
+            [0, 10, 20, 30, 40, 50],
             index=[0,10,20,30,40,50].index(st.session_state.admin_tolerance)
         )
         st.markdown("---")
 
-        # Check Lock
-        boms_locked = st.session_state.get('persistent_boms_locked', False)
-        if boms_locked:
-            st.warning("🔒 BOM Data is locked for Users.")
-            if st.button("🔓 Unlock to Edit"):
+        # BOM Management
+        locked = st.session_state.get('persistent_boms_locked', False)
+        if locked:
+            st.warning("🔒 BOM Data is Locked for Users.")
+            if st.button("🔓 Unlock Data"):
                 st.session_state.persistent_boms_locked = False
                 st.rerun()
-            return
-
-        st.subheader("📁 Upload Bill of Materials (BOM)")
-        st.info("Upload 1 to 5 BOM files. Each file represents an Aggregate/Product.")
-
-        uploaded_files = st.file_uploader(
-            "Choose BOM Excel files", type=['xlsx', 'xls', 'csv'], 
-            accept_multiple_files=True
-        )
-
-        if uploaded_files:
-            if len(uploaded_files) > 5:
-                st.error("❌ Maximum 5 files allowed.")
-            else:
-                st.write(f"📂 {len(uploaded_files)} files selected.")
-                
-                if st.button("Process & Save BOMs"):
-                    processed_boms = {}
-                    valid_upload = True
-                    
-                    for u_file in uploaded_files:
-                        # Extract Aggregate Name from Filename (remove extension)
-                        agg_name = u_file.name.rsplit('.', 1)[0]
-                        try:
-                            df = pd.read_csv(u_file) if u_file.name.endswith('.csv') else pd.read_excel(u_file)
-                            std_data = self.standardize_bom_data(df, agg_name)
-                            if std_data:
-                                processed_boms[agg_name] = std_data
-                            else:
-                                valid_upload = False
-                        except Exception as e:
-                            st.error(f"Error reading {u_file.name}: {e}")
-                            valid_upload = False
-                    
-                    if valid_upload and processed_boms:
-                        self.persistence.save_data_to_session_state('persistent_boms_data', processed_boms)
-                        st.success(f"✅ Successfully saved {len(processed_boms)} BOMs!")
+        else:
+            st.subheader("1. Upload BOM Files")
+            st.info("Upload separate Excel/CSV files for each Vehicle/Aggregate (Max 5).")
+            
+            uploaded_files = st.file_uploader(
+                "Upload BOMs", 
+                type=['xlsx', 'xls', 'csv'], 
+                accept_multiple_files=True
+            )
+            
+            if uploaded_files:
+                if len(uploaded_files) > 5:
+                    st.error("Max 5 files allowed.")
+                else:
+                    if st.button("Process & Save BOMs"):
+                        processed_boms = {}
+                        valid = True
+                        for f in uploaded_files:
+                            agg_name = f.name.rsplit('.', 1)[0]
+                            try:
+                                df = pd.read_csv(f) if f.name.endswith('.csv') else pd.read_excel(f)
+                                data = self.standardize_bom_data(df, agg_name)
+                                if data:
+                                    processed_boms[agg_name] = data
+                                else:
+                                    valid = False
+                            except Exception as e:
+                                st.error(f"Error reading {f.name}: {e}")
+                                valid = False
                         
-                        # Preview
-                        for name, data in processed_boms.items():
-                            with st.expander(f"📄 BOM: {name} ({len(data)} parts)"):
-                                st.dataframe(pd.DataFrame(data).head())
-                                
-                        if st.button("🔒 Lock Data for Users"):
-                            st.session_state.persistent_boms_locked = True
+                        if valid and processed_boms:
+                            self.persistence.save_data_to_session_state('persistent_boms_data', processed_boms)
+                            st.success(f"✅ Saved {len(processed_boms)} Aggregates!")
                             st.rerun()
-                    else:
-                        st.error("Failed to process some files. Check column headers.")
-
-        # Show current status if no file uploaded
-        current_boms = self.persistence.load_data_from_session_state('persistent_boms_data')
-        if current_boms and not uploaded_files:
-            st.success(f"Currently Loaded: {', '.join(current_boms.keys())}")
-            if st.button("🔒 Lock Existing Data"):
-                st.session_state.persistent_boms_locked = True
-                st.rerun()
+            
+            # Show existing data
+            current_boms = self.persistence.load_data_from_session_state('persistent_boms_data')
+            if current_boms:
+                st.write(f"**Loaded Aggregates:** {', '.join(current_boms.keys())}")
+                if st.button("🔒 Lock Data & Publish to Users"):
+                    st.session_state.persistent_boms_locked = True
+                    st.rerun()
 
     def user_inventory_upload(self):
-        """User Interface: Daily Production Input + Inventory Upload"""
-        st.header("📦 Inventory Analysis System")
+        """User Interface"""
+        st.header("📦 Inventory Analysis Dashboard")
         
-        # 1. Check Admin Data
+        # Check Admin Data
         boms_data = self.persistence.load_data_from_session_state('persistent_boms_data')
         boms_locked = st.session_state.get('persistent_boms_locked', False)
         
         if not boms_data or not boms_locked:
-            st.error("❌ Admin has not locked BOM data yet.")
+            st.error("⚠️ Admin has not locked/published BOM data yet.")
             return
 
-        # 2. Daily Production Input (The Core Logic Change)
-        st.subheader("🏭 Daily Production Plan")
-        st.info("Enter the planned production quantity for each Aggregate.")
+        # 1. Production Plan Input
+        st.subheader("1. 🏭 Daily Production Plan")
+        st.info("Enter the planned production quantity for each aggregate today.")
         
-        col_container = st.container()
-        cols = col_container.columns(len(boms_data))
-        
+        cols = st.columns(len(boms_data))
         production_plan = {}
         
-        # Initialize session state for plan if needed
         if 'current_plan' not in st.session_state: st.session_state.current_plan = {}
-
+        
         for idx, (bom_name, _) in enumerate(boms_data.items()):
-            with cols[idx % len(cols)]:
-                # Use session state to remember inputs
+            with cols[idx % 3]:
                 val = st.number_input(
                     f"{bom_name}", 
                     min_value=0, 
                     value=st.session_state.current_plan.get(bom_name, 0),
-                    key=f"prod_input_{idx}"
+                    key=f"prod_{idx}"
                 )
                 production_plan[bom_name] = val
                 st.session_state.current_plan[bom_name] = val
-
-        # 3. Inventory Upload (Standard)
-        st.subheader("📊 Upload Current Inventory")
         
-        # Check if inventory is already loaded
-        inv_data = self.persistence.load_data_from_session_state('persistent_inventory_data')
+        # 2. Inventory Upload
+        st.subheader("2. 📊 Upload Current Inventory")
         inv_locked = st.session_state.get('persistent_inventory_locked', False)
         
-        if inv_locked and inv_data:
-            st.info("Inventory Loaded. Proceeding to Analysis...")
-            # Pass everything to analysis
-            self.display_analysis_interface(boms_data, inv_data, production_plan)
-            
+        if inv_locked:
+            st.success("✅ Inventory Loaded.")
             if st.button("🔄 Reset Inventory"):
                 st.session_state.persistent_inventory_locked = False
+                st.session_state.persistent_inventory_data = None
                 st.rerun()
-            return
-
-        uploaded_file = st.file_uploader("Choose Inventory File", type=['xlsx', 'xls', 'csv'])
-        if uploaded_file:
-            df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
-            std_inv = self.standardize_current_inventory(df) # (Use your existing method)
             
-            if std_inv:
-                st.success(f"✅ Loaded {len(std_inv)} inventory records.")
-                if st.button("💾 Save & Analyze"):
-                    self.persistence.save_data_to_session_state('persistent_inventory_data', std_inv)
-                    st.session_state.persistent_inventory_locked = True
-                    st.rerun()
+            # Proceed to Analysis
+            self.run_analysis(boms_data, production_plan)
+        else:
+            inv_file = st.file_uploader("Upload Inventory File", type=['xlsx', 'csv'])
+            if inv_file:
+                df = pd.read_csv(inv_file) if inv_file.name.endswith('.csv') else pd.read_excel(inv_file)
+                std_inv = self.standardize_current_inventory(df)
+                
+                if std_inv:
+                    st.success(f"Read {len(std_inv)} rows.")
+                    if st.button("💾 Save & Analyze"):
+                        self.persistence.save_data_to_session_state('persistent_inventory_data', std_inv)
+                        st.session_state.persistent_inventory_locked = True
+                        st.rerun()
 
-    def display_analysis_interface(self, boms_data=None, inventory_data=None, production_plan=None):
-        """Orchestrates the analysis display"""
+    def run_analysis(self, boms_data, production_plan):
+        """Execute Analysis and Display Results"""
+        inv_data = self.persistence.load_data_from_session_state('persistent_inventory_data')
         
-        # Reload if arguments missing (dashboard refresh)
-        if not boms_data:
-            boms_data = self.persistence.load_data_from_session_state('persistent_boms_data')
-            inventory_data = self.persistence.load_data_from_session_state('persistent_inventory_data')
-            production_plan = st.session_state.get('current_plan', {})
-
-        if not boms_data or not inventory_data: return
-
+        total_prod = sum(production_plan.values())
+        if total_prod == 0:
+            st.warning("⚠️ Please enter Production Plan quantities (Step 1) to see analysis.")
+            return
+            
         st.markdown("---")
         st.subheader("📈 Analysis Results")
         
-        # Check if plan has values
-        total_prod = sum(production_plan.values())
-        if total_prod == 0:
-            st.warning("⚠️ Please enter Production Plan quantities above to see requirements.")
-            return
-
         tolerance = st.session_state.get('admin_tolerance', 30)
-        st.info(f"Analysis Parameters: Tolerance ±{tolerance}% | Total Production: {total_prod} Units")
-
-        # Run Analysis
-        with st.spinner("Calculating Material Requirements & Variances..."):
-            results = self.analyzer.analyze_inventory(
-                boms_data, 
-                inventory_data, 
-                production_plan, 
-                tolerance
-            )
+        
+        # Run Logic
+        results = self.analyzer.analyze_inventory(boms_data, inv_data, production_plan, tolerance)
         
         if results:
-            self.persistence.save_data_to_session_state('persistent_analysis_results', results)
-            # Call your existing display methods
-            self.display_analysis_results() # This calls your existing display logic
+            self.display_dashboard(results)
         else:
-            st.error("No results generated. Check part number matching between BOM and Inventory.")
+            st.error("No results found. Check matching Part Numbers between BOM and Inventory.")
 
-    # ... [Keep all other existing display methods: display_analysis_results, standardize_current_inventory, etc.] ...
-    # ... [Keep safe_float_convert, safe_print, etc.] ...
+    def display_dashboard(self, results):
+        """Visualization Dashboard"""
+        df = pd.DataFrame(results)
+        
+        # Metrics
+        st.markdown("#### Key Metrics")
+        c1, c2, c3, c4 = st.columns(4)
+        total_parts = len(df)
+        excess_count = len(df[df['Status'] == 'Excess Inventory'])
+        short_count = len(df[df['Status'] == 'Short Inventory'])
+        total_excess_val = df[df['Status'] == 'Excess Inventory']['Stock Deviation Value'].sum()
+        total_short_val = abs(df[df['Status'] == 'Short Inventory']['Stock Deviation Value'].sum())
+        
+        c1.metric("Total Parts", total_parts)
+        c2.metric("Excess Parts", excess_count)
+        c3.metric("Excess Value", f"₹{total_excess_val:,.0f}")
+        c4.metric("Shortage Value", f"₹{total_short_val:,.0f}")
+        
+        st.markdown("---")
+        
+        # Tabs for tables
+        t1, t2, t3 = st.tabs(["🔴 Shortages", "🔵 Excess", "📋 Full Details"])
+        
+        with t1:
+            short_df = df[df['Status'] == 'Short Inventory'].sort_values('Stock Deviation Value', ascending=True)
+            st.dataframe(short_df[[
+                'PART NO', 'PART DESCRIPTION', 'Vendor Name', 'Current Inventory - Qty', 
+                'Lower Bound Qty', 'Stock Deviation Value'
+            ]], use_container_width=True)
+            
+            # Chart
+            self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors by Shortage Value", "short_v", "#F44336")
+            
+        with t2:
+            excess_df = df[df['Status'] == 'Excess Inventory'].sort_values('Stock Deviation Value', ascending=False)
+            st.dataframe(excess_df[[
+                'PART NO', 'PART DESCRIPTION', 'Vendor Name', 'Current Inventory - Qty', 
+                'Upper Bound Qty', 'Stock Deviation Value'
+            ]], use_container_width=True)
+            
+            # Chart
+            self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors by Excess Value", "excess_v", "#2196F3")
+            
+        with t3:
+            st.dataframe(df, use_container_width=True)
+            
+            # Download
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button("📥 Download Full Analysis CSV", csv, "inventory_analysis.csv", "text/csv")
 
-    # Ensure standardize_current_inventory is available (from your previous code)
-    def standardize_current_inventory(self, df):
-        # (Paste your existing standardize_current_inventory method here)
-        # This is critical because we need 'Current Inventory - VALUE' to calculate Unit Price
-        if df is None or df.empty: return []
+    def run(self):
+        st.title("🏭 Production-Based Inventory Analyzer")
+        self.authenticate_user()
         
-        col_map = {
-            'part_no': ['part_no', 'part no', 'material', 'item code'],
-            'current_qty': ['current_qty', 'stock', 'qty', 'closing stock'],
-            'value': ['value', 'amount', 'stock value', 'total value']
-        }
-        
-        # ... [Standardization logic similar to your previous code] ...
-        # Simplified for brevity in this snippet:
-        df.columns = [str(col).strip().lower() for col in df.columns]
-        
-        mapped = {}
-        for k, v in col_map.items():
-            for alias in v:
-                if alias in df.columns: mapped[k] = alias; break
-        
-        if 'part_no' not in mapped or 'current_qty' not in mapped:
-            st.error("Inventory file missing Part No or Qty column"); return []
-
-        data = []
-        for _, row in df.iterrows():
-            try:
-                item = {
-                    'Part_No': str(row[mapped['part_no']]).strip(),
-                    'Current_QTY': self.safe_float_convert(row[mapped['current_qty']]),
-                    'Current Inventory - VALUE': self.safe_float_convert(row.get(mapped.get('value'), 0)),
-                    'Description': str(row.get('description', '')),
-                    'Vendor_Code': str(row.get('vendor', ''))
-                }
-                data.append(item)
-            except: continue
-        return data
+        if st.session_state.user_role == "Admin":
+            self.admin_data_management()
+        elif st.session_state.user_role == "User":
+            self.user_inventory_upload()
+        else:
+            st.info("👈 Please login from the sidebar.")
 
 if __name__ == "__main__":
     app = InventoryManagementSystem()
