@@ -143,7 +143,8 @@ class InventoryAnalyzer:
     def analyze_inventory(self, boms_data, inventory_data, production_plan, tolerance=None):
         """
         Analyze inventory using Dynamic Norms.
-        FIX: Calculates absolute deviation values for both shortages and excesses.
+        STRICT FIX: All deviation values are calculated as POSITIVE numbers.
+        Negative calculations are removed so sums work correctly.
         """
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)
@@ -190,15 +191,21 @@ class InventoryAnalyzer:
 
                 if current_qty < lower_bound:
                     status = 'Short Inventory'
-                    # FIX: Calculate as Positive Magnitude
+                    # Positive Magnitude: How much are we missing?
                     deviation_qty = lower_bound - current_qty 
+                    # Positive Value: Cost to fill the shortage
                     deviation_value = deviation_qty * unit_price 
                 elif current_qty > upper_bound:
                     status = 'Excess Inventory'
-                    # FIX: Calculate as Positive Magnitude
+                    # Positive Magnitude: How much extra do we have?
                     deviation_qty = current_qty - upper_bound
+                    # Positive Value: Value of excess stock
                     deviation_value = deviation_qty * unit_price
                 
+                # Double check to ensure we only have positive values
+                if deviation_value < 0:
+                    deviation_value = 0
+
                 # Create Result Record
                 result = {
                     'PART NO': part_no,
@@ -216,7 +223,7 @@ class InventoryAnalyzer:
                     'Current Inventory - VALUE': current_value,
                     
                     'Stock Deviation Qty': deviation_qty,
-                    'Stock Deviation Value': deviation_value, # Positive value for chart/sum
+                    'Stock Deviation Value': deviation_value, # STRICTLY POSITIVE
                     'Status': status,
                     'INVENTORY REMARK STATUS': status
                 }
@@ -227,19 +234,21 @@ class InventoryAnalyzer:
         return results
 
     def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='lakhs'):
-        """Show top 10 vendors by deviation value"""
+        """Show top 10 vendors by deviation value (Strictly Positive)"""
         # Filter by status
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
         
         vendor_totals = {}
         for item in filtered:
             vendor = item.get('Vendor Name', 'Unknown')
-            # Use absolute deviation value (Ensure positive)
-            val = abs(item.get('Stock Deviation Value', 0))
-            vendor_totals[vendor] = vendor_totals.get(vendor, 0) + val
+            val = item.get('Stock Deviation Value', 0)
+            
+            # STRICT FILTER: Ignore negative values
+            if val > 0:
+                vendor_totals[vendor] = vendor_totals.get(vendor, 0) + val
             
         if not vendor_totals:
-            st.info(f"No vendors found for {status_filter}.")
+            st.info(f"No positive values found for {status_filter}.")
             return
 
         # Sort top 10
@@ -614,9 +623,10 @@ class InventoryManagementSystem:
         total_parts = len(df)
         excess_count = len(df[df['Status'] == 'Excess Inventory'])
         
-        # Calculations: Values are now always positive in the results
-        total_excess_val = df[df['Status'] == 'Excess Inventory']['Stock Deviation Value'].sum()
-        total_short_val = df[df['Status'] == 'Short Inventory']['Stock Deviation Value'].sum()
+        # STRICT SUMMING: Only sum values that are > 0. 
+        # (Though analyze_inventory should already ensure this, we add a filter here to be 100% sure)
+        total_excess_val = df[(df['Status'] == 'Excess Inventory') & (df['Stock Deviation Value'] > 0)]['Stock Deviation Value'].sum()
+        total_short_val = df[(df['Status'] == 'Short Inventory') & (df['Stock Deviation Value'] > 0)]['Stock Deviation Value'].sum()
         
         c1.metric("Total Parts", total_parts)
         c2.metric("Excess Parts", excess_count)
