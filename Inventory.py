@@ -694,8 +694,8 @@ class InventoryManagementSystem:
             st.markdown("---")
             
             # 2. Charts (Displayed BELOW the table, stacked)
-            self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors (Shortage)", "short_v", "#F44336")
             self.analyzer.show_part_chart_by_status(results, "Short Inventory", "Top Parts (Shortage)", "short_p", "#F44336")
+            self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors (Shortage)", "short_v", "#F44336")
             
         with t2:
             # 1. Table (Displayed FIRST)
@@ -712,8 +712,8 @@ class InventoryManagementSystem:
             st.markdown("---")
             
             # 2. Charts (Displayed BELOW the table, stacked)
-            self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors (Excess)", "excess_v", "#2196F3")
             self.analyzer.show_part_chart_by_status(results, "Excess Inventory", "Top Parts (Excess)", "excess_p", "#2196F3")
+            self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors (Excess)", "excess_v", "#2196F3")
             
         with t3:
             st.dataframe(df, use_container_width=True)
