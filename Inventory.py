@@ -281,6 +281,49 @@ class InventoryAnalyzer:
         )
         st.plotly_chart(fig, use_container_width=True, key=chart_key)
 
+    def show_part_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='lakhs'):
+        """Show top 10 Parts by deviation value (Strictly Positive)"""
+        # Filter by status and strictly positive value
+        filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter and item.get('Stock Deviation Value', 0) > 0]
+        
+        if not filtered:
+            st.info(f"No positive values found for {status_filter}.")
+            return
+
+        # Sort top 10 individual parts by value
+        sorted_parts = sorted(filtered, key=lambda x: x.get('Stock Deviation Value', 0), reverse=True)[:10]
+        
+        part_nos = [x['PART NO'] for x in sorted_parts]
+        descriptions = [x['PART DESCRIPTION'] for x in sorted_parts] # For hover
+        values = [x['Stock Deviation Value'] for x in sorted_parts]
+        
+        # Formatting
+        if value_format == 'lakhs':
+            plot_values = [v/100000 for v in values]
+            y_title = "Value (₹ Lakhs)"
+            text_fmt = [f"{v:.2f}L" for v in plot_values]
+        else:
+            plot_values = values
+            y_title = "Value (₹)"
+            text_fmt = [f"{v:,.0f}" for v in plot_values]
+
+        fig = go.Figure(go.Bar(
+            x=part_nos,
+            y=plot_values,
+            marker_color=color,
+            text=text_fmt,
+            textposition='auto',
+            hovertext=descriptions, # Show Part Name on hover
+            hoverinfo="x+y+text"
+        ))
+        
+        fig.update_layout(
+            title=chart_title,
+            xaxis_title="Part No",
+            yaxis_title=y_title
+        )
+        st.plotly_chart(fig, use_container_width=True, key=chart_key)
+
 
 class InventoryManagementSystem:
     """Main Application Controller"""
@@ -639,9 +682,17 @@ class InventoryManagementSystem:
         t1, t2, t3 = st.tabs(["🔴 Shortages", "🔵 Excess", "📋 Full Details"])
         
         with t1:
+            # 1. Charts Row
+            c1, c2 = st.columns(2)
+            with c1:
+                self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors (Shortage)", "short_v", "#F44336")
+            with c2:
+                self.analyzer.show_part_chart_by_status(results, "Short Inventory", "Top Parts (Shortage)", "short_p", "#F44336")
+            
+            # 2. Table
+            st.markdown("##### Detailed Shortage List")
             short_df = df[df['Status'] == 'Short Inventory'].sort_values('Stock Deviation Value', ascending=False)
             
-            # Rename column for clarity in display
             display_short = short_df[[
                 'PART NO', 'PART DESCRIPTION', 'Vendor Name', 'Current Inventory - Qty', 
                 'Lower Bound Qty', 'Stock Deviation Value'
@@ -649,10 +700,16 @@ class InventoryManagementSystem:
             
             st.dataframe(display_short, use_container_width=True)
             
-            # Chart
-            self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors by Shortage Value", "short_v", "#F44336")
-            
         with t2:
+            # 1. Charts Row
+            c1, c2 = st.columns(2)
+            with c1:
+                self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors (Excess)", "excess_v", "#2196F3")
+            with c2:
+                self.analyzer.show_part_chart_by_status(results, "Excess Inventory", "Top Parts (Excess)", "excess_p", "#2196F3")
+
+            # 2. Table
+            st.markdown("##### Detailed Excess List")
             excess_df = df[df['Status'] == 'Excess Inventory'].sort_values('Stock Deviation Value', ascending=False)
             
             display_excess = excess_df[[
@@ -662,9 +719,6 @@ class InventoryManagementSystem:
             
             st.dataframe(display_excess, use_container_width=True)
             
-            # Chart
-            self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors by Excess Value", "excess_v", "#2196F3")
-            
         with t3:
             st.dataframe(df, use_container_width=True)
             
@@ -673,7 +727,7 @@ class InventoryManagementSystem:
             st.download_button("📥 Download Full Analysis CSV", csv, "inventory_analysis.csv", "text/csv")
 
     def run(self):
-        st.title("🏭 Inventory Analyzer")
+        st.title("🏭 Production-Based Inventory Analyzer")
         self.authenticate_user()
         
         if st.session_state.user_role == "Admin":
