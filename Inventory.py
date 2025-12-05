@@ -5,14 +5,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 import logging
-import pickle
-import base64
-import uuid
 import io
-import re
-from typing import Union, Any, Optional, List, Dict
-from decimal import Decimal, InvalidOperation
-from collections import Counter
 from collections import defaultdict
 
 # Configure logging
@@ -68,23 +61,6 @@ st.markdown("""
     padding: 15px;
     margin: 10px 0;
 }
-.lock-button {
-    background-color: #28a745;
-    color: white;
-    padding: 10px 20px;
-    border-radius: 5px;
-    border: none;
-    font-weight: bold;
-}
-.switch-user-button {
-    background-color: #007bff;
-    color: white;
-    padding: 8px 16px;
-    border-radius: 5px;
-    border: none;
-    font-weight: bold;
-    margin: 5px 0;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -105,20 +81,6 @@ class DataPersistence:
         """Load data from session state if it exists"""
         if key in st.session_state and isinstance(st.session_state[key], dict):
             return st.session_state[key].get('data')
-        return None
-    
-    @staticmethod
-    def is_data_saved(key):
-        """Check if data is saved"""
-        if key in st.session_state and isinstance(st.session_state[key], dict):
-            return st.session_state[key].get('saved', False)
-        return False
-    
-    @staticmethod
-    def get_data_timestamp(key):
-        """Get data timestamp"""
-        if key in st.session_state and isinstance(st.session_state[key], dict):
-            return st.session_state[key].get('timestamp')
         return None
 
 class InventoryAnalyzer:
@@ -146,7 +108,6 @@ class InventoryAnalyzer:
     def calculate_dynamic_norms(self, boms_data, production_plan):
         """
         Calculate total required quantity for every part based on BOMs and Production Plan.
-        Formula: Sum(Qty_Per_Vehicle_in_BOM * Daily_Production_for_BOM)
         """
         master_requirements = {}
 
@@ -181,8 +142,8 @@ class InventoryAnalyzer:
 
     def analyze_inventory(self, boms_data, inventory_data, production_plan, tolerance=None):
         """
-        Analyze inventory using Dynamic Norms (BOM * Production Plan) vs Actual Inventory.
-        UPDATED: Only analyzes parts found in BOTH BOM and Inventory.
+        Analyze inventory using Dynamic Norms.
+        FIX: Calculates absolute deviation values for both shortages and excesses.
         """
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)
@@ -193,13 +154,9 @@ class InventoryAnalyzer:
         results = []
         
         # 2. Normalize Inventory Data Dictionary
-        # Inventory file contains 'Current_QTY' and 'Current Inventory - VALUE'
         inventory_dict = {str(item['Part_No']).strip().upper(): item for item in inventory_data}
         
-        # ---------------------------------------------------------
-        # UPDATED LOGIC HERE: INTERSECTION ONLY
-        # Only take parts that exist in BOTH requirements AND inventory
-        # ---------------------------------------------------------
+        # 3. Intersection Only: Parts in BOTH BOM and Inventory
         all_parts = set(required_parts_dict.keys()) & set(inventory_dict.keys())
 
         for part_no in all_parts:
@@ -216,7 +173,7 @@ class InventoryAnalyzer:
                 rm_qty_norm = float(req_data.get('RM_IN_QTY', 0)) # Calculated Norm
                 current_qty = float(inv_data.get('Current_QTY', 0))
                 
-                # Financials: Derive Unit Price from Inventory Data if possible
+                # Financials
                 current_value = float(inv_data.get('Current Inventory - VALUE', 0))
                 unit_price = 0.0
                 if current_qty > 0:
@@ -233,12 +190,12 @@ class InventoryAnalyzer:
 
                 if current_qty < lower_bound:
                     status = 'Short Inventory'
-                    # Shortage quantity relative to the Norm (or Lower Bound depending on policy)
-                    # Usually: Shortage = Norm - Current
+                    # FIX: Calculate as Positive Magnitude
                     deviation_qty = lower_bound - current_qty 
-                    deviation_value = deviation_qty * unit_price * -1 # Negative to indicate shortage cost impact
+                    deviation_value = deviation_qty * unit_price 
                 elif current_qty > upper_bound:
                     status = 'Excess Inventory'
+                    # FIX: Calculate as Positive Magnitude
                     deviation_qty = current_qty - upper_bound
                     deviation_value = deviation_qty * unit_price
                 
@@ -259,44 +216,16 @@ class InventoryAnalyzer:
                     'Current Inventory - VALUE': current_value,
                     
                     'Stock Deviation Qty': deviation_qty,
-                    'Stock Deviation Value': deviation_value, # For charts
-                    'VALUE(Unit Price* Short/Excess Inventory)': deviation_value, # For consistency
-                    
+                    'Stock Deviation Value': deviation_value, # Positive value for chart/sum
                     'Status': status,
                     'INVENTORY REMARK STATUS': status
                 }
                 results.append(result)
             except Exception as e:
-                # logger.error(f"Error analyzing part {part_no}: {e}")
                 continue
                 
         return results
 
-    def get_vendor_summary(self, processed_data):
-        """Summarize inventory by vendor"""
-        summary = defaultdict(lambda: {
-            'total_parts': 0,
-            'short_parts': 0,
-            'excess_parts': 0,
-            'normal_parts': 0,
-            'total_value': 0.0
-        })
-        for item in processed_data:
-            vendor = item.get('Vendor Name', 'Unknown')
-            status = item.get('Status', 'Unknown')
-            val = item.get('Current Inventory - VALUE', 0)
-            
-            summary[vendor]['total_parts'] += 1
-            summary[vendor]['total_value'] += val
-            
-            if status == "Short Inventory":
-                summary[vendor]['short_parts'] += 1
-            elif status == "Excess Inventory":
-                summary[vendor]['excess_parts'] += 1
-            else:
-                summary[vendor]['normal_parts'] += 1
-        return summary
-        
     def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='lakhs'):
         """Show top 10 vendors by deviation value"""
         # Filter by status
@@ -305,7 +234,7 @@ class InventoryAnalyzer:
         vendor_totals = {}
         for item in filtered:
             vendor = item.get('Vendor Name', 'Unknown')
-            # Use absolute deviation value (Excess amount or Shortage amount)
+            # Use absolute deviation value (Ensure positive)
             val = abs(item.get('Stock Deviation Value', 0))
             vendor_totals[vendor] = vendor_totals.get(vendor, 0) + val
             
@@ -348,7 +277,6 @@ class InventoryManagementSystem:
     """Main Application Controller"""
     
     def __init__(self):
-        self.debug = True
         self.analyzer = InventoryAnalyzer()
         self.persistence = DataPersistence()
         self.initialize_session_state()
@@ -371,7 +299,8 @@ class InventoryManagementSystem:
             'persistent_inventory_data', 
             'persistent_inventory_locked',
             'persistent_analysis_results',
-            'production_plan'          # Stores user input for daily production
+            'production_plan',
+            'admin_tolerance'
         ]
         
         for key in self.persistent_keys:
@@ -392,7 +321,7 @@ class InventoryManagementSystem:
                 st.markdown("**Admin Login**")
                 password = st.sidebar.text_input("Password", type="password")
                 if st.sidebar.button("Login"):
-                    if password == "Agilomatrix@123": # Change as needed
+                    if password == "Agilomatrix@123": # Change password as needed
                         st.session_state.user_role = "Admin"
                         st.rerun()
                     else:
@@ -535,7 +464,9 @@ class InventoryManagementSystem:
         st.header("🔧 Admin Dashboard - BOM Management")
         
         # Tolerance
-        if "admin_tolerance" not in st.session_state: st.session_state.admin_tolerance = 30
+        if st.session_state.admin_tolerance is None:
+            st.session_state.admin_tolerance = 30
+            
         st.session_state.admin_tolerance = st.selectbox(
             "Set Analysis Tolerance (+/- %)", 
             [0, 10, 20, 30, 40, 50],
@@ -682,9 +613,10 @@ class InventoryManagementSystem:
         c1, c2, c3, c4 = st.columns(4)
         total_parts = len(df)
         excess_count = len(df[df['Status'] == 'Excess Inventory'])
-        short_count = len(df[df['Status'] == 'Short Inventory'])
+        
+        # Calculations: Values are now always positive in the results
         total_excess_val = df[df['Status'] == 'Excess Inventory']['Stock Deviation Value'].sum()
-        total_short_val = abs(df[df['Status'] == 'Short Inventory']['Stock Deviation Value'].sum())
+        total_short_val = df[df['Status'] == 'Short Inventory']['Stock Deviation Value'].sum()
         
         c1.metric("Total Parts", total_parts)
         c2.metric("Excess Parts", excess_count)
@@ -697,21 +629,28 @@ class InventoryManagementSystem:
         t1, t2, t3 = st.tabs(["🔴 Shortages", "🔵 Excess", "📋 Full Details"])
         
         with t1:
-            short_df = df[df['Status'] == 'Short Inventory'].sort_values('Stock Deviation Value', ascending=True)
-            st.dataframe(short_df[[
+            short_df = df[df['Status'] == 'Short Inventory'].sort_values('Stock Deviation Value', ascending=False)
+            
+            # Rename column for clarity in display
+            display_short = short_df[[
                 'PART NO', 'PART DESCRIPTION', 'Vendor Name', 'Current Inventory - Qty', 
                 'Lower Bound Qty', 'Stock Deviation Value'
-            ]], use_container_width=True)
+            ]].rename(columns={'Stock Deviation Value': 'Shortage Amount (₹)'})
+            
+            st.dataframe(display_short, use_container_width=True)
             
             # Chart
             self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors by Shortage Value", "short_v", "#F44336")
             
         with t2:
             excess_df = df[df['Status'] == 'Excess Inventory'].sort_values('Stock Deviation Value', ascending=False)
-            st.dataframe(excess_df[[
+            
+            display_excess = excess_df[[
                 'PART NO', 'PART DESCRIPTION', 'Vendor Name', 'Current Inventory - Qty', 
                 'Upper Bound Qty', 'Stock Deviation Value'
-            ]], use_container_width=True)
+            ]].rename(columns={'Stock Deviation Value': 'Excess Amount (₹)'})
+            
+            st.dataframe(display_excess, use_container_width=True)
             
             # Chart
             self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors by Excess Value", "excess_v", "#2196F3")
