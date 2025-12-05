@@ -144,7 +144,6 @@ class InventoryAnalyzer:
         """
         Analyze inventory using Dynamic Norms.
         STRICT FIX: All deviation values are calculated as POSITIVE numbers.
-        Negative calculations are removed so sums work correctly.
         """
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)
@@ -667,7 +666,6 @@ class InventoryManagementSystem:
         excess_count = len(df[df['Status'] == 'Excess Inventory'])
         
         # STRICT SUMMING: Only sum values that are > 0. 
-        # (Though analyze_inventory should already ensure this, we add a filter here to be 100% sure)
         total_excess_val = df[(df['Status'] == 'Excess Inventory') & (df['Stock Deviation Value'] > 0)]['Stock Deviation Value'].sum()
         total_short_val = df[(df['Status'] == 'Short Inventory') & (df['Stock Deviation Value'] > 0)]['Stock Deviation Value'].sum()
         
@@ -682,14 +680,7 @@ class InventoryManagementSystem:
         t1, t2, t3 = st.tabs(["🔴 Shortages", "🔵 Excess", "📋 Full Details"])
         
         with t1:
-            # 1. Charts Row
-            c1, c2 = st.columns(2)
-            with c1:
-                self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors (Shortage)", "short_v", "#F44336")
-            with c2:
-                self.analyzer.show_part_chart_by_status(results, "Short Inventory", "Top Parts (Shortage)", "short_p", "#F44336")
-            
-            # 2. Table
+            # 1. Table (Displayed FIRST)
             st.markdown("##### Detailed Shortage List")
             short_df = df[df['Status'] == 'Short Inventory'].sort_values('Stock Deviation Value', ascending=False)
             
@@ -700,15 +691,14 @@ class InventoryManagementSystem:
             
             st.dataframe(display_short, use_container_width=True)
             
+            st.markdown("---")
+            
+            # 2. Charts (Displayed BELOW the table, stacked)
+            self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors (Shortage)", "short_v", "#F44336")
+            self.analyzer.show_part_chart_by_status(results, "Short Inventory", "Top Parts (Shortage)", "short_p", "#F44336")
+            
         with t2:
-            # 1. Charts Row
-            c1, c2 = st.columns(2)
-            with c1:
-                self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors (Excess)", "excess_v", "#2196F3")
-            with c2:
-                self.analyzer.show_part_chart_by_status(results, "Excess Inventory", "Top Parts (Excess)", "excess_p", "#2196F3")
-
-            # 2. Table
+            # 1. Table (Displayed FIRST)
             st.markdown("##### Detailed Excess List")
             excess_df = df[df['Status'] == 'Excess Inventory'].sort_values('Stock Deviation Value', ascending=False)
             
@@ -718,6 +708,12 @@ class InventoryManagementSystem:
             ]].rename(columns={'Stock Deviation Value': 'Excess Amount (₹)'})
             
             st.dataframe(display_excess, use_container_width=True)
+            
+            st.markdown("---")
+            
+            # 2. Charts (Displayed BELOW the table, stacked)
+            self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors (Excess)", "excess_v", "#2196F3")
+            self.analyzer.show_part_chart_by_status(results, "Excess Inventory", "Top Parts (Excess)", "excess_p", "#2196F3")
             
         with t3:
             st.dataframe(df, use_container_width=True)
