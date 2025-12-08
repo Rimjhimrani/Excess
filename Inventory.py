@@ -100,25 +100,26 @@ class InventoryAnalyzer:
         for bom_name, bom_rows in boms_data.items():
             production_count = production_plan.get(bom_name, 0)
             
-            if production_count > 0:
-                for item in bom_rows:
-                    part_no = str(item['Part_No']).strip().upper()
-                    qty_per_veh = self.safe_float_convert(item.get('Qty_Veh', 0))
-                    
-                    total_req_for_bom = qty_per_veh * production_count
-                    
-                    if part_no in master_requirements:
-                        master_requirements[part_no]['RM_IN_QTY'] += total_req_for_bom
-                        if bom_name not in master_requirements[part_no]['Aggregates']:
-                            master_requirements[part_no]['Aggregates'].append(bom_name)
-                    else:
-                        master_requirements[part_no] = {
-                            'Part_No': part_no,
-                            'Description': item.get('Description', ''),
-                            'RM_IN_QTY': total_req_for_bom, 
-                            'Aggregates': [bom_name],
-                            'Vendor_Name': item.get('Vendor_Name', 'Unknown')
-                        }
+            # PROCESS ALL PARTS regardless of production count to establish "Matched" status
+            for item in bom_rows:
+                part_no = str(item['Part_No']).strip().upper()
+                qty_per_veh = self.safe_float_convert(item.get('Qty_Veh', 0))
+                
+                # Calculate required quantity (will be 0 if production_count is 0)
+                total_req_for_bom = qty_per_veh * production_count
+                
+                if part_no in master_requirements:
+                    master_requirements[part_no]['RM_IN_QTY'] += total_req_for_bom
+                    if bom_name not in master_requirements[part_no]['Aggregates']:
+                        master_requirements[part_no]['Aggregates'].append(bom_name)
+                else:
+                    master_requirements[part_no] = {
+                        'Part_No': part_no,
+                        'Description': item.get('Description', ''),
+                        'RM_IN_QTY': total_req_for_bom, 
+                        'Aggregates': [bom_name],
+                        'Vendor_Name': item.get('Vendor_Name', 'Unknown')
+                    }
         return master_requirements
 
     def analyze_inventory(self, boms_data, inventory_data, production_plan, tolerance=None):
@@ -127,7 +128,7 @@ class InventoryAnalyzer:
         1. Iterate ONLY through Inventory Data.
         2. If Part matches BOM -> Calculate Short/Excess based on norms.
         3. If Part NOT in BOM -> It is automatically EXCESS.
-        4. If Part in BOM but NOT in Inventory -> IGNORE (Do not display).
+        4. If Part in BOM but NOT in Inventory -> IGNORE.
         """
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)
@@ -214,6 +215,7 @@ class InventoryAnalyzer:
                     'PART DESCRIPTION': part_desc,
                     'Vendor Name': vendor_name,
                     'Used In Aggregates': ", ".join(aggregates),
+                    'Matched Status': "Matched" if req_data else "Unmatched",
                     
                     'RM Norm - In Qty': rm_qty_norm,
                     'Lower Bound Qty': lower_bound,
@@ -533,15 +535,24 @@ class InventoryManagementSystem:
         df = pd.DataFrame(results)
         
         st.markdown("#### Key Metrics")
+        
+        # New Metric: Matched Parts (Parts that exist in both Inventory and BOM)
+        matched_count = len(df[df['Matched Status'] == 'Matched'])
+        
         excess_count = len(df[df['Status'] == 'Excess Inventory'])
         short_count = len(df[df['Status'] == 'Short Inventory'])
+        
         total_excess_val = df[(df['Status'] == 'Excess Inventory') & (df['Stock Deviation Value'] > 0)]['Stock Deviation Value'].sum()
         total_short_val = df[(df['Status'] == 'Short Inventory') & (df['Stock Deviation Value'] > 0)]['Stock Deviation Value'].sum()
         
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Parts in Excess (Count)", f"{excess_count}", delta="Overstocked", delta_color="inverse")
+        c0, c1, c2, c3, c4 = st.columns(5)
+        
+        c0.metric("✅ Matched Parts", f"{matched_count}", help="Count of parts found in both Inventory and BOM")
+        
+        c1.metric("Parts in Excess", f"{excess_count}", delta="Overstocked", delta_color="inverse")
         c2.metric("Total Excess Value", f"₹{total_excess_val:,.0f}", delta="Dead Money")
-        c3.metric("Parts in Shortage (Count)", f"{short_count}", delta="Critical", delta_color="inverse")
+        
+        c3.metric("Parts in Shortage", f"{short_count}", delta="Critical", delta_color="inverse")
         c4.metric("Total Shortage Value", f"₹{total_short_val:,.0f}", delta="Purchase Cost")
         
         st.markdown("---")
