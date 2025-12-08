@@ -1,4 +1,4 @@
-import streamlit as st
+\import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -238,7 +238,7 @@ class InventoryAnalyzer:
         return results
 
     def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='lakhs'):
-        """Show top 10 vendors by deviation value (Strictly Positive)"""
+        """Show top 10 vendors by deviation value (Strictly Positive) with custom hover"""
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
         
         vendor_totals = {}
@@ -256,6 +256,7 @@ class InventoryAnalyzer:
         vendors = [x[0] for x in sorted_vendors]
         values = [x[1] for x in sorted_vendors]
         
+        # Formatting y-axis
         if value_format == 'lakhs':
             plot_values = [v/100000 for v in values]
             y_title = "Value (₹ Lakhs)"
@@ -265,14 +266,29 @@ class InventoryAnalyzer:
             y_title = "Value (₹)"
             text_fmt = [f"{v:,.0f}" for v in plot_values]
 
+        # Custom Hover Text
+        hover_texts = []
+        for v, val in zip(vendors, values):
+            hover_texts.append(
+                f"<b>Vendor:</b> {v}<br>" +
+                f"<b>Total {status_filter} Value:</b> ₹{val:,.2f}<br>"
+            )
+
         fig = go.Figure(go.Bar(
-            x=vendors, y=plot_values, marker_color=color, text=text_fmt, textposition='auto'
+            x=vendors, 
+            y=plot_values, 
+            marker_color=color, 
+            text=text_fmt, 
+            textposition='auto',
+            hovertext=hover_texts,
+            hoverinfo="text"
         ))
+        
         fig.update_layout(title=chart_title, xaxis_title="Vendor", yaxis_title=y_title)
         st.plotly_chart(fig, use_container_width=True, key=chart_key)
 
     def show_part_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='lakhs'):
-        """Show top 10 Parts by deviation value"""
+        """Show top 10 Parts by deviation value with detailed custom hover"""
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter and item.get('Stock Deviation Value', 0) > 0]
         
         if not filtered:
@@ -282,10 +298,9 @@ class InventoryAnalyzer:
         sorted_parts = sorted(filtered, key=lambda x: x.get('Stock Deviation Value', 0), reverse=True)[:10]
         
         part_nos = [x['PART NO'] for x in sorted_parts]
-        descriptions = [x['PART DESCRIPTION'] for x in sorted_parts]
-        vendor_name = [x['Vendor Name'] for x in sorted_parts]
         values = [x['Stock Deviation Value'] for x in sorted_parts]
         
+        # Prepare Plot Values
         if value_format == 'lakhs':
             plot_values = [v/100000 for v in values]
             y_title = "Value (₹ Lakhs)"
@@ -295,10 +310,46 @@ class InventoryAnalyzer:
             y_title = "Value (₹)"
             text_fmt = [f"{v:,.0f}" for v in plot_values]
 
+        # Create Custom Hover Text
+        hover_texts = []
+        for item in sorted_parts:
+            p_no = item['PART NO']
+            desc = item['PART DESCRIPTION']
+            vend = item['Vendor Name']
+            dev_val = item['Stock Deviation Value']
+            dev_qty = item['Stock Deviation Qty']
+            
+            # Logic for "From what point is above/below norm"
+            norm_context = ""
+            if status_filter == 'Excess Inventory':
+                # Excess logic
+                if item['Matched Status'] == 'Unmatched':
+                    norm_context = f"⚠️ <b>Not in BOM</b> (All Qty Excess): {dev_qty:,.2f}"
+                else:
+                    norm_context = f"⚠️ <b>Above Max Norm by:</b> {dev_qty:,.2f} Qty"
+            elif status_filter == 'Short Inventory':
+                norm_context = f"⚠️ <b>Below Min Norm by:</b> {dev_qty:,.2f} Qty"
+            
+            # Build HTML String
+            hover_html = (
+                f"<b>Part No:</b> {p_no}<br>"
+                f"<b>Description:</b> {desc}<br>"
+                f"<b>Vendor:</b> {vend}<br>"
+                f"<b>Deviation Value:</b> ₹{dev_val:,.2f}<br>"
+                f"{norm_context}"
+            )
+            hover_texts.append(hover_html)
+
         fig = go.Figure(go.Bar(
-            x=part_nos, y=plot_values, marker_color=color, text=text_fmt, textposition='auto',
-            hovertext=descriptions, hoverinfo="x+y+text"
+            x=part_nos, 
+            y=plot_values, 
+            marker_color=color, 
+            text=text_fmt, 
+            textposition='auto',
+            hovertext=hover_texts,
+            hoverinfo="text" # Tells plotly to use ONLY our custom text
         ))
+        
         fig.update_layout(title=chart_title, xaxis_title="Part No", yaxis_title=y_title)
         st.plotly_chart(fig, use_container_width=True, key=chart_key)
 
