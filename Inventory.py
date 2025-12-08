@@ -633,7 +633,7 @@ class InventoryManagementSystem:
             st.download_button("📥 Download Full Analysis CSV", csv, "inventory_analysis.csv", "text/csv")
 
     def run(self):
-        st.title("🏭 Production-Based Inventory Analyzer")
+        st.title("🏭 Inventory Analyzer")
         self.authenticate_user()
         if st.session_state.user_role == "Admin": self.admin_data_management()
         elif st.session_state.user_role == "User": self.user_inventory_upload()
