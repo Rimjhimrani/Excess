@@ -237,7 +237,7 @@ class InventoryAnalyzer:
                 
         return results
 
-    def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='lakhs'):
+    def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='million'):
         """Show top 10 vendors by deviation value (Strictly Positive) with custom hover"""
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
         
@@ -256,11 +256,12 @@ class InventoryAnalyzer:
         vendors = [x[0] for x in sorted_vendors]
         values = [x[1] for x in sorted_vendors]
         
-        # Formatting y-axis
-        if value_format == 'lakhs':
-            plot_values = [v/100000 for v in values]
-            y_title = "Value (₹ Lakhs)"
-            text_fmt = [f"{v:.2f}L" for v in plot_values]
+        # Formatting y-axis - CHANGED TO MILLION
+        # 1 Million = 10 Lakhs = 1,000,000
+        if value_format == 'million' or value_format == 'lakhs': # Default handling
+            plot_values = [v/1000000 for v in values]
+            y_title = "Value (₹ Millions)"
+            text_fmt = [f"{v:.2f}M" for v in plot_values]
         else:
             plot_values = values
             y_title = "Value (₹)"
@@ -287,7 +288,7 @@ class InventoryAnalyzer:
         fig.update_layout(title=chart_title, xaxis_title="Vendor", yaxis_title=y_title)
         st.plotly_chart(fig, use_container_width=True, key=chart_key)
 
-    def show_part_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='lakhs'):
+    def show_part_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='million'):
         """Show top 10 Parts by deviation value with detailed custom hover"""
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter and item.get('Stock Deviation Value', 0) > 0]
         
@@ -300,11 +301,11 @@ class InventoryAnalyzer:
         part_nos = [x['PART NO'] for x in sorted_parts]
         values = [x['Stock Deviation Value'] for x in sorted_parts]
         
-        # Prepare Plot Values
-        if value_format == 'lakhs':
-            plot_values = [v/100000 for v in values]
-            y_title = "Value (₹ Lakhs)"
-            text_fmt = [f"{v:.2f}L" for v in plot_values]
+        # Prepare Plot Values - CHANGED TO MILLION
+        if value_format == 'million' or value_format == 'lakhs':
+            plot_values = [v/1000000 for v in values]
+            y_title = "Value (₹ Millions)"
+            text_fmt = [f"{v:.2f}M" for v in plot_values]
         else:
             plot_values = values
             y_title = "Value (₹)"
