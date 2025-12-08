@@ -143,7 +143,10 @@ class InventoryAnalyzer:
     def analyze_inventory(self, boms_data, inventory_data, production_plan, tolerance=None):
         """
         Analyze inventory using Dynamic Norms.
-        STRICT FIX: All deviation values are calculated as POSITIVE numbers.
+        UPDATED LOGIC:
+        1. If Part in BOM & Inventory -> Check Norms.
+        2. If Part in Inventory but NOT in BOM -> Mark as EXCESS (Norm = 0).
+        3. If Part in BOM but NOT in Inventory -> Mark as SHORT (Current = 0).
         """
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)
@@ -156,26 +159,40 @@ class InventoryAnalyzer:
         # 2. Normalize Inventory Data Dictionary
         inventory_dict = {str(item['Part_No']).strip().upper(): item for item in inventory_data}
         
-        # 3. Intersection Only: Parts in BOTH BOM and Inventory
-        all_parts = set(required_parts_dict.keys()) & set(inventory_dict.keys())
+        # 3. Union: We want to look at ALL parts (In BOMs OR In Inventory)
+        all_parts = set(required_parts_dict.keys()) | set(inventory_dict.keys())
 
         for part_no in all_parts:
             try:
                 # Get Data
-                req_data = required_parts_dict.get(part_no, {})
-                inv_data = inventory_dict.get(part_no, {})
+                req_data = required_parts_dict.get(part_no)
+                inv_data = inventory_dict.get(part_no)
                 
-                # Basic info
-                part_desc = inv_data.get('Description') or req_data.get('Description') or "Unknown"
-                vendor_name = inv_data.get('Vendor_Name') or req_data.get('Vendor_Name') or "Unknown"
-                
-                # Quantities
-                rm_qty_norm = float(req_data.get('RM_IN_QTY', 0)) # Calculated Norm
-                current_qty = float(inv_data.get('Current_QTY', 0))
-                
-                # Financials
-                current_value = float(inv_data.get('Current Inventory - VALUE', 0))
+                # Defaults
+                rm_qty_norm = 0.0
+                current_qty = 0.0
+                current_value = 0.0
                 unit_price = 0.0
+                part_desc = "Unknown"
+                vendor_name = "Unknown"
+                aggregates = []
+
+                # --- Fill Data from Requirement (BOM) ---
+                if req_data:
+                    rm_qty_norm = float(req_data.get('RM_IN_QTY', 0))
+                    part_desc = req_data.get('Description', part_desc)
+                    vendor_name = req_data.get('Vendor_Name', vendor_name)
+                    aggregates = req_data.get('Aggregates', [])
+                
+                # --- Fill Data from Inventory ---
+                if inv_data:
+                    current_qty = float(inv_data.get('Current_QTY', 0))
+                    current_value = float(inv_data.get('Current Inventory - VALUE', 0))
+                    # Overwrite desc/vendor from inventory if available as it might be more accurate
+                    if inv_data.get('Description'): part_desc = inv_data.get('Description')
+                    if inv_data.get('Vendor_Name'): vendor_name = inv_data.get('Vendor_Name')
+                
+                # --- Derived Financials ---
                 if current_qty > 0:
                     unit_price = current_value / current_qty
                 
@@ -183,35 +200,45 @@ class InventoryAnalyzer:
                 lower_bound = rm_qty_norm * (1 - tolerance / 100)
                 upper_bound = rm_qty_norm * (1 + tolerance / 100)
 
-                # Deviation Analysis
+                # --- Deviation Analysis Logic ---
                 deviation_qty = 0
                 deviation_value = 0
                 status = 'Within Norms'
 
-                if current_qty < lower_bound:
-                    status = 'Short Inventory'
-                    # Positive Magnitude: How much are we missing?
-                    deviation_qty = lower_bound - current_qty 
-                    # Positive Value: Cost to fill the shortage
-                    deviation_value = deviation_qty * unit_price 
-                elif current_qty > upper_bound:
+                # Case A: Unlisted Part (In Inventory, Not in BOM) -> EXCESS
+                if req_data is None and inv_data is not None:
                     status = 'Excess Inventory'
-                    # Positive Magnitude: How much extra do we have?
-                    deviation_qty = current_qty - upper_bound
-                    # Positive Value: Value of excess stock
-                    deviation_value = deviation_qty * unit_price
+                    deviation_qty = current_qty # All of it is excess
+                    deviation_value = current_value
+                    # Remark to clarify why
+                    aggregates = ["Not in BOM"]
+
+                # Case B: Standard Analysis
+                else:
+                    if current_qty < lower_bound:
+                        status = 'Short Inventory'
+                        deviation_qty = lower_bound - current_qty 
+                        deviation_value = deviation_qty * unit_price 
+                        # If unit price is missing (0 qty), try to infer? 
+                        # For now, if current qty is 0, value deviation might be 0 unless we had a master price list.
+                        # Assuming user input value handles existing stock. 
+                        
+                    elif current_qty > upper_bound:
+                        status = 'Excess Inventory'
+                        deviation_qty = current_qty - upper_bound
+                        deviation_value = deviation_qty * unit_price
                 
                 # Double check to ensure we only have positive values
-                if deviation_value < 0:
-                    deviation_value = 0
+                if deviation_value < 0: deviation_value = 0
+                if deviation_qty < 0: deviation_qty = 0
 
                 # Create Result Record
                 result = {
                     'PART NO': part_no,
                     'PART DESCRIPTION': part_desc,
                     'Vendor Name': vendor_name,
-                    'Vendor_Code': inv_data.get('Vendor_Code', ''),
-                    'Used In Aggregates': ", ".join(req_data.get('Aggregates', [])),
+                    'Vendor_Code': inv_data.get('Vendor_Code', '') if inv_data else '',
+                    'Used In Aggregates': ", ".join(aggregates),
                     
                     'RM Norm - In Qty': rm_qty_norm,
                     'Lower Bound Qty': lower_bound,
@@ -659,20 +686,49 @@ class InventoryManagementSystem:
         """Visualization Dashboard"""
         df = pd.DataFrame(results)
         
-        # Metrics
+        # Metrics: "how many parts count with price going in excess, and how many parts count with price going in short"
         st.markdown("#### Key Metrics")
-        c1, c2, c3, c4 = st.columns(4)
-        total_parts = len(df)
-        excess_count = len(df[df['Status'] == 'Excess Inventory'])
         
-        # STRICT SUMMING: Only sum values that are > 0. 
+        # Calculate Counts
+        excess_count = len(df[df['Status'] == 'Excess Inventory'])
+        short_count = len(df[df['Status'] == 'Short Inventory'])
+        
+        # Calculate Values (Summing positive deviation values)
         total_excess_val = df[(df['Status'] == 'Excess Inventory') & (df['Stock Deviation Value'] > 0)]['Stock Deviation Value'].sum()
         total_short_val = df[(df['Status'] == 'Short Inventory') & (df['Stock Deviation Value'] > 0)]['Stock Deviation Value'].sum()
         
-        c1.metric("Total Parts", total_parts)
-        c2.metric("Excess Parts", excess_count)
-        c3.metric("Excess Value", f"₹{total_excess_val:,.0f}")
-        c4.metric("Shortage Value", f"₹{total_short_val:,.0f}")
+        # Layout
+        c1, c2, c3, c4 = st.columns(4)
+        
+        # 1. Excess Count
+        c1.metric(
+            label="Parts in Excess (Count)",
+            value=f"{excess_count}",
+            delta="Overstocked",
+            delta_color="inverse" # Red if high (usually), but here blue is excess
+        )
+        
+        # 2. Excess Value
+        c2.metric(
+            label="Total Excess Value",
+            value=f"₹{total_excess_val:,.0f}",
+            delta="Dead Money"
+        )
+        
+        # 3. Short Count
+        c3.metric(
+            label="Parts in Shortage (Count)",
+            value=f"{short_count}",
+            delta="Critical",
+            delta_color="inverse"
+        )
+        
+        # 4. Short Value
+        c4.metric(
+            label="Total Shortage Value",
+            value=f"₹{total_short_val:,.0f}",
+            delta="Purchase Cost"
+        )
         
         st.markdown("---")
         
@@ -700,6 +756,7 @@ class InventoryManagementSystem:
         with t2:
             # 1. Table (Displayed FIRST)
             st.markdown("##### Detailed Excess List")
+            # This list now includes parts that are in Inventory but NOT in BOM
             excess_df = df[df['Status'] == 'Excess Inventory'].sort_values('Stock Deviation Value', ascending=False)
             
             display_excess = excess_df[[
