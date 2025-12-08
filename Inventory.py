@@ -283,7 +283,7 @@ class InventoryAnalyzer:
         
         part_nos = [x['PART NO'] for x in sorted_parts]
         descriptions = [x['PART DESCRIPTION'] for x in sorted_parts]
-        vendor name = [x['Vendor Name'] for x in sorted_parts]
+        vendor_name = [x['Vendor Name'] for x in sorted_parts]
         values = [x['Stock Deviation Value'] for x in sorted_parts]
         
         if value_format == 'lakhs':
