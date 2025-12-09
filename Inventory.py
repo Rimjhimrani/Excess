@@ -93,7 +93,6 @@ class InventoryAnalyzer:
     def calculate_dynamic_norms(self, boms_data, production_plan):
         """
         Calculate total required quantity for every part based on BOMs and Production Plan.
-        This represents the Requirement for ONE unit of the plan (e.g. 1 Day).
         """
         master_requirements = {}
 
@@ -127,14 +126,14 @@ class InventoryAnalyzer:
         """
         STRICT LOGIC APPLIED:
         1. Iterate ONLY through Inventory Data.
-        2. Get 'Target Days' from inventory file (defaults to 1 if missing).
-        3. Ideal Inventory = Daily Requirement (from BOM) * Target Days.
-        4. Compare Current Qty vs Ideal Inventory.
+        2. If Part matches BOM -> Calculate Short/Excess based on norms.
+        3. If Part NOT in BOM -> It is automatically EXCESS.
+        4. If Part in BOM but NOT in Inventory -> IGNORE.
         """
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)
 
-        # 1. Calculate Daily Requirements (The Base Norm)
+        # 1. Calculate Requirements (The Norms)
         required_parts_dict = self.calculate_dynamic_norms(boms_data, production_plan)
         
         results = []
@@ -150,14 +149,10 @@ class InventoryAnalyzer:
                 part_desc = inv_item.get('Description', 'Unknown')
                 vendor_name = inv_item.get('Vendor_Name', 'Unknown')
                 
-                # Retrieve Target Days from inventory file (default to 1.0 if not present)
-                target_days = float(inv_item.get('Target_Days', 1.0))
-                
                 # Check if this part exists in BOM Requirements
                 req_data = required_parts_dict.get(part_no)
                 
-                daily_requirement = 0.0
-                ideal_inventory_qty = 0.0
+                rm_qty_norm = 0.0
                 aggregates = []
                 lower_bound = 0.0
                 upper_bound = 0.0
@@ -173,7 +168,7 @@ class InventoryAnalyzer:
 
                 if req_data:
                     # CASE A: MATCH FOUND (In Inventory AND In BOM)
-                    daily_requirement = float(req_data.get('RM_IN_QTY', 0))
+                    rm_qty_norm = float(req_data.get('RM_IN_QTY', 0))
                     aggregates = req_data.get('Aggregates', [])
                     
                     # If description missing in inventory, try BOM
@@ -182,13 +177,9 @@ class InventoryAnalyzer:
                     if vendor_name == 'Unknown' or vendor_name == '':
                         vendor_name = req_data.get('Vendor_Name', 'Unknown')
 
-                    # --- UPDATED CALCULATION ---
-                    # Ideal = Daily Requirement * Target Days defined in file
-                    ideal_inventory_qty = daily_requirement * target_days
-
-                    # Calculate Bounds based on IDEAL, not just daily requirement
-                    lower_bound = ideal_inventory_qty * (1 - tolerance / 100)
-                    upper_bound = ideal_inventory_qty * (1 + tolerance / 100)
+                    # Calculate Bounds
+                    lower_bound = rm_qty_norm * (1 - tolerance / 100)
+                    upper_bound = rm_qty_norm * (1 + tolerance / 100)
                     
                     # Logic
                     if current_qty < lower_bound:
@@ -206,8 +197,7 @@ class InventoryAnalyzer:
                     # CASE B: NO MATCH (In Inventory but NOT in BOM) -> EXCESS
                     # Logic: We have stock, but no requirement. All of it is Excess.
                     status = 'Excess Inventory'
-                    daily_requirement = 0.0
-                    ideal_inventory_qty = 0.0
+                    rm_qty_norm = 0.0
                     lower_bound = 0.0
                     upper_bound = 0.0
                     aggregates = ["Not in BOM"]
@@ -227,10 +217,7 @@ class InventoryAnalyzer:
                     'Used In Aggregates': ", ".join(aggregates),
                     'Matched Status': "Matched" if req_data else "Unmatched",
                     
-                    'Target Days': target_days,
-                    'Daily Requirement': daily_requirement,
-                    'Ideal Inventory Qty': ideal_inventory_qty,
-                    
+                    'RM Norm - In Qty': rm_qty_norm,
                     'Lower Bound Qty': lower_bound,
                     'Upper Bound Qty': upper_bound,
                     
@@ -269,8 +256,9 @@ class InventoryAnalyzer:
         vendors = [x[0] for x in sorted_vendors]
         values = [x[1] for x in sorted_vendors]
         
-        # Formatting y-axis
-        if value_format == 'million' or value_format == 'lakhs': 
+        # Formatting y-axis - CHANGED TO MILLION
+        # 1 Million = 10 Lakhs = 1,000,000
+        if value_format == 'million' or value_format == 'lakhs': # Default handling
             plot_values = [v/1000000 for v in values]
             y_title = "Value (₹ Millions)"
             text_fmt = [f"{v:.2f}M" for v in plot_values]
@@ -313,7 +301,7 @@ class InventoryAnalyzer:
         part_nos = [x['PART NO'] for x in sorted_parts]
         values = [x['Stock Deviation Value'] for x in sorted_parts]
         
-        # Prepare Plot Values
+        # Prepare Plot Values - CHANGED TO MILLION
         if value_format == 'million' or value_format == 'lakhs':
             plot_values = [v/1000000 for v in values]
             y_title = "Value (₹ Millions)"
@@ -331,17 +319,17 @@ class InventoryAnalyzer:
             vend = item['Vendor Name']
             dev_val = item['Stock Deviation Value']
             dev_qty = item['Stock Deviation Qty']
-            target_days = item.get('Target Days', 1)
             
             # Logic for "From what point is above/below norm"
             norm_context = ""
             if status_filter == 'Excess Inventory':
+                # Excess logic
                 if item['Matched Status'] == 'Unmatched':
-                    norm_context = f"⚠️ <b>Not in BOM</b> (All Qty Excess)"
+                    norm_context = f"⚠️ <b>Not in BOM</b> (All Qty Excess): {dev_qty:,.2f}"
                 else:
-                    norm_context = f"⚠️ <b>Above Max (Based on {target_days} Days):</b> {dev_qty:,.0f} Qty"
+                    norm_context = f"⚠️ <b>Above Max Norm by:</b> {dev_qty:,.2f} Qty"
             elif status_filter == 'Short Inventory':
-                norm_context = f"⚠️ <b>Below Min (Based on {target_days} Days):</b> {dev_qty:,.0f} Qty"
+                norm_context = f"⚠️ <b>Below Min Norm by:</b> {dev_qty:,.2f} Qty"
             
             # Build HTML String
             hover_html = (
@@ -360,7 +348,7 @@ class InventoryAnalyzer:
             text=text_fmt, 
             textposition='auto',
             hovertext=hover_texts,
-            hoverinfo="text" 
+            hoverinfo="text" # Tells plotly to use ONLY our custom text
         ))
         
         fig.update_layout(title=chart_title, xaxis_title="Part No", yaxis_title=y_title)
@@ -469,17 +457,13 @@ class InventoryManagementSystem:
     def standardize_current_inventory(self, df):
         if df is None or df.empty: return []
         df.columns = [str(col).strip().lower() for col in df.columns]
-        
-        # Added 'target_days' to the map
         col_map = {
             'part_no': ['part no', 'part_no', 'material', 'item code'],
             'current_qty': ['current stock', 'stock', 'qty', 'current_qty', 'quantity', 'unrestricted'],
             'value': ['value', 'amount', 'total value', 'stock value', 'current inventory - value'],
             'desc': ['description', 'material description'],
-            'vendor': ['vendor', 'vendor name'],
-            'target_days': ['target_days', 'target days', 'norm days', 'days cover', 'doi']
+            'vendor': ['vendor', 'vendor name']
         }
-        
         found = {}
         for target, aliases in col_map.items():
             for alias in aliases:
@@ -494,22 +478,14 @@ class InventoryManagementSystem:
             try:
                 p_no = str(row[found['part_no']]).strip()
                 if not p_no or p_no.lower() == 'nan': continue
-                
                 val = 0.0
                 if 'value' in found: val = self.safe_float_convert(row[found['value']])
-                
-                # Capture Target Days (Default to 1 if column not found)
-                t_days = 1.0
-                if 'target_days' in found:
-                    t_days = self.safe_float_convert(row[found['target_days']], default=1.0)
-                
                 item = {
                     'Part_No': p_no,
                     'Current_QTY': self.safe_float_convert(row[found['current_qty']]),
                     'Current Inventory - VALUE': val,
                     'Description': str(row.get(found.get('desc'), '')).strip(),
-                    'Vendor_Name': str(row.get(found.get('vendor'), '')).strip(),
-                    'Target_Days': t_days # Storing the time factor
+                    'Vendor_Name': str(row.get(found.get('vendor'), '')).strip()
                 }
                 std_data.append(item)
             except Exception: continue
@@ -583,7 +559,7 @@ class InventoryManagementSystem:
                 st.rerun()
             self.run_analysis(boms_data, production_plan)
         else:
-            inv_file = st.file_uploader("Upload Inventory File (Optional col: 'Target Days')", type=['xlsx', 'csv'])
+            inv_file = st.file_uploader("Upload Inventory File", type=['xlsx', 'csv'])
             if inv_file:
                 df = pd.read_csv(inv_file) if inv_file.name.endswith('.csv') else pd.read_excel(inv_file)
                 std_inv = self.standardize_current_inventory(df)
@@ -613,17 +589,22 @@ class InventoryManagementSystem:
         
         st.markdown("#### Key Metrics")
         
-        # Metrics
+        # New Metric: Matched Parts (Parts that exist in both Inventory and BOM)
         matched_count = len(df[df['Matched Status'] == 'Matched'])
+        
         excess_count = len(df[df['Status'] == 'Excess Inventory'])
         short_count = len(df[df['Status'] == 'Short Inventory'])
+        
         total_excess_val = df[(df['Status'] == 'Excess Inventory') & (df['Stock Deviation Value'] > 0)]['Stock Deviation Value'].sum()
         total_short_val = df[(df['Status'] == 'Short Inventory') & (df['Stock Deviation Value'] > 0)]['Stock Deviation Value'].sum()
         
         c0, c1, c2, c3, c4 = st.columns(5)
+        
         c0.metric("✅ Matched Parts", f"{matched_count}", help="Count of parts found in both Inventory and BOM")
+        
         c1.metric("Parts in Excess", f"{excess_count}", delta="Overstocked", delta_color="inverse")
         c2.metric("Total Excess Value", f"₹{total_excess_val:,.0f}", delta="Dead Money")
+        
         c3.metric("Parts in Shortage", f"{short_count}", delta="Critical", delta_color="inverse")
         c4.metric("Total Shortage Value", f"₹{total_short_val:,.0f}", delta="Purchase Cost")
         
@@ -633,11 +614,7 @@ class InventoryManagementSystem:
         with t1:
             st.markdown("##### Detailed Shortage List")
             short_df = df[df['Status'] == 'Short Inventory'].sort_values('Stock Deviation Value', ascending=False)
-            
-            # Display relevant columns
-            cols_to_show = ['PART NO', 'PART DESCRIPTION', 'Vendor Name', 'Current Inventory - Qty', 'Lower Bound Qty', 'Stock Deviation Value']
-            st.dataframe(short_df[cols_to_show].rename(columns={'Stock Deviation Value': 'Shortage Amount (₹)'}), use_container_width=True)
-            
+            st.dataframe(short_df[['PART NO', 'PART DESCRIPTION', 'Vendor Name', 'Current Inventory - Qty', 'Lower Bound Qty', 'Stock Deviation Value']].rename(columns={'Stock Deviation Value': 'Shortage Amount (₹)'}), use_container_width=True)
             st.markdown("---")
             self.analyzer.show_part_chart_by_status(results, "Short Inventory", "Top Parts (Shortage)", "short_p", "#F44336")
             self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors (Shortage)", "short_v", "#F44336")
@@ -645,27 +622,13 @@ class InventoryManagementSystem:
         with t2:
             st.markdown("##### Detailed Excess List")
             excess_df = df[df['Status'] == 'Excess Inventory'].sort_values('Stock Deviation Value', ascending=False)
-            
-            # Display relevant columns
-            cols_to_show = ['PART NO', 'PART DESCRIPTION', 'Vendor Name', 'Current Inventory - Qty', 'Upper Bound Qty', 'Stock Deviation Value']
-            st.dataframe(excess_df[cols_to_show].rename(columns={'Stock Deviation Value': 'Excess Amount (₹)'}), use_container_width=True)
-            
+            st.dataframe(excess_df[['PART NO', 'PART DESCRIPTION', 'Vendor Name', 'Current Inventory - Qty', 'Upper Bound Qty', 'Stock Deviation Value']].rename(columns={'Stock Deviation Value': 'Excess Amount (₹)'}), use_container_width=True)
             st.markdown("---")
             self.analyzer.show_part_chart_by_status(results, "Excess Inventory", "Top Parts (Excess)", "excess_p", "#2196F3")
             self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors (Excess)", "excess_v", "#2196F3")
             
         with t3:
-            # Reorder columns to make the Logic clearer
-            ideal_cols = [
-                'PART NO', 'PART DESCRIPTION', 'Vendor Name', 
-                'Target Days', 'Daily Requirement', 'Ideal Inventory Qty', 
-                'Lower Bound Qty', 'Upper Bound Qty', 
-                'Current Inventory - Qty', 'Status', 'Stock Deviation Value'
-            ]
-            # Ensure columns exist before selecting
-            final_cols = [c for c in ideal_cols if c in df.columns]
-            
-            st.dataframe(df[final_cols], use_container_width=True)
+            st.dataframe(df, use_container_width=True)
             csv = df.to_csv(index=False).encode('utf-8')
             st.download_button("📥 Download Full Analysis CSV", csv, "inventory_analysis.csv", "text/csv")
 
