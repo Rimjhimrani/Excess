@@ -566,7 +566,7 @@ class InventoryManagementSystem:
         c0.metric("✅ Matched Parts", f"{matched_count}", help="Count of parts found in both Inventory and BOM")
         
         c1.metric("Parts in Excess", f"{excess_count}", delta="Overstocked", delta_color="inverse")
-        c2.metric("Total Excess Value", f"₹{total_excess_val:,.0f}", delta="Dead Money")
+        c2.metric("Total Excess Value", f"₹{total_excess_val:,.0f}", delta="Excess Cost")
         
         c3.metric("Parts in Shortage", f"{short_count}", delta="Critical", delta_color="inverse")
         c4.metric("Total Shortage Value", f"₹{total_short_val:,.0f}", delta="Purchase Cost")
