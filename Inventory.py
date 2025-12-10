@@ -148,8 +148,9 @@ class InventoryAnalyzer:
                     if vendor_name == 'Unknown' or vendor_name == '':
                         vendor_name = req_data.get('Vendor_Name', 'Unknown')
 
-                    lower_bound = rm_qty_norm * (1 - tolerance / 100)
-                    upper_bound = rm_qty_norm * (1 + tolerance / 100)
+                    # --- UPDATED: Round Up (Ceiling) Logic for Bounds ---
+                    lower_bound = np.ceil(rm_qty_norm * (1 - tolerance / 100))
+                    upper_bound = np.ceil(rm_qty_norm * (1 + tolerance / 100))
                     
                     if current_qty < lower_bound:
                         status = 'Short Inventory'
@@ -195,7 +196,6 @@ class InventoryAnalyzer:
                 continue
         return results
 
-    # --- UPDATED CHART FUNCTION 1: VENDORS ---
     def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='million'):
         """Show top 10 vendors by deviation value with selectable currency unit"""
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
@@ -229,7 +229,7 @@ class InventoryAnalyzer:
         y_title = f"Value (₹ {unit_label})"
         text_fmt = [f"{v:.2f}{suffix}" for v in plot_values]
 
-        # Custom Hover Text (Keep raw full value in hover)
+        # Custom Hover Text
         hover_texts = []
         for v, val in zip(vendors, values):
             hover_texts.append(
@@ -250,7 +250,6 @@ class InventoryAnalyzer:
         fig.update_layout(title=chart_title, xaxis_title="Vendor", yaxis_title=y_title)
         st.plotly_chart(fig, use_container_width=True, key=chart_key)
 
-    # --- UPDATED CHART FUNCTION 2: PARTS ---
     def show_part_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='million'):
         """Show top 10 Parts by deviation value with selectable currency unit"""
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter and item.get('Stock Deviation Value', 0) > 0]
@@ -573,21 +572,6 @@ class InventoryManagementSystem:
         c4.metric("Total Shortage Value", f"₹{total_short_val:,.0f}", delta="Purchase Cost")
         
         st.markdown("---")
-
-        # --- NEW: Graph Unit Selector ---
-        # User can choose between Millions and Lakhs
-        col_unit, col_spacer = st.columns([1, 4])
-        with col_unit:
-            unit_choice = st.radio(
-                "Select Graph Currency Unit:", 
-                ["Millions", "Lakhs"], 
-                horizontal=True,
-                index=0
-            )
-        
-        # Convert choice to lowercase for internal logic ('millions' -> 'million', 'lakhs' -> 'lakhs')
-        selected_format = "million" if unit_choice == "Millions" else "lakhs"
-        
         t1, t2, t3 = st.tabs(["🔴 Shortages", "🔵 Excess", "📋 Full Details"])
         
         with t1:
@@ -596,9 +580,20 @@ class InventoryManagementSystem:
             st.dataframe(short_df[['PART NO', 'PART DESCRIPTION', 'Vendor Name', 'Current Inventory - Qty', 'Lower Bound Qty', 'Stock Deviation Value']].rename(columns={'Stock Deviation Value': 'Shortage Amount (₹)'}), use_container_width=True)
             st.markdown("---")
             
-            # Pass selected_format to charts
-            self.analyzer.show_part_chart_by_status(results, "Short Inventory", "Top Parts (Shortage)", "short_p", "#F44336", value_format=selected_format)
-            self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors (Shortage)", "short_v", "#F44336", value_format=selected_format)
+            # --- UPDATED: Unit Selector Inserted Here (Between Table and Graph) ---
+            col_us, col_xs = st.columns([2, 8])
+            with col_us:
+                unit_choice_short = st.radio(
+                    "Graph Currency Unit", 
+                    ["Millions", "Lakhs"], 
+                    horizontal=True,
+                    index=0,
+                    key="unit_short"
+                )
+            fmt_short = "lakhs" if unit_choice_short == "Lakhs" else "million"
+
+            self.analyzer.show_part_chart_by_status(results, "Short Inventory", "Top Parts (Shortage)", "short_p", "#F44336", value_format=fmt_short)
+            self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors (Shortage)", "short_v", "#F44336", value_format=fmt_short)
             
         with t2:
             st.markdown("##### Detailed Excess List")
@@ -606,9 +601,20 @@ class InventoryManagementSystem:
             st.dataframe(excess_df[['PART NO', 'PART DESCRIPTION', 'Vendor Name', 'Current Inventory - Qty', 'Upper Bound Qty', 'Stock Deviation Value']].rename(columns={'Stock Deviation Value': 'Excess Amount (₹)'}), use_container_width=True)
             st.markdown("---")
             
-            # Pass selected_format to charts
-            self.analyzer.show_part_chart_by_status(results, "Excess Inventory", "Top Parts (Excess)", "excess_p", "#2196F3", value_format=selected_format)
-            self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors (Excess)", "excess_v", "#2196F3", value_format=selected_format)
+            # --- UPDATED: Unit Selector Inserted Here (Between Table and Graph) ---
+            col_ue, col_xe = st.columns([2, 8])
+            with col_ue:
+                unit_choice_excess = st.radio(
+                    "Graph Currency Unit", 
+                    ["Millions", "Lakhs"], 
+                    horizontal=True,
+                    index=0,
+                    key="unit_excess"
+                )
+            fmt_excess = "lakhs" if unit_choice_excess == "Lakhs" else "million"
+            
+            self.analyzer.show_part_chart_by_status(results, "Excess Inventory", "Top Parts (Excess)", "excess_p", "#2196F3", value_format=fmt_excess)
+            self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors (Excess)", "excess_v", "#2196F3", value_format=fmt_excess)
             
         with t3:
             st.dataframe(df, use_container_width=True)
