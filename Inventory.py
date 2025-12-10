@@ -91,21 +91,12 @@ class InventoryAnalyzer:
             return default
 
     def calculate_dynamic_norms(self, boms_data, production_plan):
-        """
-        Calculate total required quantity for every part based on BOMs and Production Plan.
-        """
         master_requirements = {}
-
-        # Iterate through every uploaded BOM
         for bom_name, bom_rows in boms_data.items():
             production_count = production_plan.get(bom_name, 0)
-            
-            # PROCESS ALL PARTS regardless of production count to establish "Matched" status
             for item in bom_rows:
                 part_no = str(item['Part_No']).strip().upper()
                 qty_per_veh = self.safe_float_convert(item.get('Qty_Veh', 0))
-                
-                # Calculate required quantity (will be 0 if production_count is 0)
                 total_req_for_bom = qty_per_veh * production_count
                 
                 if part_no in master_requirements:
@@ -123,65 +114,43 @@ class InventoryAnalyzer:
         return master_requirements
 
     def analyze_inventory(self, boms_data, inventory_data, production_plan, tolerance=None):
-        """
-        STRICT LOGIC APPLIED:
-        1. Iterate ONLY through Inventory Data.
-        2. If Part matches BOM -> Calculate Short/Excess based on norms.
-        3. If Part NOT in BOM -> It is automatically EXCESS.
-        4. If Part in BOM but NOT in Inventory -> IGNORE.
-        """
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)
 
-        # 1. Calculate Requirements (The Norms)
         required_parts_dict = self.calculate_dynamic_norms(boms_data, production_plan)
-        
         results = []
         
-        # 2. Iterate ONLY through the Uploaded Inventory File
         for inv_item in inventory_data:
             try:
                 part_no = str(inv_item['Part_No']).strip().upper()
-                
-                # Inventory Data
                 current_qty = float(inv_item.get('Current_QTY', 0))
                 current_value = float(inv_item.get('Current Inventory - VALUE', 0))
                 part_desc = inv_item.get('Description', 'Unknown')
                 vendor_name = inv_item.get('Vendor_Name', 'Unknown')
                 
-                # Check if this part exists in BOM Requirements
                 req_data = required_parts_dict.get(part_no)
-                
                 rm_qty_norm = 0.0
                 aggregates = []
                 lower_bound = 0.0
                 upper_bound = 0.0
-                
                 status = "Within Norms"
                 deviation_qty = 0.0
                 deviation_value = 0.0
-                
-                # Calculate Unit Price (Derived from Inventory)
                 unit_price = 0.0
                 if current_qty > 0:
                     unit_price = current_value / current_qty
 
                 if req_data:
-                    # CASE A: MATCH FOUND (In Inventory AND In BOM)
                     rm_qty_norm = float(req_data.get('RM_IN_QTY', 0))
                     aggregates = req_data.get('Aggregates', [])
-                    
-                    # If description missing in inventory, try BOM
                     if part_desc == 'Unknown' or part_desc == '':
                         part_desc = req_data.get('Description', 'Unknown')
                     if vendor_name == 'Unknown' or vendor_name == '':
                         vendor_name = req_data.get('Vendor_Name', 'Unknown')
 
-                    # Calculate Bounds
                     lower_bound = rm_qty_norm * (1 - tolerance / 100)
                     upper_bound = rm_qty_norm * (1 + tolerance / 100)
                     
-                    # Logic
                     if current_qty < lower_bound:
                         status = 'Short Inventory'
                         deviation_qty = lower_bound - current_qty
@@ -192,53 +161,43 @@ class InventoryAnalyzer:
                         deviation_value = deviation_qty * unit_price
                     else:
                         status = 'Within Norms'
-                        
                 else:
-                    # CASE B: NO MATCH (In Inventory but NOT in BOM) -> EXCESS
-                    # Logic: We have stock, but no requirement. All of it is Excess.
                     status = 'Excess Inventory'
                     rm_qty_norm = 0.0
                     lower_bound = 0.0
                     upper_bound = 0.0
                     aggregates = ["Not in BOM"]
-                    
                     deviation_qty = current_qty
-                    deviation_value = current_value # The entire value is excess
+                    deviation_value = current_value
 
-                # Ensure positive values only
                 if deviation_value < 0: deviation_value = 0
                 if deviation_qty < 0: deviation_qty = 0
 
-                # Append Result
                 result = {
                     'PART NO': part_no,
                     'PART DESCRIPTION': part_desc,
                     'Vendor Name': vendor_name,
                     'Used In Aggregates': ", ".join(aggregates),
                     'Matched Status': "Matched" if req_data else "Unmatched",
-                    
                     'RM Norm - In Qty': rm_qty_norm,
                     'Lower Bound Qty': lower_bound,
                     'Upper Bound Qty': upper_bound,
-                    
                     'UNIT PRICE': unit_price,
                     'Current Inventory - Qty': current_qty,
                     'Current Inventory - VALUE': current_value,
-                    
                     'Stock Deviation Qty': deviation_qty,
                     'Stock Deviation Value': deviation_value,
                     'Status': status,
                     'INVENTORY REMARK STATUS': status
                 }
                 results.append(result)
-
             except Exception as e:
                 continue
-                
         return results
 
+    # --- UPDATED CHART FUNCTION 1: VENDORS ---
     def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='million'):
-        """Show top 10 vendors by deviation value (Strictly Positive) with custom hover"""
+        """Show top 10 vendors by deviation value with selectable currency unit"""
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
         
         vendor_totals = {}
@@ -256,18 +215,21 @@ class InventoryAnalyzer:
         vendors = [x[0] for x in sorted_vendors]
         values = [x[1] for x in sorted_vendors]
         
-        # Formatting y-axis - CHANGED TO MILLION
-        # 1 Million = 10 Lakhs = 1,000,000
-        if value_format == 'million' or value_format == 'lakhs': # Default handling
-            plot_values = [v/1000000 for v in values]
-            y_title = "Value (₹ Millions)"
-            text_fmt = [f"{v:.2f}M" for v in plot_values]
+        # --- DYNAMIC UNIT LOGIC ---
+        if value_format == 'lakhs':
+            divisor = 100000
+            unit_label = "Lakhs"
+            suffix = "L"
         else:
-            plot_values = values
-            y_title = "Value (₹)"
-            text_fmt = [f"{v:,.0f}" for v in plot_values]
+            divisor = 1000000
+            unit_label = "Millions"
+            suffix = "M"
 
-        # Custom Hover Text
+        plot_values = [v / divisor for v in values]
+        y_title = f"Value (₹ {unit_label})"
+        text_fmt = [f"{v:.2f}{suffix}" for v in plot_values]
+
+        # Custom Hover Text (Keep raw full value in hover)
         hover_texts = []
         for v, val in zip(vendors, values):
             hover_texts.append(
@@ -288,8 +250,9 @@ class InventoryAnalyzer:
         fig.update_layout(title=chart_title, xaxis_title="Vendor", yaxis_title=y_title)
         st.plotly_chart(fig, use_container_width=True, key=chart_key)
 
+    # --- UPDATED CHART FUNCTION 2: PARTS ---
     def show_part_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='million'):
-        """Show top 10 Parts by deviation value with detailed custom hover"""
+        """Show top 10 Parts by deviation value with selectable currency unit"""
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter and item.get('Stock Deviation Value', 0) > 0]
         
         if not filtered:
@@ -301,17 +264,21 @@ class InventoryAnalyzer:
         part_nos = [x['PART NO'] for x in sorted_parts]
         values = [x['Stock Deviation Value'] for x in sorted_parts]
         
-        # Prepare Plot Values - CHANGED TO MILLION
-        if value_format == 'million' or value_format == 'lakhs':
-            plot_values = [v/1000000 for v in values]
-            y_title = "Value (₹ Millions)"
-            text_fmt = [f"{v:.2f}M" for v in plot_values]
+        # --- DYNAMIC UNIT LOGIC ---
+        if value_format == 'lakhs':
+            divisor = 100000
+            unit_label = "Lakhs"
+            suffix = "L"
         else:
-            plot_values = values
-            y_title = "Value (₹)"
-            text_fmt = [f"{v:,.0f}" for v in plot_values]
+            divisor = 1000000
+            unit_label = "Millions"
+            suffix = "M"
 
-        # Create Custom Hover Text
+        plot_values = [v / divisor for v in values]
+        y_title = f"Value (₹ {unit_label})"
+        text_fmt = [f"{v:.2f}{suffix}" for v in plot_values]
+
+        # Custom Hover Text
         hover_texts = []
         for item in sorted_parts:
             p_no = item['PART NO']
@@ -320,10 +287,8 @@ class InventoryAnalyzer:
             dev_val = item['Stock Deviation Value']
             dev_qty = item['Stock Deviation Qty']
             
-            # Logic for "From what point is above/below norm"
             norm_context = ""
             if status_filter == 'Excess Inventory':
-                # Excess logic
                 if item['Matched Status'] == 'Unmatched':
                     norm_context = f"⚠️ <b>Not in BOM</b> (All Qty Excess): {dev_qty:,.2f}"
                 else:
@@ -331,7 +296,6 @@ class InventoryAnalyzer:
             elif status_filter == 'Short Inventory':
                 norm_context = f"⚠️ <b>Below Min Norm by:</b> {dev_qty:,.2f} Qty"
             
-            # Build HTML String
             hover_html = (
                 f"<b>Part No:</b> {p_no}<br>"
                 f"<b>Description:</b> {desc}<br>"
@@ -348,7 +312,7 @@ class InventoryAnalyzer:
             text=text_fmt, 
             textposition='auto',
             hovertext=hover_texts,
-            hoverinfo="text" # Tells plotly to use ONLY our custom text
+            hoverinfo="text"
         ))
         
         fig.update_layout(title=chart_title, xaxis_title="Part No", yaxis_title=y_title)
@@ -609,6 +573,21 @@ class InventoryManagementSystem:
         c4.metric("Total Shortage Value", f"₹{total_short_val:,.0f}", delta="Purchase Cost")
         
         st.markdown("---")
+
+        # --- NEW: Graph Unit Selector ---
+        # User can choose between Millions and Lakhs
+        col_unit, col_spacer = st.columns([1, 4])
+        with col_unit:
+            unit_choice = st.radio(
+                "Select Graph Currency Unit:", 
+                ["Millions", "Lakhs"], 
+                horizontal=True,
+                index=0
+            )
+        
+        # Convert choice to lowercase for internal logic ('millions' -> 'million', 'lakhs' -> 'lakhs')
+        selected_format = "million" if unit_choice == "Millions" else "lakhs"
+        
         t1, t2, t3 = st.tabs(["🔴 Shortages", "🔵 Excess", "📋 Full Details"])
         
         with t1:
@@ -616,16 +595,20 @@ class InventoryManagementSystem:
             short_df = df[df['Status'] == 'Short Inventory'].sort_values('Stock Deviation Value', ascending=False)
             st.dataframe(short_df[['PART NO', 'PART DESCRIPTION', 'Vendor Name', 'Current Inventory - Qty', 'Lower Bound Qty', 'Stock Deviation Value']].rename(columns={'Stock Deviation Value': 'Shortage Amount (₹)'}), use_container_width=True)
             st.markdown("---")
-            self.analyzer.show_part_chart_by_status(results, "Short Inventory", "Top Parts (Shortage)", "short_p", "#F44336")
-            self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors (Shortage)", "short_v", "#F44336")
+            
+            # Pass selected_format to charts
+            self.analyzer.show_part_chart_by_status(results, "Short Inventory", "Top Parts (Shortage)", "short_p", "#F44336", value_format=selected_format)
+            self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors (Shortage)", "short_v", "#F44336", value_format=selected_format)
             
         with t2:
             st.markdown("##### Detailed Excess List")
             excess_df = df[df['Status'] == 'Excess Inventory'].sort_values('Stock Deviation Value', ascending=False)
             st.dataframe(excess_df[['PART NO', 'PART DESCRIPTION', 'Vendor Name', 'Current Inventory - Qty', 'Upper Bound Qty', 'Stock Deviation Value']].rename(columns={'Stock Deviation Value': 'Excess Amount (₹)'}), use_container_width=True)
             st.markdown("---")
-            self.analyzer.show_part_chart_by_status(results, "Excess Inventory", "Top Parts (Excess)", "excess_p", "#2196F3")
-            self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors (Excess)", "excess_v", "#2196F3")
+            
+            # Pass selected_format to charts
+            self.analyzer.show_part_chart_by_status(results, "Excess Inventory", "Top Parts (Excess)", "excess_p", "#2196F3", value_format=selected_format)
+            self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors (Excess)", "excess_v", "#2196F3", value_format=selected_format)
             
         with t3:
             st.dataframe(df, use_container_width=True)
