@@ -169,9 +169,10 @@ class InventoryAnalyzer:
                 rm_qty = self.safe_float_convert(pfep_item.get('RM_IN_QTY', 0))
                 # Inventory value
                 current_value = current_qty * unit_price
-                # Norms with tolerance
-                lower_bound = rm_qty * (1 - tolerance / 100)
-                upper_bound = rm_qty * (1 + tolerance / 100)
+                
+                # Norms with tolerance (UPDATED: Round Up using np.ceil)
+                lower_bound = np.ceil(rm_qty * (1 - tolerance / 100))
+                upper_bound = np.ceil(rm_qty * (1 + tolerance / 100))
 
                 # Revised Norm shown for reference
                 revised_norm_qty = upper_bound  # you can rename if needed
