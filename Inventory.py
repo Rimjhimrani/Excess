@@ -22,16 +22,36 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for "Stockpeers" Look with HIGH CONTRAST TEXT
+# Custom CSS for "Stockpeers" Look with FIXED VISIBILITY
 st.markdown("""
 <style>
     /* Global Background & Font */
     .stApp {
         background-color: #0e1117;
         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        color: #ffffff; /* FORCE WHITE TEXT */
+        color: #ffffff;
     }
     
+    /* --- FIX 1: Make Widget Labels (like Tolerance) Bright White --- */
+    .stSelectbox label, .stNumberInput label, .stFileUploader label, .stRadio label {
+        color: #ffffff !important;
+        font-weight: 600;
+    }
+
+    /* --- FIX 2: Make File Uploader Text Black (so it shows on white box) --- */
+    [data-testid="stFileUploader"] section {
+        color: #000000 !important; /* Black text for drag & drop area */
+    }
+    [data-testid="stFileUploader"] section div, 
+    [data-testid="stFileUploader"] section span, 
+    [data-testid="stFileUploader"] section small {
+        color: #374151 !important; /* Dark grey for secondary text */
+    }
+    /* Optional: Icon color inside uploader */
+    [data-testid="stFileUploader"] section svg {
+        fill: #374151 !important;
+    }
+
     /* Custom KPI Cards */
     .kpi-card {
         background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
@@ -51,7 +71,7 @@ st.markdown("""
     
     /* High Contrast Text Styles */
     .kpi-title {
-        color: #ffffff !important; /* Pure White */
+        color: #ffffff !important;
         font-size: 1.0rem;
         font-weight: 600;
         text-transform: uppercase;
@@ -65,18 +85,12 @@ st.markdown("""
         text-shadow: 0 2px 4px rgba(0,0,0,0.5);
     }
     .kpi-sub {
-        color: #e5e7eb !important; /* Bright Silver */
+        color: #e5e7eb !important;
         font-size: 0.9rem;
         margin-top: 5px;
         font-weight: 500;
     }
     
-    /* Color Utilities */
-    .text-green { color: #34d399 !important; }
-    .text-red { color: #f87171 !important; }
-    .text-blue { color: #60a5fa !important; }
-    .text-orange { color: #fbbf24 !important; }
-
     /* Custom Graph Container */
     .graph-container {
         background-color: #1f2937;
@@ -94,7 +108,7 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] {
         background-color: #1f2937;
         border-radius: 5px;
-        color: #ffffff; /* White Text */
+        color: #ffffff;
         border: 1px solid #374151;
     }
     .stTabs [aria-selected="true"] {
@@ -103,16 +117,19 @@ st.markdown("""
         border: 1px solid #2563eb;
     }
     
-    /* Input/Selectbox Styling */
+    /* Input/Selectbox Inner Styling */
     .stSelectbox div[data-baseweb="select"] > div {
         background-color: #1f2937;
         color: white;
         border-color: #374151;
     }
-    .stRadio label {
-        color: white !important;
-    }
     
+    /* Color Utilities */
+    .text-green { color: #34d399 !important; }
+    .text-red { color: #f87171 !important; }
+    .text-blue { color: #60a5fa !important; }
+    .text-orange { color: #fbbf24 !important; }
+
     /* DataFrame Styling */
     [data-testid="stDataFrame"] {
         border: 1px solid #374151;
@@ -122,7 +139,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # -----------------------------------------------------------------------------
-# 2. PERSISTENCE & LOGIC (UNCHANGED)
+# 2. PERSISTENCE & LOGIC
 # -----------------------------------------------------------------------------
 
 class DataPersistence:
@@ -264,7 +281,6 @@ class InventoryAnalyzer:
     def show_status_distribution_line(self, processed_data):
         df = pd.DataFrame(processed_data)
         
-        # Prepare data for 3 traces
         excess_data = df[df['Status'] == 'Excess Inventory'].sort_values('Stock Deviation Value', ascending=False).reset_index(drop=True)
         excess_data['Rank'] = excess_data.index + 1
         
@@ -276,36 +292,33 @@ class InventoryAnalyzer:
 
         fig = go.Figure()
 
-        # Trace 1: Excess
         fig.add_trace(go.Scatter(
             x=excess_data['Rank'], y=excess_data['Stock Deviation Value'],
             mode='lines', name='Excess Value',
-            line=dict(color='#60a5fa', width=3), # Bright Blue
+            line=dict(color='#60a5fa', width=3),
             fill='tozeroy', fillcolor='rgba(96, 165, 250, 0.15)',
             hovertemplate='<b>Excess</b><br>Rank: %{x}<br>Value: ₹%{y:,.0f}'
         ))
 
-        # Trace 2: Shortage
         fig.add_trace(go.Scatter(
             x=short_data['Rank'], y=short_data['Stock Deviation Value'],
             mode='lines', name='Shortage Value',
-            line=dict(color='#f87171', width=3), # Bright Red
+            line=dict(color='#f87171', width=3),
             fill='tozeroy', fillcolor='rgba(248, 113, 113, 0.15)',
             hovertemplate='<b>Shortage</b><br>Rank: %{x}<br>Value: ₹%{y:,.0f}'
         ))
 
-        # Trace 3: Within Norms
         fig.add_trace(go.Scatter(
             x=normal_data['Rank'], y=normal_data['Current Inventory - VALUE'],
             mode='lines', name='Healthy Stock Value',
-            line=dict(color='#34d399', width=2, dash='dot'), # Bright Green
+            line=dict(color='#34d399', width=2, dash='dot'),
             hovertemplate='<b>Healthy</b><br>Rank: %{x}<br>Value: ₹%{y:,.0f}'
         ))
 
         fig.update_layout(
             title="<b>Inventory Value Distribution Curve</b> (Sorted High to Low)",
             title_font=dict(color="white", size=18),
-            font=dict(color="white"), # Global Font White
+            font=dict(color="white"),
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
             xaxis=dict(title="Part Count (Ranked)", showgrid=False, color="white"),
@@ -354,7 +367,7 @@ class InventoryAnalyzer:
         fig.update_layout(
             title=f"<b>{chart_title}</b> (Top {top_n})",
             title_font=dict(color="white"),
-            font=dict(color="white"), # Global Font White
+            font=dict(color="white"),
             xaxis=dict(title="Vendor", color="white", showgrid=False), 
             yaxis=dict(title=y_title, color="white", gridcolor='#374151'),
             paper_bgcolor='rgba(0,0,0,0)',
@@ -394,7 +407,7 @@ class InventoryAnalyzer:
         fig.update_layout(
             title=f"<b>{chart_title}</b> (Top {top_n})",
             title_font=dict(color="white"),
-            font=dict(color="white"), # Global Font White
+            font=dict(color="white"),
             xaxis=dict(title="Part No", color="white", showgrid=False), 
             yaxis=dict(title=y_title, color="white", gridcolor='#374151'),
             paper_bgcolor='rgba(0,0,0,0)',
