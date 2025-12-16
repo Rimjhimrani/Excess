@@ -22,7 +22,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for "Stockpeers" Look with FIXED VISIBILITY
+# Custom CSS for "Stockpeers" Look with FIXED INPUT VISIBILITY
 st.markdown("""
 <style>
     /* Global Background & Font */
@@ -32,22 +32,59 @@ st.markdown("""
         color: #ffffff;
     }
     
-    /* --- FIX 1: Make Widget Labels (like Tolerance) Bright White --- */
+    /* --- FIX 1: Make Widget Labels (Titles above boxes) Bright White --- */
     .stSelectbox label, .stNumberInput label, .stFileUploader label, .stRadio label {
         color: #ffffff !important;
         font-weight: 600;
     }
 
-    /* --- FIX 2: Make File Uploader Text Black (so it shows on white box) --- */
+    /* --- FIX 2: INPUT BOXES (Number Input, Text Input) --- */
+    /* Force the Input Box Background to White and Text to BLACK */
+    div[data-baseweb="input"] > div {
+        background-color: #ffffff !important;
+        border: 1px solid #d1d5db !important;
+    }
+    /* This targets the actual text typed inside the number input */
+    input[type="number"], input[type="text"] {
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        font-weight: 500;
+    }
+    
+    /* --- FIX 3: SELECTBOX (Dropdowns) --- */
+    /* Force the Dropdown Box Background to White and Text to BLACK */
+    div[data-baseweb="select"] > div {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        border: 1px solid #d1d5db !important;
+    }
+    /* Fix the text color inside the selected option */
+    div[data-baseweb="select"] span {
+        color: #000000 !important;
+    }
+    /* Style the Dropdown Menu Options (when clicked) */
+    ul[data-baseweb="menu"] {
+        background-color: #ffffff !important;
+    }
+    li[data-baseweb="option"] {
+        color: #000000 !important;
+    }
+
+    /* --- FIX 4: FILE UPLOADER --- */
+    /* Make the drag & drop area White with Black Text */
     [data-testid="stFileUploader"] section {
-        color: #000000 !important; /* Black text for drag & drop area */
+        background-color: #ffffff !important;
+        color: #000000 !important;
     }
-    [data-testid="stFileUploader"] section div, 
-    [data-testid="stFileUploader"] section span, 
+    /* Main "Drag and drop file here" text */
+    [data-testid="stFileUploader"] section div {
+        color: #000000 !important;
+    }
+    /* Small help text like "Limit 200MB" */
     [data-testid="stFileUploader"] section small {
-        color: #374151 !important; /* Dark grey for secondary text */
+        color: #374151 !important;
     }
-    /* Optional: Icon color inside uploader */
+    /* The SVG Icon color */
     [data-testid="stFileUploader"] section svg {
         fill: #374151 !important;
     }
@@ -115,13 +152,6 @@ st.markdown("""
         background-color: #2563eb !important;
         color: white !important;
         border: 1px solid #2563eb;
-    }
-    
-    /* Input/Selectbox Inner Styling */
-    .stSelectbox div[data-baseweb="select"] > div {
-        background-color: #1f2937;
-        color: white;
-        border-color: #374151;
     }
     
     /* Color Utilities */
