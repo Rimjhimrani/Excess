@@ -310,7 +310,7 @@ class InventoryAnalyzer:
 
         fig.add_trace(go.Scatter(
             x=normal_data['Rank'], y=normal_data['Current Inventory - VALUE'],
-            mode='lines', name='Healthy Stock Value',
+            mode='lines', name='Within Norm Stock Value',
             line=dict(color='#34d399', width=2, dash='dot'),
             hovertemplate='<b>Healthy</b><br>Rank: %{x}<br>Value: ₹%{y:,.0f}'
         ))
