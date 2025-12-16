@@ -22,7 +22,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for "Stockpeers" Look with FIXED VISIBILITY
+# Custom CSS for Dark Mode with FIXED BLACK INPUT TEXT
 st.markdown("""
 <style>
     /* Global Background & Font */
@@ -32,25 +32,46 @@ st.markdown("""
         color: #ffffff;
     }
     
-    /* --- FIX 1: Make Widget Labels (like Tolerance) Bright White --- */
+    /* ================================================================= */
+    /* 🔴 CRITICAL FIX: FORCE BLACK TEXT IN WHITE BOXES                 */
+    /* ================================================================= */
+    
+    /* 1. Fix for Input Fields (Number Input, Text Input) */
+    div[data-baseweb="input"] > div > input {
+        color: #000000 !important;          /* Text Color Black */
+        -webkit-text-fill-color: #000000 !important; /* Chrome/Safari Fix */
+        caret-color: #000000 !important;    /* Typing Cursor Black */
+        font-weight: 600 !important;        /* Make text bolder */
+    }
+    
+    /* 2. Fix for +/- Buttons on Number Input */
+    div[data-testid="stNumberInput"] button {
+        color: #000000 !important;
+    }
+
+    /* 3. Fix for File Uploader Dropzone Text */
+    [data-testid="stFileUploader"] section {
+        color: #000000 !important; 
+    }
+    [data-testid="stFileUploader"] section span, 
+    [data-testid="stFileUploader"] section small, 
+    [data-testid="stFileUploader"] section div {
+        color: #374151 !important; /* Dark Grey for descriptive text */
+    }
+    
+    /* 4. Fix for Selectbox (Dropdown) selected value */
+    div[data-baseweb="select"] > div {
+        color: #ffffff !important; /* Dropdown usually has dark background in dark mode */
+    }
+    
+    /* 5. Labels (Titles above boxes) - Keep White */
     .stSelectbox label, .stNumberInput label, .stFileUploader label, .stRadio label {
         color: #ffffff !important;
         font-weight: 600;
+        font-size: 1rem;
     }
 
-    /* --- FIX 2: Make File Uploader Text Black (so it shows on white box) --- */
-    [data-testid="stFileUploader"] section {
-        color: #000000 !important; /* Black text for drag & drop area */
-    }
-    [data-testid="stFileUploader"] section div, 
-    [data-testid="stFileUploader"] section span, 
-    [data-testid="stFileUploader"] section small {
-        color: #374151 !important; /* Dark grey for secondary text */
-    }
-    /* Optional: Icon color inside uploader */
-    [data-testid="stFileUploader"] section svg {
-        fill: #374151 !important;
-    }
+    /* ================================================================= */
 
     /* Custom KPI Cards */
     .kpi-card {
@@ -117,24 +138,17 @@ st.markdown("""
         border: 1px solid #2563eb;
     }
     
-    /* Input/Selectbox Inner Styling */
-    .stSelectbox div[data-baseweb="select"] > div {
-        background-color: #1f2937;
-        color: white;
-        border-color: #374151;
-    }
-    
-    /* Color Utilities */
-    .text-green { color: #34d399 !important; }
-    .text-red { color: #f87171 !important; }
-    .text-blue { color: #60a5fa !important; }
-    .text-orange { color: #fbbf24 !important; }
-
     /* DataFrame Styling */
     [data-testid="stDataFrame"] {
         border: 1px solid #374151;
         border-radius: 5px;
     }
+    
+    /* Utilities */
+    .text-green { color: #34d399 !important; }
+    .text-red { color: #f87171 !important; }
+    .text-blue { color: #60a5fa !important; }
+    .text-orange { color: #fbbf24 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -310,7 +324,7 @@ class InventoryAnalyzer:
 
         fig.add_trace(go.Scatter(
             x=normal_data['Rank'], y=normal_data['Current Inventory - VALUE'],
-            mode='lines', name='Within Norm Stock Value',
+            mode='lines', name='Healthy Stock Value',
             line=dict(color='#34d399', width=2, dash='dot'),
             hovertemplate='<b>Healthy</b><br>Rank: %{x}<br>Value: ₹%{y:,.0f}'
         ))
