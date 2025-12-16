@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
-# 1. PAGE CONFIGURATION & MODERN UI CSS
+# 1. PAGE CONFIGURATION & HIGH CONTRAST DARK UI
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="Inventory AI Dashboard",
@@ -22,13 +22,14 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for "Stockpeers/Modern" Dashboard Look
+# Custom CSS for "Stockpeers" Look with HIGH CONTRAST TEXT
 st.markdown("""
 <style>
     /* Global Background & Font */
     .stApp {
         background-color: #0e1117;
         font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        color: #ffffff; /* FORCE WHITE TEXT */
     }
     
     /* Custom KPI Cards */
@@ -44,28 +45,37 @@ st.markdown("""
     }
     .kpi-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 6px 8px rgba(0, 0, 0, 0.4);
+        border-color: #60a5fa;
+        box-shadow: 0 6px 15px rgba(59, 130, 246, 0.2);
     }
+    
+    /* High Contrast Text Styles */
     .kpi-title {
-        color: #9ca3af;
-        font-size: 0.9rem;
+        color: #ffffff !important; /* Pure White */
+        font-size: 1.0rem;
+        font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 1px;
-        margin-bottom: 5px;
+        margin-bottom: 8px;
     }
     .kpi-value {
         color: #ffffff;
-        font-size: 1.8rem;
-        font-weight: 700;
+        font-size: 2.2rem;
+        font-weight: 800;
+        text-shadow: 0 2px 4px rgba(0,0,0,0.5);
     }
     .kpi-sub {
-        font-size: 0.8rem;
+        color: #e5e7eb !important; /* Bright Silver */
+        font-size: 0.9rem;
         margin-top: 5px;
+        font-weight: 500;
     }
-    .text-green { color: #10b981; }
-    .text-red { color: #ef4444; }
-    .text-blue { color: #3b82f6; }
-    .text-orange { color: #f59e0b; }
+    
+    /* Color Utilities */
+    .text-green { color: #34d399 !important; }
+    .text-red { color: #f87171 !important; }
+    .text-blue { color: #60a5fa !important; }
+    .text-orange { color: #fbbf24 !important; }
 
     /* Custom Graph Container */
     .graph-container {
@@ -79,15 +89,27 @@ st.markdown("""
     /* Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {
         gap: 10px;
+        background-color: transparent;
     }
     .stTabs [data-baseweb="tab"] {
         background-color: #1f2937;
         border-radius: 5px;
-        color: white;
-        border: none;
+        color: #ffffff; /* White Text */
+        border: 1px solid #374151;
     }
     .stTabs [aria-selected="true"] {
-        background-color: #3b82f6 !important;
+        background-color: #2563eb !important;
+        color: white !important;
+        border: 1px solid #2563eb;
+    }
+    
+    /* Input/Selectbox Styling */
+    .stSelectbox div[data-baseweb="select"] > div {
+        background-color: #1f2937;
+        color: white;
+        border-color: #374151;
+    }
+    .stRadio label {
         color: white !important;
     }
     
@@ -104,7 +126,6 @@ st.markdown("""
 # -----------------------------------------------------------------------------
 
 class DataPersistence:
-    """Handle data persistence across sessions"""
     @staticmethod
     def save_data_to_session_state(key, data):
         st.session_state[key] = {
@@ -120,8 +141,6 @@ class DataPersistence:
         return None
 
 class InventoryAnalyzer:
-    """Enhanced inventory analysis with BOM and Daily Production logic"""
-    
     def __init__(self):
         self.debug = False
 
@@ -240,24 +259,18 @@ class InventoryAnalyzer:
                 continue
         return results
 
-    # --- NEW: Graph to show all 3 statuses in one line graph ---
+    # --- GRAPH FUNCTIONS ---
+
     def show_status_distribution_line(self, processed_data):
-        """
-        Creates a multi-line chart where the X-axis is the Part Rank (sorted by value)
-        and Y-axis is the Value. This creates a curve showing the magnitude of each category.
-        """
         df = pd.DataFrame(processed_data)
         
         # Prepare data for 3 traces
-        # 1. Excess (Deviation Value)
         excess_data = df[df['Status'] == 'Excess Inventory'].sort_values('Stock Deviation Value', ascending=False).reset_index(drop=True)
         excess_data['Rank'] = excess_data.index + 1
         
-        # 2. Short (Deviation Value)
         short_data = df[df['Status'] == 'Short Inventory'].sort_values('Stock Deviation Value', ascending=False).reset_index(drop=True)
         short_data['Rank'] = short_data.index + 1
         
-        # 3. Within Norms (Current Inventory Value - as they have 0 deviation, we show actual stock value)
         normal_data = df[df['Status'] == 'Within Norms'].sort_values('Current Inventory - VALUE', ascending=False).reset_index(drop=True)
         normal_data['Rank'] = normal_data.index + 1
 
@@ -265,44 +278,37 @@ class InventoryAnalyzer:
 
         # Trace 1: Excess
         fig.add_trace(go.Scatter(
-            x=excess_data['Rank'], 
-            y=excess_data['Stock Deviation Value'],
-            mode='lines',
-            name='Excess Value',
-            line=dict(color='#3b82f6', width=3), # Blue
-            fill='tozeroy',
-            fillcolor='rgba(59, 130, 246, 0.1)',
+            x=excess_data['Rank'], y=excess_data['Stock Deviation Value'],
+            mode='lines', name='Excess Value',
+            line=dict(color='#60a5fa', width=3), # Bright Blue
+            fill='tozeroy', fillcolor='rgba(96, 165, 250, 0.15)',
             hovertemplate='<b>Excess</b><br>Rank: %{x}<br>Value: ₹%{y:,.0f}'
         ))
 
         # Trace 2: Shortage
         fig.add_trace(go.Scatter(
-            x=short_data['Rank'], 
-            y=short_data['Stock Deviation Value'],
-            mode='lines',
-            name='Shortage Value',
-            line=dict(color='#ef4444', width=3), # Red
-            fill='tozeroy',
-            fillcolor='rgba(239, 68, 68, 0.1)',
+            x=short_data['Rank'], y=short_data['Stock Deviation Value'],
+            mode='lines', name='Shortage Value',
+            line=dict(color='#f87171', width=3), # Bright Red
+            fill='tozeroy', fillcolor='rgba(248, 113, 113, 0.15)',
             hovertemplate='<b>Shortage</b><br>Rank: %{x}<br>Value: ₹%{y:,.0f}'
         ))
 
         # Trace 3: Within Norms
         fig.add_trace(go.Scatter(
-            x=normal_data['Rank'], 
-            y=normal_data['Current Inventory - VALUE'],
-            mode='lines',
-            name='Healthy Stock Value',
-            line=dict(color='#10b981', width=2, dash='dot'), # Green
+            x=normal_data['Rank'], y=normal_data['Current Inventory - VALUE'],
+            mode='lines', name='Healthy Stock Value',
+            line=dict(color='#34d399', width=2, dash='dot'), # Bright Green
             hovertemplate='<b>Healthy</b><br>Rank: %{x}<br>Value: ₹%{y:,.0f}'
         ))
 
         fig.update_layout(
             title="<b>Inventory Value Distribution Curve</b> (Sorted High to Low)",
-            title_font_color="white",
+            title_font=dict(color="white", size=18),
+            font=dict(color="white"), # Global Font White
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(title="Part Count (Ranked by Value)", showgrid=False, color="white"),
+            xaxis=dict(title="Part Count (Ranked)", showgrid=False, color="white"),
             yaxis=dict(title="Value (₹)", gridcolor='#374151', color="white"),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color="white")),
             hovermode="x unified",
@@ -310,7 +316,6 @@ class InventoryAnalyzer:
             margin=dict(l=20, r=20, t=50, b=20)
         )
         st.plotly_chart(fig, use_container_width=True)
-
 
     def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='million', top_n=10):
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
@@ -348,7 +353,8 @@ class InventoryAnalyzer:
         
         fig.update_layout(
             title=f"<b>{chart_title}</b> (Top {top_n})",
-            title_font_color="white",
+            title_font=dict(color="white"),
+            font=dict(color="white"), # Global Font White
             xaxis=dict(title="Vendor", color="white", showgrid=False), 
             yaxis=dict(title=y_title, color="white", gridcolor='#374151'),
             paper_bgcolor='rgba(0,0,0,0)',
@@ -387,7 +393,8 @@ class InventoryAnalyzer:
         
         fig.update_layout(
             title=f"<b>{chart_title}</b> (Top {top_n})",
-            title_font_color="white",
+            title_font=dict(color="white"),
+            font=dict(color="white"), # Global Font White
             xaxis=dict(title="Part No", color="white", showgrid=False), 
             yaxis=dict(title=y_title, color="white", gridcolor='#374151'),
             paper_bgcolor='rgba(0,0,0,0)',
@@ -462,7 +469,6 @@ class InventoryManagementSystem:
             st.sidebar.error("❌ Inventory: Not Loaded")
 
     def standardize_bom_data(self, df, aggregate_name):
-        # (Same logic as before, omitted for brevity but included in execution)
         if df is None or df.empty: return []
         df.columns = [str(col).strip().lower() for col in df.columns]
         col_map = {
@@ -495,7 +501,6 @@ class InventoryManagementSystem:
         return std_data
 
     def standardize_current_inventory(self, df):
-        # (Same logic as before)
         if df is None or df.empty: return []
         df.columns = [str(col).strip().lower() for col in df.columns]
         col_map = {
@@ -534,7 +539,6 @@ class InventoryManagementSystem:
         st.session_state.admin_tolerance = st.selectbox("Set Analysis Tolerance (+/- %)", [0, 10, 20, 30, 40, 50], index=3)
         st.markdown("---")
         
-        # (Admin logic remains identical)
         locked = st.session_state.get('persistent_boms_locked', False)
         if locked:
             st.warning("🔒 BOM Data is Locked for Users.")
@@ -632,7 +636,7 @@ class InventoryManagementSystem:
         total_excess_val = df[(df['Status'] == 'Excess Inventory') & (df['Stock Deviation Value'] > 0)]['Stock Deviation Value'].sum()
         total_short_val = df[(df['Status'] == 'Short Inventory') & (df['Stock Deviation Value'] > 0)]['Stock Deviation Value'].sum()
 
-        # --- 1. MODERN KPI CARDS ---
+        # --- 1. MODERN KPI CARDS (HIGH CONTRAST) ---
         c1, c2, c3, c4 = st.columns(4)
         
         with c1:
@@ -671,7 +675,7 @@ class InventoryManagementSystem:
             </div>
             """, unsafe_allow_html=True)
 
-        # --- 2. GLOBAL LINE GRAPH (THE NEW FEATURE) ---
+        # --- 2. GLOBAL LINE GRAPH (HIGH CONTRAST) ---
         st.markdown('<div class="graph-container">', unsafe_allow_html=True)
         self.analyzer.show_status_distribution_line(results)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -691,11 +695,11 @@ class InventoryManagementSystem:
             col_g1, col_g2 = st.columns(2)
             with col_g1:
                 st.markdown('<div class="graph-container">', unsafe_allow_html=True)
-                self.analyzer.show_part_chart_by_status(results, "Short Inventory", "Top Parts (Shortage)", "short_p", "#ef4444", fmt_short, top_n_short)
+                self.analyzer.show_part_chart_by_status(results, "Short Inventory", "Top Parts (Shortage)", "short_p", "#f87171", fmt_short, top_n_short)
                 st.markdown('</div>', unsafe_allow_html=True)
             with col_g2:
                 st.markdown('<div class="graph-container">', unsafe_allow_html=True)
-                self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors (Shortage)", "short_v", "#ef4444", fmt_short, top_n_short)
+                self.analyzer.show_vendor_chart_by_status(results, "Short Inventory", "Top Vendors (Shortage)", "short_v", "#f87171", fmt_short, top_n_short)
                 st.markdown('</div>', unsafe_allow_html=True)
 
             short_df = df[df['Status'] == 'Short Inventory'].sort_values('Stock Deviation Value', ascending=False)
@@ -713,11 +717,11 @@ class InventoryManagementSystem:
             col_g3, col_g4 = st.columns(2)
             with col_g3:
                 st.markdown('<div class="graph-container">', unsafe_allow_html=True)
-                self.analyzer.show_part_chart_by_status(results, "Excess Inventory", "Top Parts (Excess)", "excess_p", "#3b82f6", fmt_excess, top_n_excess)
+                self.analyzer.show_part_chart_by_status(results, "Excess Inventory", "Top Parts (Excess)", "excess_p", "#60a5fa", fmt_excess, top_n_excess)
                 st.markdown('</div>', unsafe_allow_html=True)
             with col_g4:
                 st.markdown('<div class="graph-container">', unsafe_allow_html=True)
-                self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors (Excess)", "excess_v", "#3b82f6", fmt_excess, top_n_excess)
+                self.analyzer.show_vendor_chart_by_status(results, "Excess Inventory", "Top Vendors (Excess)", "excess_v", "#60a5fa", fmt_excess, top_n_excess)
                 st.markdown('</div>', unsafe_allow_html=True)
 
             excess_df = df[df['Status'] == 'Excess Inventory'].sort_values('Stock Deviation Value', ascending=False)
