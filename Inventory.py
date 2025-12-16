@@ -170,7 +170,7 @@ class InventoryAnalyzer:
                 # Inventory value
                 current_value = current_qty * unit_price
                 
-                # Norms with tolerance (UPDATED: Round Up using np.ceil)
+                # Norms with tolerance (Rounding Up)
                 lower_bound = np.ceil(rm_qty * (1 - tolerance / 100))
                 upper_bound = np.ceil(rm_qty * (1 + tolerance / 100))
 
@@ -305,12 +305,18 @@ class InventoryAnalyzer:
         vendor_names = [v[0] for v in top_vendors]
         raw_values = [v[1] for v in top_vendors]
         counts = [v[2] for v in top_vendors]
+        
         # Value formatting
         if value_format == 'lakhs':
             values = [v / 100000 for v in raw_values]
             y_axis_title = "Value (₹ Lakhs)"
             hover_suffix = "L"
             tick_suffix = "L"
+        elif value_format == 'millions':
+            values = [v / 1000000 for v in raw_values]
+            y_axis_title = "Value (Millions)"
+            hover_suffix = "M"
+            tick_suffix = "M"
         elif value_format == 'crores':
             values = [v / 10000000 for v in raw_values]
             y_axis_title = "Value (₹ Crores)"
@@ -321,6 +327,7 @@ class InventoryAnalyzer:
             y_axis_title = "Value (₹)"
             hover_suffix = ""
             tick_suffix = ""
+            
         if status_filter == "Excess Inventory":
             y_axis_title = y_axis_title.replace("Value", "Excess Value Above Norm")
             hover_label = "Excess Value"
@@ -335,7 +342,7 @@ class InventoryAnalyzer:
             x=vendor_names,
             y=values,
             marker_color=color,
-            text=[f"{hover_label}: ₹{v:,.0f}{hover_suffix}<br>Parts: {c}" for v, c in zip(values, counts)],
+            text=[f"{hover_label}: ₹{v:,.1f}{hover_suffix}<br>Parts: {c}" for v, c in zip(values, counts)],
             hovertemplate='<b>%{x}</b><br>%{text}<extra></extra>',
         ))
         fig.update_layout(
@@ -2782,6 +2789,23 @@ class InventoryManagementSystem:
     def display_enhanced_analysis_charts(self, analysis_results):
         """Display enhanced visual summaries with better error handling"""
         st.subheader("📊 Enhanced Inventory Charts")
+        
+        # Add Unit Toggle
+        unit_col, _ = st.columns([1, 5])
+        with unit_col:
+            chart_unit = st.selectbox("Select Currency Unit:", ["Lakhs", "Millions"], key="chart_unit_selector")
+
+        if chart_unit == "Millions":
+            divisor = 1_000_000
+            suffix = "M"
+            unit_name = "Millions"
+            format_key = "millions"
+        else:
+            divisor = 100_000
+            suffix = "L"
+            unit_name = "Lakhs"
+            format_key = "lakhs"
+            
         df = pd.DataFrame(analysis_results)
         if df.empty:
             st.warning("⚠️ No data available for charts.")
@@ -2801,8 +2825,8 @@ class InventoryManagementSystem:
                 .head(10)
                 .copy()
             )
-            # Convert to lakhs
-            chart_data['Value_Lakh'] = chart_data[value_col] / 100_000
+            # Convert to selected unit
+            chart_data['Value_Converted'] = chart_data[value_col] / divisor
             # Combine description and part no into a single label
             chart_data['Part'] = chart_data.apply(
                 lambda row: f"{row['PART DESCRIPTION']}\n({row['PART NO']})",
@@ -2857,7 +2881,7 @@ class InventoryManagementSystem:
             for i, row in chart_data.iterrows():
                 fig1.add_trace(go.Bar(
                     x=[row['Part']],
-                    y=[row['Value_Lakh']],
+                    y=[row['Value_Converted']],
                     name=row['Inventory_Status'],
                     marker_color=row['Bar_Color'],
                     customdata=[row['HOVER_TEXT']],
@@ -2874,13 +2898,13 @@ class InventoryManagementSystem:
                     showlegend=True
                 ))
             fig1.update_layout(
-                title="Top 10 Parts by Stock Value (Color-coded by Inventory Status)",
+                title=f"Top 10 Parts by Stock Value (Color-coded by Inventory Status)",
                 xaxis_title="Parts",
-                yaxis_title="Stock Value (in ₹ Lakhs)",
+                yaxis_title=f"Stock Value (in ₹ {unit_name})",
                 xaxis_tickangle=-45,
                 yaxis=dict(
-                    tickformat=',.0f',
-                    ticksuffix='L'
+                    tickformat=',.1f',
+                    ticksuffix=suffix
                 ),
                 xaxis=dict(
                     tickfont=dict(size=10)
@@ -2942,7 +2966,7 @@ class InventoryManagementSystem:
             # Convert to DataFrame and get top 10
             vendor_df = pd.DataFrame(vendor_data).sort_values(by=value_col, ascending=False).head(10)
             if not vendor_df.empty:
-                vendor_df['Value_Lakh'] = vendor_df[value_col] / 100000  # Convert to ₹ Lakhs
+                vendor_df['Value_Converted'] = vendor_df[value_col] / divisor
                 # Create color mapping
                 color_map = {
                     "Excess Inventory": "#2196F3",
@@ -2967,7 +2991,7 @@ class InventoryManagementSystem:
                 for i, row in vendor_df.iterrows():
                     fig3.add_trace(go.Bar(
                         x=[row[vendor_col]],
-                        y=[row['Value_Lakh']],
+                        y=[row['Value_Converted']],
                         name=row['Vendor_Status'],
                         marker_color=row['Bar_Color'],
                         customdata=[row['HOVER_TEXT']],
@@ -2984,13 +3008,13 @@ class InventoryManagementSystem:
                         showlegend=True
                     ))
                 fig3.update_layout(
-                    title='Top 10 Vendors by Stock Value (Color-coded by Inventory Status)',
+                    title=f'Top 10 Vendors by Stock Value (Color-coded by Inventory Status)',
                     xaxis_title="Vendors",
-                    yaxis_title="Inventory Value (in ₹ Lakhs)",
+                    yaxis_title=f"Inventory Value (in ₹ {unit_name})",
                     xaxis_tickangle=-45,
                     yaxis=dict(
-                        tickformat=',.0f',
-                        ticksuffix='L'
+                        tickformat=',.1f',
+                        ticksuffix=suffix
                     ),
                     showlegend=True,
                     legend=dict(
@@ -3039,24 +3063,24 @@ class InventoryManagementSystem:
                     # For excess inventory, show only positive deviation values (excess amount)
                     status_df = status_df[status_df['Stock Deviation Value'] > 0]
                     status_df = status_df.sort_values(by='Stock Deviation Value', ascending=False).head(10)
-                    chart_title = "Top 10 Excess Inventory Parts (₹ Excess Value in Lakhs)"
-                    y_title = "Excess Inventory Value (₹ Lakhs)"
+                    chart_title = f"Top 10 Excess Inventory Parts (₹ Excess Value in {unit_name})"
+                    y_title = f"Excess Inventory Value (₹ {unit_name})"
                 elif status == "Short Inventory":
                     # For short inventory, show absolute value of negative deviation
                     status_df = status_df[status_df['Stock Deviation Value'] < 0]
                     status_df['Abs_Deviation_Value'] = abs(status_df['Stock Deviation Value'])
                     status_df = status_df.sort_values(by='Abs_Deviation_Value', ascending=False).head(10)
-                    chart_title = "Top 10 Short Inventory Parts (₹ Shortage Value in Lakhs)"
-                    y_title = "Shortage Value (₹ Lakhs)"
+                    chart_title = f"Top 10 Short Inventory Parts (₹ Shortage Value in {unit_name})"
+                    y_title = f"Shortage Value (₹ {unit_name})"
                 if status_df.empty:
                     st.info(f"No data found for '{status}' parts.")
                     continue
                 # Prepare chart data
                 if status == "Excess Inventory":
-                    status_df['Value_Lakh'] = status_df['Stock Deviation Value'] / 100000  # Excess value in lakhs
+                    status_df['Value_Converted'] = status_df['Stock Deviation Value'] / divisor  # Excess value
                     hover_value = status_df['Stock Deviation Value']
                 else:  # Short Inventory
-                    status_df['Value_Lakh'] = status_df['Abs_Deviation_Value'] / 100000  # Shortage value in lakhs
+                    status_df['Value_Converted'] = status_df['Abs_Deviation_Value'] / divisor  # Shortage value
                     hover_value = status_df['Abs_Deviation_Value']
                 status_df['PART_DESC_NO'] = status_df['PART DESCRIPTION'].astype(str) + " (" + status_df['PART NO'].astype(str) + ")"
                 status_df['HOVER_TEXT'] = status_df.apply(lambda row: (
@@ -3068,7 +3092,7 @@ class InventoryManagementSystem:
                 fig = px.bar(
                     status_df,
                     x='PART_DESC_NO',
-                    y='Value_Lakh',
+                    y='Value_Converted',
                     color_discrete_sequence=[color],
                     title=chart_title
                 )
@@ -3082,7 +3106,7 @@ class InventoryManagementSystem:
                     yaxis_title=y_title,
                     yaxis=dict(
                         tickformat=',.1f',
-                        ticksuffix='L'
+                        ticksuffix=suffix
                     )
                 )
                 st.plotly_chart(fig, use_container_width=True, key=f"{status.lower().replace(' ', '_')}_parts")
@@ -3107,7 +3131,7 @@ class InventoryManagementSystem:
                     chart_title=title,
                     chart_key=key,
                     color=color,
-                    value_format="lakhs"  # can change to "crores" if needed
+                    value_format=format_key  # Pass dynamically selected format
                 )
         except Exception as e:
             st.error("❌ Error displaying Top Vendors by Status")
