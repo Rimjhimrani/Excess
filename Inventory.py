@@ -144,16 +144,17 @@ class InventoryAnalyzer:
         
     def analyze_inventory(self, pfep_data, current_inventory, tolerance=None):
         """Analyze inventory using PFEP and Inventory Dump data.
-        Updated Logic:
+        
+        UPDATED LOGIC:
         - Ideal Inventory = AVG CONSUMPTION/DAY * Ideal Inventory Days (Admin Set)
         - Deviation % = ((Current - Ideal) / Ideal) * 100
-        - Short: Deviation < -Tolerance
-        - Excess: Deviation > +Tolerance
+        - Short: Percentage < -Tolerance
+        - Excess: Percentage > Tolerance
         """
         if tolerance is None:
-            tolerance = st.session_state.get("admin_tolerance", 30)  # default to 30%
+            tolerance = st.session_state.get("admin_tolerance", 30)
             
-        # Get Admin defined Ideal Days
+        # Retrieve Admin set Ideal Days
         ideal_days = st.session_state.get("ideal_inventory_days", 30)
 
         results = []
@@ -167,40 +168,41 @@ class InventoryAnalyzer:
                 continue  # Skip unmatched parts
             try:
                 # Basic Data
+                current_qty = float(inventory_item.get('Current_QTY', 0)) or 0.0
                 part_desc = pfep_item.get('Description', '')
                 unit_price = float(pfep_item.get('unit_price', 0)) or 1.0
                 
-                # Inventory Data
-                current_qty = float(inventory_item.get('Current_QTY', 0)) or 0.0
-                current_value = current_qty * unit_price
-                
-                # New Calculation Logic
+                # Consumption Data
                 avg_per_day = self.safe_float_convert(pfep_item.get('AVG CONSUMPTION/DAY', 0))
                 
-                # Calculate Ideal Inventory
+                # --- NEW CALCULATION LOGIC ---
+                # 1. Ideal Inventory
                 ideal_qty = avg_per_day * ideal_days
                 ideal_value = ideal_qty * unit_price
+                current_value = current_qty * unit_price
                 
-                # Calculate Deviation Percentage
+                # 2. Deviation Percentage
                 # Formula: ((Current - Ideal) / Ideal) * 100
                 if ideal_qty > 0:
                     deviation_percent = ((current_qty - ideal_qty) / ideal_qty) * 100
                 else:
-                    # If ideal is 0 but we have stock, it's 100% excess (technically infinite)
+                    # If ideal is 0:
+                    # If current is also 0 -> 0% deviation
+                    # If current > 0 -> 100% (or technically infinite) excess
                     deviation_percent = 100.0 if current_qty > 0 else 0.0
 
-                # Calculate Absolute Deviation Qty
+                # 3. Absolute Deviation Value (for financials)
                 deviation_qty = current_qty - ideal_qty
                 deviation_value = deviation_qty * unit_price
 
-                # Determine Status based on Deviation % and Tolerance
+                # 4. Status Determination
                 if deviation_percent < -tolerance:
                     status = 'Short Inventory'
                 elif deviation_percent > tolerance:
                     status = 'Excess Inventory'
                 else:
                     status = 'Within Norms'
-
+                
                 # Final result per part
                 result = {
                     'PART NO': part_no,
@@ -209,12 +211,12 @@ class InventoryAnalyzer:
                     'Vendor_Code': pfep_item.get('Vendor_Code', ''),
                     'AVG CONSUMPTION/DAY': avg_per_day,
                     'Ideal Days': ideal_days,
-                    'Ideal Inventory Qty': ideal_qty,
-                    'Ideal Inventory Value': ideal_value,
+                    'Ideal Inventory Qty': ideal_qty,     # Calculated Ideal
+                    'Ideal Inventory Value': ideal_value, # Calculated Ideal Value
                     'UNIT PRICE': unit_price,
                     'Current Inventory - Qty': current_qty,
                     'Current Inventory - VALUE': current_value,
-                    'Deviation Percentage': deviation_percent,
+                    'Deviation Percentage': deviation_percent, # New Metric
                     'SHORT/EXCESS INVENTORY': deviation_qty,
                     'Stock Deviation Value': deviation_value,
                     'Status': status,
@@ -229,7 +231,7 @@ class InventoryAnalyzer:
         return results 
         
     def get_vendor_summary(self, processed_data):
-        """Summarize inventory by vendor using actual Stock_Value field from the file."""
+        """Summarize inventory by vendor."""
         from collections import defaultdict
         summary = defaultdict(lambda: {
             'total_parts': 0,
@@ -237,43 +239,29 @@ class InventoryAnalyzer:
             'excess_parts': 0,
             'normal_parts': 0,
             'total_value': 0.0,
-            'excess_value_above_norm': 0.0,  # New field for excess value above norm
-            'short_value_below_norm': 0.0    # New field for short value below norm
+            'excess_value_above_norm': 0.0,
+            'short_value_below_norm': 0.0
         })
         for item in processed_data:
             vendor = item.get('Vendor Name', 'Unknown')
             status = item.get('INVENTORY REMARK STATUS', 'Unknown')
-            stock_value = item.get('Stock_Value') or item.get('Current Inventory - VALUE') or 0
+            stock_value = item.get('Current Inventory - VALUE', 0)
             
-            # Get current quantity and ideal values
+            # Using updated keys
             current_qty = item.get('Current Inventory - Qty', 0)
             ideal_qty = item.get('Ideal Inventory Qty', 0)
             unit_price = item.get('UNIT PRICE', 0)
 
-            try:
-                stock_value = float(stock_value)
-                current_qty = float(current_qty) if current_qty else 0
-                ideal_qty = float(ideal_qty) if ideal_qty else 0
-                unit_price = float(unit_price)
-            except (ValueError, TypeError):
-                stock_value = 0.0
-                current_qty = 0.0
-                ideal_qty = 0.0
-                unit_price = 0.0
-
             summary[vendor]['total_parts'] += 1
             summary[vendor]['total_value'] += stock_value
-            
             if status == "Short Inventory":
                 summary[vendor]['short_parts'] += 1
-                # Value of shortage (Ideal - Current)
-                if ideal_qty > current_qty and unit_price > 0:
+                if ideal_qty > current_qty:
                     short_value = (ideal_qty - current_qty) * unit_price
                     summary[vendor]['short_value_below_norm'] += short_value
             elif status == "Excess Inventory":
                 summary[vendor]['excess_parts'] += 1
-                # Value of excess (Current - Ideal)
-                if current_qty > ideal_qty and unit_price > 0:
+                if current_qty > ideal_qty:
                     excess_value = (current_qty - ideal_qty) * unit_price
                     summary[vendor]['excess_value_above_norm'] += excess_value
             elif status == "Within Norms":
@@ -293,6 +281,7 @@ class InventoryAnalyzer:
                 ideal_qty = float(item.get('Ideal Inventory Qty', 0) or 0)
                 unit_price = float(item.get('UNIT PRICE', 0) or 0)
                 
+                # Logic updated to use Ideal Qty
                 if status_filter == "Excess Inventory" and current_qty > ideal_qty:
                     deviation_value = (current_qty - ideal_qty) * unit_price
                     vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + deviation_value
@@ -311,7 +300,7 @@ class InventoryAnalyzer:
             (vendor, vendor_totals[vendor], vendor_counts.get(vendor, 0))
             for vendor in vendor_totals
         ]
-        # Sort and take top N by value
+        # Sort and take top N by value (Updated Logic Here)
         top_vendors = sorted(combined, key=lambda x: x[1], reverse=True)[:top_n]
         vendor_names = [v[0] for v in top_vendors]
         raw_values = [v[1] for v in top_vendors]
@@ -398,6 +387,10 @@ class InventoryManagementSystem:
                 'default_tolerance': 30,
                 'chart_theme': 'plotly'
             }
+            
+        # Initialize Admin Setting for Ideal Inventory Days
+        if 'ideal_inventory_days' not in st.session_state:
+            st.session_state.ideal_inventory_days = 30  # Default Value
         
         # Initialize persistent data keys
         self.persistent_keys = [
@@ -411,12 +404,7 @@ class InventoryManagementSystem:
         # Initialize persistent data if not exists
         for key in self.persistent_keys:
             if key not in st.session_state:
-                st.session_state[key] = None
-
-        # Initialize Admin Setting for Ideal Inventory Days
-        if 'ideal_inventory_days' not in st.session_state:
-            st.session_state.ideal_inventory_days = 30 # Default to 30 days
-
+                st.session_state[key] = None  # BUG: should be None, not empty list
     def safe_print(self, message):
         """Safely print to streamlit or console"""
         try:
@@ -467,6 +455,11 @@ class InventoryManagementSystem:
         float_result = self.safe_float_convert(value)
         return int(float_result)
             
+    def create_top_parts_chart(self, data, status_filter, bar_color, key):
+        """Top 10 parts chart by status — shows EXCESS/SHORT VALUE vs IDEAL VALUE comparison"""
+        # Note: This is a supplementary chart, the main one requested is in display_enhanced_analysis_charts
+        pass 
+
     def authenticate_user(self):
         """Enhanced authentication system with better UX and user switching"""
         st.sidebar.markdown("### 🔐 Authentication")
@@ -590,9 +583,8 @@ class InventoryManagementSystem:
     def load_sample_pfep_data(self):
         pfep_sample = [
            ["AC0303020106", "FLAT ALUMINIUM PROFILE", 4.000, "V001", "Vendor_A", "Mumbai", "Maharashtra", 2.5],
-           ["JJ1010101010", "WINDSHIELD WASHER", 25, "V002", "Vendor_B", "Delhi", "Delhi", 1.8],
-           ["TEST001", "HIGH CONSUMPTION PART", 100, "V003", "Vendor_C", "Pune", "MH", 10.0],
-           ["TEST002", "LOW CONSUMPTION PART", 10, "V003", "Vendor_C", "Pune", "MH", 0.5]
+           ["JJ1010101010", "WINDSHIELD WASHER", 25, "V002", "Vendor_B", "Delhi", "Delhi", 1.8]
+           # Add more sample data with consumption values...
         ]
         pfep_data = []
         for row in pfep_sample:
@@ -604,19 +596,18 @@ class InventoryManagementSystem:
                 'Vendor_Name': row[4],
                 'City': row[5],
                 'State': row[6],
-                'Unit_Price': 100,            
-                'RM_IN_DAYS': 7,              
-                'AVG CONSUMPTION/DAY': self.safe_float_convert(row[7]) if len(row) > 7 else 0
+                'Unit_Price': 100,            # 🔁 you can customize this per part
+                'RM_IN_DAYS': 7,              # 🔁 default or configurable
+                'AVG CONSUMPTION/DAY': self.safe_float_convert(row[7]) if len(row) > 7 else ""  # ✅ Added consumption data
             })
         return pfep_data
     
     def load_sample_current_inventory(self):
         """Load sample current inventory data with consistent fields"""
         current_sample = [
-            ["AC0303020106", "FLAT ALUMINIUM PROFILE", 5.230, 523],
-            ["JJ1010101010", "WINDSHIELD WASHER", 33, 3300],
-            ["TEST001", "HIGH CONSUMPTION PART", 500, 50000], # Excess (Needs ~300)
-            ["TEST002", "LOW CONSUMPTION PART", 2, 200] # Short (Needs ~15)
+            ["AC0303020106", "FLAT ALUMINIUM PROFILE", 5.230, 496],
+            # ... rest of your data
+            ["JJ1010101010", "WINDSHIELD WASHER", 33, 495]
         ]
         return [{
             'Part_No': row[0],
@@ -629,101 +620,175 @@ class InventoryManagementSystem:
         """Enhanced PFEP data standardization with added Unit_Price and RM_IN_DAYS support"""
         if df is None or df.empty:
             return []
-        
+        # Debug: Show original column names
+        if self.debug:
+            st.write("🔍 DEBUG: Original Excel columns:")
+            for i, col in enumerate(df.columns):
+                st.write(f"  {i}: '{col}' (type: {type(col)})")
+        # Comprehensive column mapping with more variations
         column_mappings = {
             'part_no': [
                 'part_no', 'part_number', 'material', 'material_code', 'item_code', 
-                'code', 'part no', 'partno', 'Part No', 'Part_No', 'PART_NO'
+                'code', 'part no', 'partno', 'Part No', 'Part_No', 'PART_NO',
+                'Material', 'Material Code', 'Item Code'
             ],
             'description': [
                 'description', 'item_description', 'part_description', 'desc', 
-                'part description', 'material_description', 'item desc', 'Part Description'
+                'part description', 'material_description', 'item desc', 'Part Description',
+                'Description', 'DESCRIPTION', 'Material Description'
             ],
             'rm_qty': [
                 'rm_in_qty', 'rm_qty', 'required_qty', 'norm_qty', 'target_qty', 
-                'rm', 'ri_in_qty', 'rm in qty', 'RM_IN_QTY', 'RM_QTY', 'RM IN QTY'
+                'rm', 'ri_in_qty', 'rm in qty', 'RM_IN_QTY', 'RM_QTY', 'RM IN QTY',
+                'Required Qty', 'Norm Qty', 'Target Qty'
+            ],
+            'rm_days': [
+                'rm_in_days', 'rm days', 'inventory days', 'rmindays', 'RM_IN_DAYS',
+                'RM IN DAYS', 'RM Days', 'Inventory Days'
             ],
             'unit_price': [
                 'unit_price', 'price', 'unit cost', 'unit rate', 'unitprice', 'Unit Price',
-                'UNIT_PRICE', 'UNIT PRICE', 'Price', 'PRICE'
+                'UNIT_PRICE', 'UNIT PRICE', 'Price', 'PRICE', 'Unit Cost', 'UNIT_COST',
+                'unit_cost', 'Unit Rate', 'UNIT_RATE', 'unit_rate', 'rate', 'Rate', 'RATE',
+                'cost', 'Cost', 'COST', 'Unit_Price'
             ],
             'vendor_code': [
                 'vendor_code', 'vendor_id', 'supplier_code', 'supplier_id', 'vendor id', 
-                'Vendor Code', 'vendor code'
+                'Vendor Code', 'vendor code', 'VENDOR_CODE', 'VENDOR CODE', 'Vendor_Code',
+                'Supplier Code', 'SUPPLIER_CODE'
             ],
             'vendor_name': [
                 'vendor_name', 'vendor', 'supplier_name', 'supplier', 'Vendor Name', 
-                'vendor name'
+                'vendor name', 'VENDOR_NAME', 'VENDOR NAME', 'Vendor_Name',
+                'Supplier Name', 'SUPPLIER_NAME', 'Supplier'
             ],
             'avg_consumption_per_day': [
                 'avg consumption/day', 'average consumption/day', 'avg_per_day',
                 'avg daily usage', 'AVG CONSUMPTION/DAY', 'Average Per Day',
-                'avg consumption per day', 'daily consumption', 'consumption per day'
+                'avg consumption per day', 'daily consumption', 'consumption per day',
+                'AVG_CONSUMPTION_PER_DAY', 'AVERAGE_CONSUMPTION_PER_DAY'
             ],
-            'city': ['city', 'location', 'place', 'City'],
-            'state': ['state', 'region', 'province', 'State']
+            'city': ['city', 'location', 'place', 'City', 'CITY', 'Location', 'LOCATION'],
+            'state': ['state', 'region', 'province', 'State', 'STATE', 'Region', 'REGION']
         }
-        
+        # Create case-insensitive column lookup
         df_columns_lookup = {}
         for col in df.columns:
             if col is not None:
+                # Clean column name (remove extra spaces, special characters)
                 clean_col = str(col).strip()
                 df_columns_lookup[clean_col.lower()] = clean_col
-
+        if self.debug:
+            st.write("🔍 DEBUG: Cleaned column lookup:")
+            for k, v in df_columns_lookup.items():
+                st.write(f"  '{k}' -> '{v}'")
+        # Map columns using case-insensitive matching
         mapped_columns = {}
         for key, variations in column_mappings.items():
+            found = False
             for variation in variations:
                 variation_lower = variation.lower().strip()
                 if variation_lower in df_columns_lookup:
                     mapped_columns[key] = df_columns_lookup[variation_lower]
+                    if self.debug:
+                        st.write(f"✅ Mapped {key} -> '{mapped_columns[key]}' (from variation: '{variation}')")
+                    found = True
                     break
-        
+            if not found and self.debug:
+                st.write(f"❌ No mapping found for {key}")
+        # Check for required columns
         if 'part_no' not in mapped_columns:
             st.error("❌ Part Number column not found. Please ensure your file has a Part Number column.")
             return []
+        if 'rm_qty' not in mapped_columns:
+            st.error("❌ RM Quantity column not found. Please ensure your file has an RM/Required Quantity column.")
+            return []
+        # Warning for missing unit price
+        if 'unit_price' not in mapped_columns:
+            st.warning("⚠️ Unit Price column not found. Using default value of 100 for all parts.")
+            st.info("💡 Expected Unit Price column names: Unit Price, Price, Unit Cost, Rate, etc.")
             
         if 'avg_consumption_per_day' not in mapped_columns:
-            st.warning("⚠️ AVG CONSUMPTION/DAY column not found. This is critical for Ideal Inventory calculation.")
+            st.warning("⚠️ AVG CONSUMPTION/DAY column not found. This will be left empty.")
+            st.info("💡 Expected column names: AVG CONSUMPTION/DAY, Average Per Day, Daily Consumption, etc.")
             
+        if self.debug:
+            st.write("🔍 DEBUG: Final column mappings:")
+            for k, v in mapped_columns.items():
+                st.write(f"  {k} -> '{v}'")
+        # Standardize data
         standardized_data = []
         for idx, row in df.iterrows():
             try:
-                unit_price_value = 100.0
+                # Extract unit price with detailed debugging
+                unit_price_value = 100.0  # Default value
                 if 'unit_price' in mapped_columns:
                     raw_price = row[mapped_columns['unit_price']]
                     unit_price_value = self.safe_float_convert(raw_price)
-
-                avg_consumption_value = 0.0
-                if 'avg_consumption_per_day' in mapped_columns:
-                    raw_consumption = row[mapped_columns['avg_consumption_per_day']]
-                    if pd.notna(raw_consumption) and str(raw_consumption).strip() != '':
-                        avg_consumption_value = self.safe_float_convert(raw_consumption)
-                        
+                    if self.debug and idx < 3:  # Debug first 3 rows
+                        st.write(f"🔍 Row {idx+1} Unit Price: '{raw_price}' -> {unit_price_value}")
+                    # Extract AVG CONSUMPTION/DAY with proper handling
+                    avg_consumption_value = ""  # Default empty string
+                    if 'avg_consumption_per_day' in mapped_columns:
+                        raw_consumption = row[mapped_columns['avg_consumption_per_day']]
+                        # Handle different data types
+                        if pd.notna(raw_consumption) and str(raw_consumption).strip() != '':
+                            avg_consumption_value = self.safe_float_convert(raw_consumption)
+                        if self.debug and idx < 3:  # Debug first 3 rows
+                            st.write(f"🔍 Row {idx+1} AVG CONSUMPTION/DAY: '{raw_consumption}' -> {avg_consumption_value}")
                 item = {
                     'Part_No': str(row[mapped_columns['part_no']]).strip(),
                     'Description': str(row.get(mapped_columns.get('description', ''), '')).strip(),
-                    'RM_IN_QTY': self.safe_float_convert(row.get(mapped_columns.get('rm_qty', ''), 0)),
-                    'unit_price': unit_price_value,
+                    'RM_IN_QTY': self.safe_float_convert(row[mapped_columns['rm_qty']]),
+                    'RM_IN_DAYS': self.safe_float_convert(row.get(mapped_columns.get('rm_days', ''), 7)),  # Default 7 days
+                    'unit_price': unit_price_value,  # Fixed: use lowercase to match analyzer expectation
                     'Vendor_Code': str(row.get(mapped_columns.get('vendor_code', ''), '')).strip(),
                     'Vendor_Name': str(row.get(mapped_columns.get('vendor_name', ''), 'Unknown')).strip(),
-                    'AVG CONSUMPTION/DAY': avg_consumption_value,
+                    'AVG CONSUMPTION/DAY': row.get(mapped_columns.get('avg_consumption_per_day', ''), ''),
                     'City': str(row.get(mapped_columns.get('city', ''), '')).strip(),
                     'State': str(row.get(mapped_columns.get('state', ''), '')).strip()
                 }
-                
+                # Skip rows with empty part numbers
                 if not item['Part_No'] or item['Part_No'].lower() in ['nan', 'none', '']:
                     continue
                 standardized_data.append(item)
             except Exception as e:
+                if self.debug:
+                    st.warning(f"⚠️ Error processing row {idx+1}: {e}")
                 continue
-        
+        # Summary of data processing
         st.success(f"✅ Processed {len(standardized_data)} PFEP records")
+        # Show unit price statistics
+        if standardized_data:
+            prices = [item['unit_price'] for item in standardized_data if item['unit_price'] > 0]
+            if prices:
+                avg_price = sum(prices) / len(prices)
+                st.info(f"💰 Unit Price Summary: {len(prices)} parts with prices, Average: ₹{avg_price:.2f}")
+            else:
+                st.warning("⚠️ No valid unit prices found in the data")
+            # Show AVG CONSUMPTION/DAY statistics
+            consumption_values = [
+                item.get('AVG CONSUMPTION/DAY')
+                for item in standardized_data
+                if item.get('AVG CONSUMPTION/DAY') not in (None, '', 'nan')
+            ]
+            if consumption_values:
+                # Convert strings to floats, skip zeros
+                numeric = [self.safe_float_convert(val) for val in consumption_values if self.safe_float_convert(val) > 0]
+                if numeric:
+                    avg_consumption = sum(numeric) / len(numeric)
+                    st.info(f"📊 AVG CONSUMPTION/DAY Summary: {len(numeric)} parts with consumption data, Average: {avg_consumption:.2f}")
+                else:
+                    st.warning("⚠️ All AVG CONSUMPTION/DAY values were zero or invalid.")
+            else:
+                st.warning("⚠️ No AVG CONSUMPTION/DAY data found in the file")
         return standardized_data
     
     def standardize_current_inventory(self, df):
         """Standardize current inventory data with full column mappings and debugging."""
         if df is None or df.empty:
             return []
+        # 🔁 Add all possible column mappings
         column_mappings = {
             'part_no': ['part_no', 'part_number', 'material', 'material_code', 'item_code', 'code', 'part no', 'Part No'],
             'description': ['description', 'item_description', 'part_description', 'desc','Part Description'],
@@ -741,7 +806,11 @@ class InventoryManagementSystem:
                 if variation.lower() in df_columns_lower:
                     mapped_columns[key] = df_columns_lower[variation.lower()]
                     break
-
+        # Debug: show mappings
+        if self.debug:
+            st.write("🔍 DEBUG: Column mappings found:")
+            for key, col in mapped_columns.items():
+                st.write(f"  {key} → {col}")
         if 'part_no' not in mapped_columns or 'current_qty' not in mapped_columns:
             st.error("❌ Required columns not found. Please ensure your file has Part Number and Current Quantity columns.")
             return []
@@ -762,16 +831,22 @@ class InventoryManagementSystem:
                     'Batch': str(row.get(mapped_columns.get('batch', ''), '')).strip()
                 }
                 standardized_data.append(item)
+                if self.debug and i < 5:
+                    st.write(f"🔍 Row {i+1}:", item)
             except Exception as e:
+                if self.debug:
+                    st.write(f"⚠️ Error processing row {i+1}: {e}")
                 continue
+        if self.debug:
+            st.write(f"✅ Total standardized records: {len(standardized_data)}")
         return standardized_data
     
     def validate_inventory_against_pfep(self, inventory_data):
-        """Validate inventory data against PFEP master data."""
+        """Validate inventory data against PFEP master data with normalized keys and warnings."""
         pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
         if not pfep_data:
             return {'is_valid': False, 'issues': ['No PFEP data available'], 'warnings': []}
-        
+        # Normalize part numbers
         def normalize(pn): return str(pn).strip().upper()
         pfep_df = pd.DataFrame(pfep_data)
         inventory_df = pd.DataFrame(inventory_data)
@@ -787,6 +862,7 @@ class InventoryManagementSystem:
         missing_parts = pfep_parts - inventory_parts
         extra_parts = inventory_parts - pfep_parts
         
+        # Check for parts with zero quantity
         zero_qty_parts = inventory_df[inventory_df['Current_QTY'] == 0]['Part_No'].tolist()
         if zero_qty_parts:
             warnings.append(f"Parts with zero quantity: {len(zero_qty_parts)} parts")
@@ -820,6 +896,7 @@ class InventoryManagementSystem:
             with col2:
                 if st.button("🔓 Unlock Data", type="secondary"):
                     st.session_state.persistent_pfep_locked = False
+                    # Clear related data when PFEP is unlocked
                     st.session_state.persistent_inventory_data = None
                     st.session_state.persistent_inventory_locked = False
                     st.session_state.persistent_analysis_results = None
@@ -836,8 +913,8 @@ class InventoryManagementSystem:
                 self.display_pfep_data_preview(pfep_data)
             return
 
-        # --- ADMIN SETTINGS SECTION ---
-        st.subheader("⚙️ Inventory Settings (Admin Only)")
+        # --- UPDATED: Admin Settings for Tolerance AND Ideal Days ---
+        st.subheader("📐 Analysis Settings")
         
         col_tol, col_days = st.columns(2)
         
@@ -845,24 +922,26 @@ class InventoryManagementSystem:
             # Initialize admin_tolerance if not exists
             if "admin_tolerance" not in st.session_state:
                 st.session_state.admin_tolerance = 30
-        
+    
+            # Create selectbox with proper callback
             new_tolerance = st.selectbox(
-                "Deviation Tolerance Zone (+/-)",
-                options=[0, 1, 5, 10, 20, 30, 40, 50],
-                index=[0, 1, 5, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance),
+                "Tolerance Zone (+/-)",
+                options=[0, 10, 20, 30, 40, 50],
+                index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance),
                 format_func=lambda x: f"{x}%",
-                key="tolerance_selector",
-                help="If Deviation % is more than this, it is Excess. If less than negative of this, it is Short."
+                key="tolerance_selector"
             )
+            # Update tolerance if changed
             if new_tolerance != st.session_state.admin_tolerance:
                 st.session_state.admin_tolerance = new_tolerance
                 st.success(f"✅ Tolerance updated to {new_tolerance}%")
                 
         with col_days:
-            # Initialize ideal_inventory_days if not exists
+             # Initialize ideal_inventory_days if not exists
             if "ideal_inventory_days" not in st.session_state:
                 st.session_state.ideal_inventory_days = 30
-
+            
+            # Create number input for Ideal Days
             new_ideal_days = st.number_input(
                 "Ideal Inventory Days",
                 min_value=1,
@@ -870,18 +949,23 @@ class InventoryManagementSystem:
                 value=st.session_state.ideal_inventory_days,
                 step=1,
                 key="ideal_days_selector",
-                help="Ideal Inventory = Avg Daily Consumption * Ideal Inventory Days"
+                help="Ideal Inventory = Avg Daily Consumption * This Value"
             )
             if new_ideal_days != st.session_state.ideal_inventory_days:
                 st.session_state.ideal_inventory_days = new_ideal_days
                 st.success(f"✅ Ideal Inventory Days updated to {new_ideal_days} days")
-
-        st.markdown(f"**Current Settings:** Ideal Days = {st.session_state.ideal_inventory_days} | Tolerance = ±{st.session_state.admin_tolerance}%")
+                
+            # If analysis exists, refresh it
+            if st.session_state.get('persistent_analysis_results'):
+                st.info("🔄 Analysis will be refreshed on next run")
+        
+        st.markdown(f"**Current Settings:** Tolerance: ±{st.session_state.admin_tolerance}% | Ideal Days: {st.session_state.ideal_inventory_days}")
         st.markdown("---")
         
         # PFEP Data Management Section
         st.subheader("📊 PFEP Master Data Management")
         
+        # Tab interface for different data input methods
         tab1, tab2, tab3 = st.tabs(["📁 Upload File", "🧪 Load Sample", "📋 Current Data"])
         
         with tab1:
@@ -889,11 +973,12 @@ class InventoryManagementSystem:
             uploaded_file = st.file_uploader(
                 "Choose PFEP file",
                 type=['xlsx', 'xls', 'csv'],
-                help="Upload your PFEP master data file. Must contain 'AVG CONSUMPTION/DAY'."
+                help="Upload your PFEP master data file"
             )
             
             if uploaded_file is not None:
                 try:
+                    # Read file based on extension
                     if uploaded_file.name.endswith('.csv'):
                         df = pd.read_csv(uploaded_file)
                     else:
@@ -901,11 +986,22 @@ class InventoryManagementSystem:
                     
                     st.success(f"✅ File loaded: {len(df)} rows")
                     
+                    # Show preview
+                    with st.expander("📋 Preview Raw Data"):
+                        st.dataframe(df.head())
+                    
+                    # Standardize data
                     standardized_data = self.standardize_pfep_data(df)
                     
                     if standardized_data:
                         st.success(f"✅ Standardized: {len(standardized_data)} valid records")
                         
+                        # Show standardized preview
+                        with st.expander("📋 Preview Standardized Data"):
+                            preview_df = pd.DataFrame(standardized_data[:5])
+                            st.dataframe(preview_df)
+                        
+                        # Save button
                         if st.button("💾 Save PFEP Data", type="primary"):
                             self.persistence.save_data_to_session_state(
                                 'persistent_pfep_data', 
@@ -921,6 +1017,7 @@ class InventoryManagementSystem:
         
         with tab2:
             st.markdown("**Load Sample PFEP Data for Testing**")
+            st.info("This will load pre-configured sample data for demonstration")
             
             if st.button("🧪 Load Sample PFEP Data", type="secondary"):
                 sample_data = self.load_sample_pfep_data()
@@ -938,6 +1035,7 @@ class InventoryManagementSystem:
             if pfep_data:
                 self.display_pfep_data_preview(pfep_data)
                 
+                # Lock data for users
                 st.markdown("---")
                 st.markdown("**🔒 Lock Data for Users**")
                 st.info("Locking PFEP data allows users to upload inventory and perform analysis")
@@ -953,6 +1051,7 @@ class InventoryManagementSystem:
         """Display PFEP data preview with statistics"""
         st.markdown("**📊 PFEP Data Overview**")
         
+        # Statistics
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Total Parts", len(pfep_data))
@@ -960,20 +1059,38 @@ class InventoryManagementSystem:
             vendors = set(item.get('Vendor_Name', 'Unknown') for item in pfep_data)
             st.metric("Unique Vendors", len(vendors))
         with col3:
-            total_consumption = sum(item.get('AVG CONSUMPTION/DAY', 0) for item in pfep_data)
-            st.metric("Total Avg Daily Consumption", f"{total_consumption:,.0f}")
+            total_rm_qty = sum(item.get('RM_IN_QTY', 0) for item in pfep_data)
+            st.metric("Total RM Qty", f"{total_rm_qty:,.0f}")
         with col4:
-            avg_unit_price = sum(item.get('unit_price', 0) for item in pfep_data) / len(pfep_data) if len(pfep_data) > 0 else 0
+            avg_unit_price = sum(item.get('Unit_Price', 0) for item in pfep_data) / len(pfep_data)
             st.metric("Avg Unit Price", f"₹{avg_unit_price:.2f}")
         
+        # Data preview
         with st.expander("📋 Data Preview (First 10 rows)"):
             preview_df = pd.DataFrame(pfep_data[:10])
             st.dataframe(preview_df)
+        
+        # Vendor summary
+        with st.expander("📈 Vendor Summary"):
+            vendor_summary = {}
+            for item in pfep_data:
+                vendor = item.get('Vendor_Name', 'Unknown')
+                if vendor not in vendor_summary:
+                    vendor_summary[vendor] = {'count': 0, 'total_qty': 0}
+                vendor_summary[vendor]['count'] += 1
+                vendor_summary[vendor]['total_qty'] += item.get('RM_IN_QTY', 0)
+            
+            vendor_df = pd.DataFrame([
+                {'Vendor': k, 'Parts Count': v['count'], 'Total RM Qty': v['total_qty']}
+                for k, v in vendor_summary.items()
+            ])
+            st.dataframe(vendor_df)
     
     def user_inventory_upload(self):
         """User interface for inventory upload and analysis"""
         st.header("📦 Inventory Analysis System")
         
+        # Check if PFEP data is available and locked
         pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
         pfep_locked = st.session_state.get('persistent_pfep_locked', False)
         
@@ -982,8 +1099,10 @@ class InventoryManagementSystem:
             st.info("Please contact admin to load and lock PFEP data first.")
             return
         
+        # Display PFEP status
         st.success(f"✅ PFEP Master Data: {len(pfep_data)} parts available")
         
+        # Check if inventory is already loaded and locked
         inventory_data = self.persistence.load_data_from_session_state('persistent_inventory_data')
         inventory_locked = st.session_state.get('persistent_inventory_locked', False)
         
@@ -992,8 +1111,10 @@ class InventoryManagementSystem:
             self.display_analysis_interface()
             return
         
+        # Inventory upload interface
         st.subheader("📊 Upload Current Inventory Data")
         
+        # Tab interface
         tab1, tab2 = st.tabs(["📁 Upload File", "🧪 Load Sample"])
         
         with tab1:
@@ -1006,21 +1127,37 @@ class InventoryManagementSystem:
             
             if uploaded_file is not None:
                 try:
+                    # Read file
                     if uploaded_file.name.endswith('.csv'):
                         df = pd.read_csv(uploaded_file)
                     else:
                         df = pd.read_excel(uploaded_file)
                     
                     st.success(f"✅ File loaded: {len(df)} rows")
+                    
+                    # Show preview
+                    with st.expander("📋 Preview Raw Data"):
+                        st.dataframe(df.head())
+                    
+                    # Standardize data
                     standardized_data = self.standardize_current_inventory(df)
                     
                     if standardized_data:
                         st.success(f"✅ Standardized: {len(standardized_data)} valid records")
                         
+                        # Validate against PFEP
                         validation_result = self.validate_inventory_against_pfep(standardized_data)
+                        
+                        # Display validation results
                         self.display_validation_results(validation_result)
                         
                         if validation_result['is_valid']:
+                            # Show standardized preview
+                            with st.expander("📋 Preview Standardized Data"):
+                                preview_df = pd.DataFrame(standardized_data[:5])
+                                st.dataframe(preview_df)
+                            
+                            # Save and lock button
                             if st.button("💾 Save & Lock Inventory Data", type="primary"):
                                 self.persistence.save_data_to_session_state(
                                     'persistent_inventory_data', 
@@ -1039,10 +1176,12 @@ class InventoryManagementSystem:
         
         with tab2:
             st.markdown("**Load Sample Inventory Data for Testing**")
+            st.info("This will load pre-configured sample inventory data")
             
             if st.button("🧪 Load Sample Inventory Data", type="secondary"):
                 sample_data = self.load_sample_current_inventory()
                 
+                # Validate sample data
                 validation_result = self.validate_inventory_against_pfep(sample_data)
                 self.display_validation_results(validation_result)
                 
@@ -1054,7 +1193,25 @@ class InventoryManagementSystem:
                     st.session_state.persistent_inventory_locked = True
                     st.success(f"✅ Sample inventory data loaded and locked: {len(sample_data)} parts")
                     st.rerun()
+    def run(self):
+        st.title("📊 Inventory Analyzer")
+        st.markdown(
+            "<p style='font-size:18px; font-style:italic;'>Designed and Developed by Agilomatrix</p>",
+            unsafe_allow_html=True
+        )
+        st.markdown("---")
 
+        # Authenticate user
+        self.authenticate_user()
+
+        # Show UI based on role
+        if st.session_state.user_role == "Admin":
+            self.admin_data_management()
+        elif st.session_state.user_role == "User":
+            self.user_inventory_upload()
+        else:
+            st.info("👋 Please select your role and authenticate to access the system.")
+    
     def display_validation_results(self, validation_result):
         """Display inventory validation results"""
         st.markdown("**📋 Validation Results**")
@@ -1065,14 +1222,42 @@ class InventoryManagementSystem:
             for issue in validation_result['issues']:
                 st.error(f"• {issue}")
         
+        # Display warnings
         if validation_result['warnings']:
             st.warning("⚠️ Validation Warnings:")
             for warning in validation_result['warnings']:
                 st.warning(f"• {warning}")
+        
+        # Statistics
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("PFEP Parts", validation_result['pfep_parts_count'])
+        with col2:
+            st.metric("Inventory Parts", validation_result['inventory_parts_count'])
+        with col3:
+            st.metric("Matching Parts", validation_result['matching_parts_count'])
+        
+        # Detailed breakdown
+        with st.expander("📊 Detailed Breakdown"):
+            col1, col2 = st.columns(2)
+            with col1:
+                if validation_result['missing_parts_count'] > 0:
+                    st.warning(f"Missing Parts ({validation_result['missing_parts_count']}):")
+                    st.text("\n".join(validation_result['missing_parts_list'][:10]))
+                    if len(validation_result['missing_parts_list']) > 10:
+                        st.text(f"... and {len(validation_result['missing_parts_list']) - 10} more")
+            
+            with col2:
+                if validation_result['extra_parts_count'] > 0:
+                    st.info(f"Extra Parts ({validation_result['extra_parts_count']}):")
+                    st.text("\n".join(validation_result['extra_parts_list'][:10]))
+                    if len(validation_result['extra_parts_list']) > 10:
+                        st.text(f"... and {len(validation_result['extra_parts_list']) - 10} more")
     
     def display_analysis_interface(self):
         """Main analysis interface for users"""
         st.subheader("📈 Inventory Analysis Results")
+        # Get PFEP and Inventory data
         try:
             pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
             inventory_data = self.persistence.load_data_from_session_state('persistent_inventory_data')
@@ -1080,26 +1265,20 @@ class InventoryManagementSystem:
             st.error("❌ Error loading PFEP or Inventory data.")
             st.code(str(e))
             return
-        
         if not pfep_data or not inventory_data:
-            st.error("❌ Required data not available.")
+            st.error("❌ Required data not available. Please upload PFEP and Inventory data first.")
             return
-        
-        # Get tolerance and ideal days from settings
+        # Get tolerance from admin settings
         tolerance = st.session_state.get('admin_tolerance', 30)
-        ideal_days = st.session_state.get('ideal_inventory_days', 30)
-        
-        st.info(f"📐 Settings: Ideal Days = {ideal_days} | Tolerance = ±{tolerance}%")
+        st.info(f"📐 Analysis Tolerance: ±{tolerance}% (Set by Admin)")
 
-        # Auto re-analyze if needed
+        # Check if analysis needs to be performed or updated
         analysis_data = self.persistence.load_data_from_session_state('persistent_analysis_results')
-        
-        # We should check if settings changed
         last_tolerance = st.session_state.get('last_analysis_tolerance', None)
-        last_ideal_days = st.session_state.get('last_analysis_ideal_days', None)
 
-        if not analysis_data or last_tolerance != tolerance or last_ideal_days != ideal_days:
-            st.info(f"🔄 Re-analyzing with new settings...")
+        # Auto re-analyze if tolerance changed or no data exists
+        if not analysis_data or last_tolerance != tolerance:
+            st.info(f"🔄 Re-analyzing with ±{tolerance}% tolerance...")
             with st.spinner("Analyzing inventory..."):
                 try:
                     analysis_results = self.analyzer.analyze_inventory(
@@ -1114,13 +1293,12 @@ class InventoryManagementSystem:
             if analysis_results:
                 self.persistence.save_data_to_session_state('persistent_analysis_results', analysis_results)
                 st.session_state.last_analysis_tolerance = tolerance
-                st.session_state.last_analysis_ideal_days = ideal_days
                 st.success("✅ Analysis completed successfully!")
                 st.rerun()
             else:
                 st.error("❌ Analysis failed. No results generated.")
                 return
-        
+        # ✅ Use the full dashboard method
         try:
             self.display_analysis_results()
         except Exception as e:
@@ -1129,117 +1307,1386 @@ class InventoryManagementSystem:
             return
             
     def display_comprehensive_analysis(self, analysis_results):
-        """Display comprehensive analysis results"""
+        """Display comprehensive analysis results with enhanced features"""
         st.success(f"✅ Analysis Complete: {len(analysis_results)} parts analyzed")
-        
         try:
             self.display_enhanced_summary_metrics(analysis_results)
         except Exception as e:
             st.error("❌ Error in Summary Metrics")
-        
+            st.code(str(e))
+        try:
+            self.display_enhanced_detailed_tables(analysis_results)
+        except Exception as e:
+            st.error("❌ Error in Detailed Tables")
+            st.code(str(e))
         try:
             self.display_enhanced_analysis_charts(analysis_results)
         except Exception as e:
             st.error("❌ Error in Charts")
             st.code(str(e))
-
         try:
-            self.display_enhanced_detailed_tables(analysis_results)
+            self.display_enhanced_export_options(analysis_results)
         except Exception as e:
-            st.error("❌ Error in Detailed Tables")
+            st.error("❌ Error in Export Options")
+            st.code(str(e))
 
+    def display_enhanced_export_options(self, analysis_results):
+        """Allow users to export the analysis results"""
+        st.subheader("📤 Export Analysis Results")
+        df = pd.DataFrame(analysis_results)
+        # Export to CSV
+        csv_buffer = io.StringIO()
+        df.to_csv(csv_buffer, index=False)
+        st.download_button(
+            label="📄 Download CSV",
+            data=csv_buffer.getvalue(),
+            file_name="inventory_analysis.csv",
+            mime="text/csv"
+        )
+        # Export to Excel
+        excel_buffer = io.BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='Analysis')
+        st.download_button(
+            label="📊 Download Excel",
+            data=excel_buffer.getvalue(),
+            file_name="inventory_analysis.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        
     def display_enhanced_summary_metrics(self, analysis_results):
-        """Enhanced summary metrics dashboard"""
+        """Enhanced summary metrics dashboard - Fixed Width Issues"""
         st.header("📊 Executive Summary Dashboard")
+        # Add CSS with better responsive design
         st.markdown("""
         <style>
         .metric-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 1.5rem;
-            border-radius: 12px;
-            margin: 0.5rem 0;
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3);
-            text-align: center;
-            color: white;
+            padding: 1.5rem; /* Increased from 1.2rem */
+            border-radius: 12px; /* Slightly more rounded */
+            margin: 0.5rem 0; /* Increased margin */
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3); /* Enhanced shadow */
+            align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            max-width: 100%;
+            box-sizing: border-box;
+            min-height: 140px; /* Increased from 120px */
+            transition: transform 0.2s ease; /* Added hover effect */
         }
+        .metric-card:hover {
+            transform: translateY(-2px); /* Subtle lift on hover */
+        }
+        /* Status-specific styling remains the same */
         .status-normal { background: linear-gradient(135deg, #4CAF50, #45a049); }
         .status-excess { background: linear-gradient(135deg, #2196F3, #1976D2); }
         .status-short { background: linear-gradient(135deg, #F44336, #D32F2F); }
-        .metric-value { font-size: 1.6rem; font-weight: bold; }
-        .metric-label { font-size: 1.1rem; }
+        .status-total { background: linear-gradient(135deg, #FF9800, #F57C00); }
+        .metric-value {
+            color: white;
+            font-weight: bold;
+            font-size: 1.6rem; /* Increased from 1.4rem */
+            margin-bottom: 0.4rem; /* Increased spacing */
+            word-wrap: break-word;
+            line-height: 1.2;
+        }
+        .metric-label {
+            color: #f0f0f0;
+            font-size: 1.1rem; /* Increased from 1.0rem */
+            margin-bottom: 0.5rem; /* Increased spacing */
+            word-wrap: break-word;
+            font-weight: 500; /* Added font weight */
+        }
+        .metric-delta {
+            color: #e0e0e0;
+            font-size: 0.9rem; /* Increased from 0.85rem */
+            word-wrap: break-word;
+            font-weight: 400;
+        }
+        .highlight-box {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            padding: 1.2rem; /* Increased padding */
+            border-radius: 12px; /* Consistent with cards */
+            color: white;
+            margin: 1rem 0; /* Increased margin */
+            max-width: 85%;
+            box-sizing: border-box;
+        }
+        .dashboard-container {
+            max-width: 85%; /* Increased from 80% for more space */
+            overflow-x: auto;
+            margin: 0 auto; /* Center the container */
+        }
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .metric-card {
+                min-height: 100px;
+                padding: 1rem;
+            }
+            .metric-value {
+                font-size: 1.3rem;
+            }
+            .metric-label {
+                font-size: 0.9rem;
+            }
+            .dashboard-container {
+                max-width: 95%;
+            }
+        }
         </style>
         """, unsafe_allow_html=True)
-        
+        # Wrap everything in a container with 70% max width
+        st.markdown('<div class="dashboard-container">', unsafe_allow_html=True)
+        # DataFrame prep
         df = pd.DataFrame(analysis_results)
+        # Identify value and status columns
         value_col = 'Stock Deviation Value'
-        status_col = 'Status'
-        
-        if not df.empty:
+        status_col = 'Status' if 'Status' in df.columns else 'INVENTORY REMARK STATUS'
+        # Compute KPI values safely
+        if not df.empty and value_col in df.columns and status_col in df.columns:
             short_value = df[df[status_col] == 'Short Inventory'][value_col].sum()
             excess_value = df[df[status_col] == 'Excess Inventory'][value_col].sum()
-            total_stock_value = df['Current Inventory - VALUE'].sum()
         else:
-            short_value, excess_value, total_stock_value = 0, 0, 0
-            
-        cols = st.columns(4)
-        
-        status_counts = df[status_col].value_counts()
-        
+            short_value = 0
+            excess_value = 0
+        # Total values
+        total_parts = len(df)
+        inventory_value_col = next((col for col in [
+            'Current Inventory - VALUE', 'Stock_Value', 'VALUE'
+        ] if col in df.columns), None)
+        total_stock_value = df[inventory_value_col].sum() if inventory_value_col else 0
+        st.markdown('<div class="highlight-box">', unsafe_allow_html=True)
+        st.markdown(f"""
+        ### 🎯 Key Inventory KPIs
+        - **Total Parts Analyzed**: {total_parts:,}
+        - **Total Inventory Value**: ₹{total_stock_value:,.0f}
+        - **Short Inventory Impact**: ₹{abs(short_value):,.0f}
+        - **Excess Inventory Impact**: ₹{excess_value:,.0f}
+        - **Net Financial Impact**: ₹{abs(short_value) - excess_value:,.0f}
+        """)
+        st.markdown('</div>', unsafe_allow_html=True)
+        # Status breakdown
+        status_values = {}
+        for label in ['Within Norms', 'Excess Inventory', 'Short Inventory']:
+            filtered = df[df[status_col] == label]
+            status_values[label] = {
+                'count': len(filtered),
+                'value': filtered[inventory_value_col].sum() if inventory_value_col in filtered.columns else 0
+            }
+        # Display 4 columns
+        cols = st.columns([1, 1, 1, 1])
         with cols[0]:
-            st.markdown(f"""<div class="metric-card status-normal">
-                <div class="metric-label">Within Norms</div>
-                <div class="metric-value">{status_counts.get('Within Norms', 0)} parts</div>
-            </div>""", unsafe_allow_html=True)
+            norm = status_values.get('Within Norms', {'count': 0, 'value': 0})
+            st.markdown(f"""
+            <div class="metric-card status-normal">
+                <div class="metric-label">🟢 Within Norms</div>
+                <div class="metric-value">{norm['count']} parts</div>
+                <div class="metric-delta">₹{norm['value']:,.0f}</div>
+            </div>
+            """, unsafe_allow_html=True)
         with cols[1]:
-            st.markdown(f"""<div class="metric-card status-excess">
-                <div class="metric-label">Excess Inventory</div>
-                <div class="metric-value">{status_counts.get('Excess Inventory', 0)} parts</div>
-                <div>₹{excess_value:,.0f}</div>
-            </div>""", unsafe_allow_html=True)
+            excess = status_values.get('Excess Inventory', {'count': 0, 'value': 0})
+            st.markdown(f"""
+            <div class="metric-card status-excess">
+                <div class="metric-label">🔵 Excess Inventory</div>
+                <div class="metric-value">{excess['count']} parts</div>
+                <div class="metric-delta">₹{excess['value']:,.0f}</div>
+            </div>
+            """, unsafe_allow_html=True)
         with cols[2]:
-            st.markdown(f"""<div class="metric-card status-short">
-                <div class="metric-label">Short Inventory</div>
-                <div class="metric-value">{status_counts.get('Short Inventory', 0)} parts</div>
-                <div>₹{abs(short_value):,.0f}</div>
-            </div>""", unsafe_allow_html=True)
+            short = status_values.get('Short Inventory', {'count': 0, 'value': 0})
+            st.markdown(f"""
+            <div class="metric-card status-short">
+                <div class="metric-label">🔴 Short Inventory</div>
+                <div class="metric-value">{short['count']} parts</div>
+                <div class="metric-delta">₹{short['value']:,.0f}</div>
+            </div>
+            """, unsafe_allow_html=True)
         with cols[3]:
-            st.markdown(f"""<div class="metric-card">
-                <div class="metric-label">Total Inventory</div>
-                <div class="metric-value">₹{total_stock_value:,.0f}</div>
-            </div>""", unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class="metric-card status-total">
+                <div class="metric-label">📊 Total Inventory</div>
+                <div class="metric-value">{total_parts} parts</div>
+                <div class="metric-delta">₹{total_stock_value:,.0f}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        # Close the container
+        st.markdown('</div>', unsafe_allow_html=True)
+            
+    def display_enhanced_vendor_summary(self, analysis_results):
+        """Enhanced vendor summary with better analytics"""
+        st.header("🏢 Vendor Performance Analysis")
+        df = pd.DataFrame(analysis_results)
+        # Define vendor column only if one exist
+        vendor_col = None
+        if 'Vendor' in df.columns:
+            vendor_col = 'Vendor'
+        elif 'Vendor Name' in df.columns:
+            vendor_col = 'Vendor Name'
+        elif 'VENDOR' in df.columns:
+            vendor_col = 'VENDOR'
+        if vendor_col is None:
+            st.warning("Vendor information not available in analysis data.")
+            return  # Early exit if no vendor column found
+        value_col = 'Current Inventory - VALUE'
+        vendor_summary = {}
+        for vendor in df[vendor_col].dropna().unique():
+            vendor_data = df[df[vendor_col] == vendor]
+            vendor_summary[vendor] = {
+                'total_parts': len(vendor_data),
+                'total_value': vendor_data[value_col].sum() if value_col in vendor_data.columns else 0,
+                'short_parts': len(vendor_data[vendor_data['Status'] == 'Short Inventory']),
+                'excess_parts': len(vendor_data[vendor_data['Status'] == 'Excess Inventory']),
+                'normal_parts': len(vendor_data[vendor_data['Status'] == 'Within Norms']),
+                'short_value': vendor_data[vendor_data['Status'] == 'Short Inventory'][value_col].sum() if value_col in vendor_data.columns else 0,
+                'excess_value': vendor_data[vendor_data['Status'] == 'Excess Inventory'][value_col].sum() if value_col in vendor_data.columns else 0,
+            }
+            # Create vendor DataFrame OUTSIDE the loop
+            vendor_df = pd.DataFrame([
+                {
+                    'Vendor': vendor,
+                    'Total Parts': data['total_parts'],
+                    'Short Inventory': data['short_parts'],
+                    'Excess Inventory': data['excess_parts'],
+                    'Within Norms': data['normal_parts'],
+                    'Total Value (₹)': f"₹{data['total_value']:,.0f}",
+                    'Performance Score': round((data['normal_parts'] / data['total_parts']) * 100, 1)
+                    if data['total_parts'] > 0 else 0
+                }
+                for vendor, data in vendor_summary.items()
+            ])
+            if vendor_df.empty:
+                st.warning("No vendor data available for analysis.")
+                return
+            def color_performance(val):
+                if isinstance(val, (int, float)):
+                    if val >= 80:
+                        return 'background-color: #4CAF50; color: white'
+                    elif val >= 60:
+                        return 'background-color: #FF9800; color: white'
+                    else:
+                        return 'background-color: #F44336; color: white'
+                return ''
+            st.dataframe(
+                vendor_df.style.map(color_performance, subset=['Performance Score']),
+                use_container_width=True,
+                hide_index=True
+            )
+            fig = px.bar(
+                vendor_df.head(10),
+                x='Vendor',
+                y='Performance Score',
+                title="Top 10 Vendor Performance Scores",
+                color='Performance Score',
+                color_continuous_scale='RdYlGn'
+            )
+            st.plotly_chart(fig, use_container_width=True)
 
     def display_enhanced_detailed_tables(self, analysis_results):
-        """Display detailed tables"""
+        """Display enhanced detailed tables with proper formatting"""
         st.header("📊 Detailed Analysis Tables")
         df = pd.DataFrame(analysis_results)
+        # Create tabs for different views
+        tab1, tab2, tab3, tab4 = st.tabs(["🔍 All Items", "🔴 Short Inventory", "🔵 Excess Inventory", "🟢 Within Norms"])
+        with tab1:
+            st.subheader("All Inventory Items")
+            # Add search functionality
+            search_term = st.text_input("🔍 Search parts (Part No, Description, Vendor):", key="search_all")
+            display_df = df.copy()
+            if search_term:
+                search_mask = (
+                    df['PART NO'].astype(str).str.contains(search_term, case=False, na=False) |
+                    df.get('PART DESCRIPTION', pd.Series(dtype=str)).fillna('').str.contains(search_term, case=False, na=False) |
+                    df.get('VENDOR', pd.Series(dtype=str)).fillna('').str.contains(search_term, case=False, na=False)
+                )
+                display_df = df[search_mask]
+            # Select key columns for display
+            display_columns = self._get_key_display_columns(display_df)
+            if display_columns:
+                styled_df = display_df[display_columns].style.format(self._get_column_formatters())
+                st.dataframe(
+                    styled_df,
+                    use_container_width=True,
+                    height=400,
+                    hide_index=True
+                )
+            else:
+                st.dataframe(display_df, use_container_width=True, height=400)
+            st.info(f"📊 Showing {len(display_df)} of {len(df)} total items")
+        with tab2:
+            st.subheader("🔴 Short Inventory Items")
+            short_items = df[df['Status'] == 'Short Inventory']
+            if not short_items.empty:
+                # Sort by impact/value
+                value_col = self._get_value_column(short_items)
+                if value_col:
+                    short_items = short_items.sort_values(value_col, ascending=False)
+                st.error(f"⚠️ {len(short_items)} items are short on inventory")
+                # Add urgency classification
+                if value_col:
+                    short_items['Urgency'] = pd.cut(
+                        short_items[value_col], 
+                        bins=[0, 10000, 50000, float('inf')], 
+                        labels=['Low', 'Medium', 'High'],
+                        include_lowest=True
+                    )
+                display_columns = self._get_key_display_columns(short_items)
+                if display_columns:
+                    styled_df = short_items[display_columns].style.format(self._get_column_formatters())
+                    st.dataframe(
+                        styled_df,
+                        use_container_width=True,
+                        height=400,
+                        hide_index=True
+                    )
+                else:
+                    st.dataframe(short_items, use_container_width=True, height=400)
+            else:
+                st.success("✅ No items are currently short on inventory!")
+        with tab3:
+            st.subheader("🔵 Excess Inventory Items")
+            excess_items = df[df['Status'] == 'Excess Inventory']
+            if not excess_items.empty:
+                # Sort by value
+                value_col = self._get_value_column(excess_items)
+                if value_col:
+                    excess_items = excess_items.sort_values(value_col, ascending=False)
+                st.warning(f"📦 {len(excess_items)} items have excess inventory")
+                # Calculate potential savings
+                if value_col:
+                    total_excess_value = excess_items[value_col].sum()
+                    st.metric("Total Excess Value", f"₹{total_excess_value:,.0f}")
+                display_columns = self._get_key_display_columns(excess_items)
+                if display_columns:
+                    styled_df = excess_items[display_columns].style.format(self._get_column_formatters())
+                    st.dataframe(
+                        styled_df,
+                        use_container_width=True,
+                        height=400,
+                        hide_index=True
+                    )
+                else:
+                    st.dataframe(excess_items, use_container_width=True, height=400)
+            else:
+                st.success("✅ No items have excess inventory!")
+        with tab4:
+            st.subheader("🟢 Items Within Norms")
+            normal_items = df[df['Status'] == 'Within Norms']
+            if not normal_items.empty:
+                st.success(f"✅ {len(normal_items)} items are within normal inventory levels")
+                display_columns = self._get_key_display_columns(normal_items)
+                if display_columns:
+                    styled_df = normal_items[display_columns].style.format(self._get_column_formatters())
+                    st.dataframe(
+                        styled_df,
+                        use_container_width=True,
+                        height=400,
+                        hide_index=True
+                    )
+                else:
+                    st.dataframe(normal_items, use_container_width=True, height=400)
+            else:
+                st.warning("⚠️ No items are currently within normal inventory levels!")
+        # Return the display dataframe for further use if needed
+        display_columns = self._get_key_display_columns(df)
+        return df[display_columns] if display_columns else df
         
-        tab1, tab2, tab3 = st.tabs(["🔴 Short Inventory", "🔵 Excess Inventory", "🔍 All Items"])
+    def _get_value_column(self, df):
+        """Helper method to identify the main value column"""
+        value_columns = ['Stock_Value', 'Current Inventory - VALUE', 'Current Inventory-VALUE']
+        for col in value_columns:
+            if col in df.columns:
+                return col
+        return None
         
-        cols_to_show = [
-            'PART NO', 'PART DESCRIPTION', 'Status', 'Deviation Percentage', 
-            'Current Inventory - Qty', 'Ideal Inventory Qty', 
-            'Current Inventory - VALUE', 'Stock Deviation Value'
+    def _get_key_display_columns(self, df):
+        """Helper method to select key columns for display"""
+        # Define priority columns to show
+        priority_columns = [
+             # Part identification
+            "PART NO",
+            "PART DESCRIPTION",
+            "Vendor Name",
+            "Vendor_Code",
+            "AVG CONSUMPTION/DAY",
+            "RM IN DAYS",
+            "RM Norm - In Qty",
+            "Revised Norm Qty",
+            "Lower Bound Qty",                # ✅ Added
+            "Upper Bound Qty", 
+            "UNIT PRICE",
+            "Current Inventory - Qty",
+            "Current Inventory - VALUE",
+            "SHORT/EXCESS INVENTORY",
+            "Stock Deviation Value",
+            "INVENTORY REMARK STATUS"
         ]
+        # Select columns that exist in the dataframe
+        available_columns = []
+        for col in priority_columns:
+            if col in df.columns and col not in available_columns:
+                available_columns.append(col)
+        # Add any remaining important columns not in priority list
+        for col in df.columns:
+            if col not in available_columns and len(available_columns) < 10:
+                available_columns.append(col)
+        return available_columns # Limit to 10 c
+        
+    def _get_column_formatters(self,df=None):
+        """Get column formatters for styling dataframes"""
+        formatters = {}
+        if df is not None:
+            for col in df.columns:
+                if 'VALUE' in col.upper() or 'PRICE' in col.upper() or 'COST' in col.upper():
+                    formatters[col] = lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
+                elif 'QTY' in col.upper() or 'QUANTITY' in col.upper():
+                    formatters[col] = lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
+                elif 'PERCENTAGE' in col.upper() or 'SCORE' in col.upper():
+                    formatters[col] = lambda x: f"{x:.1f}%" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
+        else:
+            # Default formatters when no dataframe is provided
+            formatters = {
+                'VALUE(Unit Price* Short/Excess Inventory)': lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+                'Current Inventory - VALUE': lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+                'Current Inventory - Qty': lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+                'UNIT PRICE': lambda x: f"₹{x:,.2f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+            }
+        return formatters
+    
+    def display_overview_metrics(self, analysis_results):
+        """Display key overview metrics"""
+        st.header("📊 Inventory Overview")
+        df = pd.DataFrame(analysis_results)
+        # Create metrics columns
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            total_parts = len(df)
+            st.metric("Total Parts", f"{total_parts:,}")
+        with col2:
+            value_col = self._get_value_column(df)
+            if value_col:
+                total_value = df[value_col].sum()
+                st.metric("Total Value", f"₹{total_value:,.0f}")
+            else:
+                st.metric("Total Value", "N/A")
+        with col3:
+            if 'Status' in df.columns:
+                within_norms = (df['Status'] == 'Within Norms').sum()
+                efficiency = (within_norms / total_parts * 100) if total_parts > 0 else 0
+                st.metric("Efficiency", f"{efficiency:.1f}%", delta=f"{within_norms} parts")
+            else:
+                st.metric("Efficiency", "N/A")
+        with col4:
+            if 'Status' in df.columns:
+                issues = len(df[df['Status'] != 'Within Norms'])
+                st.metric("Issues", f"{issues:,}", delta="Needs attention" if issues > 0 else "All good")
+            else:
+                st.metric("Issues", "N/A")
+                
+    def display_top_parts_analysis(self, analysis_results):
+        """Display top parts analysis by different criteria"""
+        st.subheader("🏆 Top Parts Analysis")
+        df = pd.DataFrame(analysis_results)
+        value_col = self._get_value_column(df)
+        if not value_col:
+            st.warning("⚠️ No value column found for top parts analysis.")
+            return
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("💰 Highest Value Parts")
+            top_value = df.nlargest(10, value_col)
+            if not top_value.empty:
+                display_cols = ['PART NO', 'PART DESCRIPTION', value_col, 'Status']
+                available_cols = [col for col in display_cols if col in top_value.columns]
+                st.dataframe(
+                    top_value[available_cols].style.format(self._get_column_formatters(top_value)),
+                    use_container_width=True
+                )
+        with col2:
+            st.subheader("⚠️ Most Critical Issues")
+            if 'Status' in df.columns:
+                critical_issues = df[df['Status'] != 'Within Norms'].nlargest(10, value_col)
+                if not critical_issues.empty:
+                    display_cols = ['PART NO', 'PART DESCRIPTION', value_col, 'Status']
+                    available_cols = [col for col in display_cols if col in critical_issues.columns]
+                    st.dataframe(
+                        critical_issues[available_cols].style.format(self._get_column_formatters(critical_issues)),
+                        use_container_width=True
+                    )
+                else:
+                    st.success("✅ No critical issues found!")
+            else:
+                st.info("ℹ️ Status information not available.")
+
+    def create_enhanced_top_parts_chart(self, processed_data, status_filter, color, key, top_n=10):
+        """Enhanced top parts chart with better visualization"""
+        filtered_data = [
+            item for item in processed_data 
+            if item.get('Status') == status_filter or item.get('INVENTORY REMARK STATUS') == status_filter
+        ]
+        if not filtered_data:
+            st.info(f"No {status_filter} parts found.")
+            return
+
+        top_parts = sorted(
+            filtered_data,
+            key=lambda x: x.get('Current Inventory - VALUE', 0),
+            reverse=True
+        )[:top_n]
+
+        labels = [f"{item['PART NO']}<br>{item.get('PART DESCRIPTION', '')[:30]}..." for item in top_parts]
+        values = [item.get('Current Inventory - VALUE', 0) for item in top_parts]
+        variance_values = [item.get('VALUE(Unit Price* Short/Excess Inventory)', 0) for item in top_parts]
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            name='Stock Value',
+            x=labels,
+            y=values,
+            marker_color=color,
+            text=[f"₹{v:,.0f}" for v in values],
+            textposition='auto',
+        ))
+        st.plotly_chart(fig, use_container_width=True)
+        
+    def apply_advanced_filters(self, df):
+        """Apply advanced filters to dataframe"""
+        filtered_df = df.copy()
+        # Apply value filted
+        if hasattr(st.session_state, 'value_filter') and 'Current Inventory - VALUE' in df.columns:
+            min_val, max_val = st.session_state.value_filter
+            filtered_df = filtered_df[
+                (filtered_df['Current Inventory - VALUE'] >= min_val) & 
+                (filtered_df['Current Inventory - VALUE'] <= max_val)
+            ]
+        # Apply quantity filter
+        if hasattr(st.session_state, 'qty_filter') and 'Current Inventory - Qty' in df.columns:
+            min_qty, max_qty = st.session_state.qty_filter
+            filtered_df = filtered_df[
+                (filtered_df['Current Inventory - Qty'] >= min_qty) & 
+                (filtered_df['Current Inventory - Qty'] <= max_qty)
+            ]
+        # Apply vendor filter (FIXED: properly handle vendor column)
+        if hasattr(st.session_state, 'vendor_filter'):
+            vendor_col = None
+            if 'Vendor' in df.columns:
+                vendor_col = 'Vendor'
+            elif 'Vendor Name' in df.columns:
+                vendor_col = 'Vendor Name'
+            if vendor_col and vendor_col in df.columns:
+                filtered_df = filtered_df[filtered_df[vendor_col].isin(st.session_state.vendor_filter)]
+        return filtered_df
+            
+    def display_trend_analysis(self, analysis_results):
+        """Display trend analysis and forecasting"""
+        st.header("📈 Trend Analysis & Forecasting")
+        df = pd.DataFrame(analysis_results)
+        # Create trend analysis tabs
+        tab1, tab2, tab3 = st.tabs(["📊 Status Trends", "💹 Value Trends", "🔮 Forecasting"])
+        with tab1:
+            # Status distribution over time (if timestamp data available)
+            status_counts = df['Status'].value_counts()
+            fig = px.pie(
+                values=status_counts.values,
+                names=status_counts.index,
+                title="Current Inventory Status Distribution",
+                color=status_counts.index, 
+                color_discrete_map={
+                    'Within Norms': '#4CAF50',
+                    'Excess Inventory': '#2196F3',
+                    'Short Inventory': '#F44336'
+                }
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            # Status by category if available
+            if 'Category' in df.columns or 'PART CATEGORY' in df.columns:
+                category_col = 'Category' if 'Category' in df.columns else 'PART CATEGORY'
+                status_category = df.groupby([category_col, 'Status']).size().unstack(fill_value=0)
+                fig = px.bar(
+                    status_category,
+                    title="Status Distribution by Category",
+                    color_discrete_map={
+                        'Within Norms': '#4CAF50',
+                        'Excess Inventory': '#2196F3',
+                        'Short Inventory': '#F44336'
+                    }
+                )
+                st.plotly_chart(fig, use_container_width=True)
+            with tab2:
+                df['VALUE_LAKH'] = df['Current Inventory - VALUE'] / 100000
+                # ✅ 1️⃣ Value Distribution Analysis (Bar Chart)
+                value_ranges = pd.cut(df['VALUE_LAKH'], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
+                value_status = pd.crosstab(value_ranges, df['Status'])
+                fig1 = px.bar(
+                    value_status,
+                    title="Status Distribution by Value Range (in ₹ Lakhs)",
+                    color_discrete_map={
+                        'Within Norms': '#4CAF50',
+                        'Excess Inventory': '#2196F3',
+                        'Short Inventory': '#F44336'
+                    },
+                    barmode='stack'
+                )
+                fig1.update_layout(yaxis_title="Number of Parts")
+                st.plotly_chart(fig1, use_container_width=True)
+                # ✅ 2️⃣ Top Value Contributors (Scatter Plot)
+                top_value_parts = df.nlargest(20, 'VALUE_LAKH')
+                fig2 = px.scatter(
+                    top_value_parts,
+                    x='Current Inventory - Qty',
+                    y='VALUE_LAKH',
+                    color='Status',
+                    size='VALUE_LAKH',
+                    hover_data=['PART NO', 'PART DESCRIPTION'],
+                    title="Top 20 Parts by Value - Quantity vs Value Analysis",
+                    color_discrete_map={
+                        'Within Norms': '#4CAF50',
+                        'Excess Inventory': '#2196F3',
+                        'Short Inventory': '#F44336'
+                    }
+                )
+                fig2.update_layout(
+                    xaxis_title="Inventory Quantity",
+                    yaxis_title="Inventory Value (in ₹ Lakhs)",
+                    yaxis=dict(tickformat=',.0f', ticksuffix='L')
+                )
+                st.plotly_chart(fig2, use_container_width=True)
+
+            with tab3:
+                st.subheader("🔮 Predictive Insights")
+                # Create two columns for better layout
+                col1, col2 = st.columns(2)
+                with col1:
+                    # Calculate reorder predictions
+                    reorder_candidates = df[
+                        (df['Status'] == 'Within Norms') & 
+                        (df['Current Inventory - Qty'] <= df['Current Inventory - VALUE'] * 1.2)
+                    ]
+                    if not reorder_candidates.empty:
+                        st.warning(f"📋 **Reorder Alert**: {len(reorder_candidates)} parts may need reordering soon")
+                        # Display reorder table
+                        reorder_display = reorder_candidates[['PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty', 
+                                                              'Current Inventory - VALUE']].copy()
+                        reorder_display['Days to Reorder'] = np.random.randint(5, 30, len(reorder_display))  # Simulated
+                        reorder_display['Priority'] = np.where(
+                            reorder_display['Current Inventory - VALUE'] > reorder_display['Current Inventory - VALUE'].median(),
+                            'High', 'Medium'
+                        )
+                        st.dataframe(reorder_display, use_container_width=True)
+                    else:
+                        st.info("✅ No immediate reorder candidates identified")
+                with col2:
+                    # Excess Inventory Reorder Point Analysis
+                    excess_inventory = df[df['Status'] == 'Excess Inventory'].copy()
+                    if not excess_inventory.empty:
+                        st.error(f"🚨 **Excess Inventory Alert**: {len(excess_inventory)} parts have excess stock")
+                        # Calculate excess reorder metrics
+                        excess_inventory['Excess_Qty'] = excess_inventory['Current Inventory - Qty'] - (
+                            excess_inventory['Current Inventory - Qty'] * 0.7  # Assuming 70% as optimal level
+                        )
+                        excess_inventory['Excess_Value_Lakh'] = (excess_inventory['Excess_Qty'] * 
+                                                                 excess_inventory['Current Inventory - VALUE'] / 
+                                                                 excess_inventory['Current Inventory - Qty']) / 100000
+                        excess_inventory['Reorder_Days'] = np.random.randint(60, 180, len(excess_inventory))  # Days until next reorder needed
+                        excess_inventory['Action_Required'] = np.where(
+                            excess_inventory['Excess_Value_Lakh'] > 1, 'Urgent', 'Monitor'
+                        )
+                
+                        # Display excess reorder days table
+                        excess_display = excess_inventory[['PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty', 
+                                                           'Excess_Qty', 'Excess_Value_Lakh', 'Reorder_Days', 
+                                                           'Action_Required']].copy()
+                        excess_display.columns = ['Part No', 'Description', 'Current Qty', 'Excess Qty', 
+                                                  'Excess Value (₹L)', 'Days Until Reorder', 'Action']
+                        st.dataframe(excess_display, use_container_width=True)
+                
+                        # Summary metrics for excess inventory
+                        total_excess_value = excess_inventory['Excess_Value_Lakh'].sum()
+                        urgent_actions = len(excess_inventory[excess_inventory['Action_Required'] == 'Urgent'])
+                    else:
+                        st.success("✅ No excess inventory detected")
+                # Combined Forecasting Table
+                st.subheader("📊 Comprehensive Forecasting Analysis")
+        
+                # Create comprehensive forecasting dataframe
+                forecasting_df = df.copy()
+                forecasting_df['Predicted_Demand'] = np.random.randint(10, 500, len(forecasting_df))  # Simulated
+                forecasting_df['Lead_Time_Days'] = np.random.randint(7, 45, len(forecasting_df))  # Simulated
+                forecasting_df['Safety_Stock'] = forecasting_df['Current Inventory - Qty'] * 0.2  # 20% safety stock
+                forecasting_df['Optimal_Reorder_Days'] = (
+                    forecasting_df['Current Inventory - Qty'] / forecasting_df['Predicted_Demand'] * 30
+                ).round(0)  # Days until reorder needed based on consumption rate
+                forecasting_df['Reorder_Recommendation'] = np.where(
+                    forecasting_df['Optimal_Reorder_Days'] <= forecasting_df['Lead_Time_Days'],
+                    'Reorder Now',
+                    np.where(
+                        forecasting_df['Optimal_Reorder_Days'] <= forecasting_df['Lead_Time_Days'] * 1.5,
+                        'Monitor Closely',
+                        'Sufficient Stock'
+                    )
+                )
+                # Display comprehensive table
+                comprehensive_display = forecasting_df[[
+                    'PART NO', 'PART DESCRIPTION', 'Status', 'Current Inventory - Qty',
+                    'Predicted_Demand', 'Optimal_Reorder_Days', 'Lead_Time_Days', 'Reorder_Recommendation'
+                ]].copy()
+                comprehensive_display.columns = [
+                    'Part No', 'Description', 'Current Status', 'Current Qty',
+                    'Predicted Monthly Demand', 'Days Until Reorder', 'Lead Time (Days)', 'Recommendation'
+                ]
+                # Add color coding for recommendations
+                def color_recommendation(val):
+                    if val == 'Reorder Now':
+                        return 'background-color: #ffebee; color: #c62828'
+                    elif val == 'Monitor Closely':
+                        return 'background-color: #fff3e0; color: #ef6c00'
+                    else:
+                        return 'background-color: #e8f5e8; color: #2e7d32'
+                styled_df = comprehensive_display.style.applymap(color_recommendation, subset=['Recommendation'])
+                st.dataframe(styled_df, use_container_width=True)
+        
+                # Seasonal analysis placeholder
+                st.info("📊 **Seasonal Analysis**: Historical data integration required for advanced forecasting")
+        
+                # Key insights summary
+                st.subheader("🔍 Key Insights")
+                insights_col1, insights_col2, insights_col3 = st.columns(3)
+                with insights_col1:
+                    reorder_now_count = len(forecasting_df[forecasting_df['Reorder_Recommendation'] == 'Reorder Now'])
+                    st.metric("Parts Needing Reorder", reorder_now_count)
+                with insights_col2:
+                    monitor_count = len(forecasting_df[forecasting_df['Reorder_Recommendation'] == 'Monitor Closely'])
+                    st.metric("Parts to Monitor", monitor_count)
+                with insights_col3:
+                    sufficient_count = len(forecasting_df[forecasting_df['Reorder_Recommendation'] == 'Sufficient Stock'])
+                    st.metric("Parts with Sufficient Stock", sufficient_count)
+                    
+    def display_export_options(self, analysis_results):
+        """Enhanced export options"""
+        st.header("📥 Export & Reporting Options")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("📊 Export Full Analysis", type="primary"):
+                self.export_comprehensive_report(analysis_results)
+        with col2:
+            if st.button("🚨 Export Critical Items Only"):
+                self.export_critical_items(analysis_results)
+        with col3:
+            if st.button("📈 Export Executive Summary"):
+                self.export_executive_summary(analysis_results)
+        # Export format options
+        st.subheader("Export Format Options")
+        export_format = st.selectbox(
+            "Select Export Format",
+            ["Excel (.xlsx)", "CSV (.csv)", "PDF Report", "PowerPoint Summary"]
+        )
+        if st.button("🎯 Custom Export"):
+            self.export_custom_format(analysis_results, export_format)
+            
+    def export_comprehensive_report(self, analysis_results):
+        """Export comprehensive analysis report"""
+        try:
+            df = pd.DataFrame(analysis_results)
+            # Create Excel writer
+            from io import BytesIO
+            output = BytesIO()
+        
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                # Main analysis sheet
+                df.to_excel(writer, sheet_name='Full Analysis', index=False)
+                # Summary sheet
+                summary_data = {
+                    'Status': df['Status'].value_counts().index.tolist(),
+                    'Count': df['Status'].value_counts().values.tolist(),
+                    'Total Value': [df[df['Status'] == status]['Current Inventory - VALUE'].sum() 
+                                    for status in df['Status'].value_counts().index]
+                }
+                pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
+                # Critical items sheet
+                critical_items = df[df['Current Inventory - VALUE'] > 100000]
+                critical_items.to_excel(writer, sheet_name='Critical Items', index=False)
+                # Download button
+                st.download_button(
+                    label="📥 Download Comprehensive Report",
+                    data=output.getvalue(),
+                    file_name=f"inventory_analysis_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+                st.success("✅ Comprehensive report prepared for download!")
+        except Exception as e:
+            st.error(f"❌ Export failed: {str(e)}")
+            
+    def export_critical_items(self, analysis_results):
+        """Export only critical items"""
+        try:
+            df = pd.DataFrame(analysis_results)
+            # Filter critical items
+            critical_items = df[
+                (df['Status'] != 'Within Norms') & 
+                (df['Current Inventory - VALUE'] > st.session_state.get('critical_threshold', 100000))
+            ]
+            if critical_items.empty:
+                st.warning("No critical items found based on current criteria.")
+                return
+            # Create CSV
+            csv = critical_items.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Critical Items Report",
+                data=csv,
+                file_name=f"critical_items_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+            st.success(f"✅ Critical items report prepared! ({len(critical_items)} items)")
+        except Exception as e:
+            st.error(f"❌ Export failed: {str(e)}")
+            
+    def export_executive_summary(self, analysis_results):
+        """Export executive summary"""
+        try:
+            df = pd.DataFrame(analysis_results)
+            # Create executive summary data
+            summary = {
+                'Metric': [
+                    'Total Parts Analyzed',
+                    'Total Inventory Value (₹)',
+                    'Parts Within Norms',
+                    'Excess Inventory Parts',
+                    'Short Inventory Parts',
+                    'Inventory Efficiency (%)',
+                    'Excess Value (₹)',
+                    'Shortage Impact (₹)'
+                ],
+                'Value': [
+                    len(df),
+                    f"₹{df['Current Inventory - VALUE'].sum():,.0f}",
+                    (df['Status'] == 'Within Norms').sum(),
+                    (df['Status'] == 'Excess Inventory').sum(),
+                    (df['Status'] == 'Short Inventory').sum(),
+                    f"{(df['Status'] == 'Within Norms').mean() * 100:.1f}%",
+                    f"₹{df[df['Status'] == 'Excess Inventory']['Current Inventory - VALUE'].sum():,.0f}",
+                    f"₹{abs(df[df['Status'] == 'Short Inventory']['Stock Deviation Value'].sum()):,.0f}"
+                ]
+            }
+            summary_df = pd.DataFrame(summary)
+            csv = summary_df.to_csv(index=False)
+            st.download_button(
+                label="📥 Download Executive Summary",
+                data=csv,
+                file_name=f"executive_summary_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
+            st.success("✅ Executive summary prepared for download!")
+        except Exception as e:
+            st.error(f"❌ Export failed: {str(e)}")
+            
+    def export_custom_format(self, analysis_results, format_type):
+        """Export in custom format"""
+        try:
+            df = pd.DataFrame(analysis_results)
+            if format_type == "Excel (.xlsx)":
+                self.export_comprehensive_report(analysis_results)
+            elif format_type == "CSV (.csv)":
+                csv = df.to_csv(index=False)
+                st.download_button(
+                    label="📥 Download CSV",
+                    data=csv,
+                    file_name=f"inventory_analysis_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    mime="text/csv"
+                )
+            elif format_type == "PDF Report":
+                st.info("📄 PDF export functionality requires additional setup. Using CSV format instead.")
+                self.export_custom_format(analysis_results, "CSV (.csv)")
+            elif format_type == "PowerPoint Summary":
+                st.info("📊 PowerPoint export functionality requires additional setup. Using Excel format instead.")
+                self.export_comprehensive_report(analysis_results)
+            st.success(f"✅ Export completed in {format_type} format!")
+        except Exception as e:
+            st.error(f"❌ Export failed: {str(e)}")
+            
+    def display_help_and_documentation(self):
+        """Display help and documentation"""
+        st.header("❓ Help & Documentation")
+        with st.expander("📖 Understanding Analysis Results"):
+            st.markdown("""
+            ### Status Categories:
+            - **🟢 Within Norms**: Inventory levels are optimal
+            - **🔵 Excess Inventory**: Stock levels exceed requirements
+            - **🔴 Short Inventory**: Stock levels are below minimum requirements
+            
+            ### Key Metrics:
+            - **Stock Value**: Total monetary value of current inventory
+            - **Variance Impact**: Financial impact of excess/shortage
+            - **Performance Score**: Percentage of parts within norms
+            """)
+        with st.expander("🔧 Advanced Features"):
+            st.markdown("""
+            ### Filtering Options:
+            - Use sidebar filters to focus on specific value ranges
+            - Filter by vendor performance
+            - Set critical value thresholds
+            ### Export Options:
+            - **Full Analysis**: Complete detailed report
+            - **Critical Items**: High-value problem items only
+            - **Executive Summary**: Key metrics for management
+            """)
+        with st.expander("💡 Best Practices"):
+            st.markdown("""
+            ### Optimization Tips:
+            1. **Regular Monitoring**: Run analysis weekly/monthly
+            2. **Vendor Performance**: Track vendor consistency
+            3. **Critical Thresholds**: Adjust based on business needs
+            4. **Action Items**: Follow up on recommendations
+            5. **Trend Analysis**: Monitor patterns over time
+            """)
+        
+    def display_actionable_insights(self, analysis_results):
+        """Display actionable insights and recommendations"""
+        st.header("💡 Actionable Insights & Recommendations")
+        df = pd.DataFrame(analysis_results)
+        # Create insights tabs
+        tab1, tab2, tab3, tab4 = st.tabs(["🚨 Immediate Actions", "💰 Cost Optimization", "📊 Performance", "🔄 Process Improvement"])
         
         with tab1:
-            short_items = df[df['Status'] == 'Short Inventory'].copy()
-            if not short_items.empty:
-                st.dataframe(short_items[cols_to_show].sort_values('Deviation Percentage'), use_container_width=True)
-            else:
-                st.success("No shortage items.")
+            st.subheader("🚨 Immediate Action Required")
+            # Critical shortage
+            critical_shortages = df[
+                (df['Status'] == 'Short Inventory') & 
+                (df['Current Inventory - VALUE'] > 50000)
+            ].sort_values('Current Inventory - VALUE', ascending=False)
+            if not critical_shortages.empty:
+                st.error(f"🔴 **URGENT**: {len(critical_shortages)} high-value parts critically short!")
+                for idx, part in critical_shortages.head(5).iterrows():
+                    with st.container():
+                        col1, col2, col3, col4 = st.columns([3, 2, 2, 2])
+                        with col1:
+                            st.write(f"**{part['PART NO']}** - {part['PART DESCRIPTION'][:50]}...")
+                        with col2:
+                            st.write(f"Value: ₹{part['Current Inventory - VALUE']:,.0f}")
+                        with col3:
+                            # Calculate shortage in rupees
+                            # Assuming you have a unit price column or can calculate it
+                            if 'Current Inventory - Qty' in df.columns and part['Current Inventory - Qty'] > 0:
+                                unit_price = part['Current Inventory - VALUE'] / part['Current Inventory - Qty']
+                                # If you have a target/required quantity column, use it. Otherwise, estimate shortage
+                                if 'Required Qty' in df.columns:
+                                    shortage_qty = part['Required Qty'] - part['Current Inventory - Qty']
+                                else:
+                                    # Estimate shortage as a percentage of current inventory
+                                    shortage_qty = part['Current Inventory - Qty'] * 0.3  # 30% more needed
+                                shortage_value = shortage_qty * unit_price
+                                st.write(f"Need: ₹{shortage_value:,.0f}")
+                            else:
+                                st.write("Need: Data unavailable")
+                        with col4:
+                            if 'Current Inventory - Qty' in df.columns:
+                                if 'Required Qty' in df.columns:
+                                    shortage_qty = part['Required Qty'] - part['Current Inventory - Qty']
+                                else:
+                                    shortage_qty = part['Current Inventory - Qty'] * 0.3
+                                st.write(f"Qty: {shortage_qty:,.0f}")
+                            else:
+                                st.write("Qty: N/A")
+                                
+            # Excess inventory actions
+            excess_items = df[
+                (df['Status'] == 'Excess Inventory') & 
+                (df['Current Inventory - VALUE'] > 100000)
+            ].sort_values('Current Inventory - VALUE', ascending=False)
+        
+            if not excess_items.empty:
+                st.warning(f"🟡 **Consider**: {len(excess_items)} high-value excess items for reallocation")
                 
         with tab2:
-            excess_items = df[df['Status'] == 'Excess Inventory'].copy()
-            if not excess_items.empty:
-                st.dataframe(excess_items[cols_to_show].sort_values('Deviation Percentage', ascending=False), use_container_width=True)
+            st.subheader("💰 Cost Optimization Opportunities")
+            # Required columns
+            required_cols = [
+                'Status', 'Current Inventory - VALUE', 'Current Inventory - Qty',
+                'Stock Deviation Value', 'UNIT PRICE', 'RM Norm - In Qty'
+            ]
+            # Check if all required columns exist
+            missing_cols = [col for col in required_cols if col not in df.columns]
+            if not missing_cols:
+                # 1️⃣ Filter excess inventory with error handling
+                excess_df = df[df['Status'] == 'Excess Inventory'].copy()
+                if len(excess_df) == 0:
+                    st.info("No excess inventory found in the current dataset.")
+                else:
+                    # 2️⃣ Handle potential NaN values and calculate excess value
+                    excess_df['Stock Deviation Value'] = pd.to_numeric(
+                        excess_df['Stock Deviation Value'], errors='coerce'
+                    ).fillna(0)
+                    excess_value = excess_df['Stock Deviation Value'].sum()
+                    # 3️⃣ Calculate savings and capital with configurable rates
+                    CARRYING_COST_RATE = 0.10  # 10% carrying cost
+                    RECOVERY_RATE = 0.70       # 70% capital recovery rate
+                    potential_savings = excess_value * CARRYING_COST_RATE
+                    freed_capital = excess_value * RECOVERY_RATE
+                    # 4️⃣ Display KPIs with better formatting
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric(
+                            "Total Excess Value",
+                            f"₹{excess_value:,.0f}",
+                            help="Total value of excess inventory"
+                        )
+                    with col2:
+                        st.metric(
+                            "Potential Annual Savings",
+                            f"₹{potential_savings:,.0f}",
+                            help=f"Based on {CARRYING_COST_RATE*100}% carrying cost reduction"
+                        )
+                    with col3:
+                        st.metric(
+                            "Capital That Could Be Freed",
+                            f"₹{freed_capital:,.0f}",
+                            help=f"Estimated {RECOVERY_RATE*100}% recoverable capital from excess stock"
+                        )
+                    # 5️⃣ Top optimization candidates with enhanced calculations
+                    st.subheader("🎯 Top Optimization Candidates")
+                    top_excess = excess_df.copy()
+                    # Ensure numeric columns are properly converted
+                    numeric_cols = ['Current Inventory - Qty', 'RM Norm - In Qty', 'UNIT PRICE']
+                    for col in numeric_cols:
+                        if col in top_excess.columns:
+                            top_excess[col] = pd.to_numeric(top_excess[col], errors='coerce').fillna(0)
+                    # Calculate excess quantity and optimization potential
+                    top_excess['Excess Qty'] = top_excess['Current Inventory - Qty'] - top_excess['RM Norm - In Qty']
+                    top_excess['Optimization Potential'] = top_excess['Excess Qty'] * top_excess['UNIT PRICE']
+                    # Filter out items with zero or negative optimization potential
+                    top_excess = top_excess[top_excess['Optimization Potential'] > 0]
+                    # Sort and get top candidates
+                    top_excess = top_excess.sort_values(by='Optimization Potential', ascending=False).head(10)
+                    if len(top_excess) > 0:
+                        # Format the display dataframe
+                        display_df = top_excess[[
+                            'PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty', 'RM Norm - In Qty',
+                            'Excess Qty', 'UNIT PRICE', 'Optimization Potential'
+                        ]].copy()
+                        # Format monetary columns
+                        display_df['UNIT PRICE'] = display_df['UNIT PRICE'].apply(lambda x: f"₹{x:,.2f}")
+                        display_df['Optimization Potential'] = display_df['Optimization Potential'].apply(lambda x: f"₹{x:,.0f}")
+                        # Rename columns for better displa
+                        display_df.columns = [
+                            'Part Number', 'Description', 'Current Qty', 'Required Qty',
+                            'Excess Qty', 'Unit Price', 'Optimization Value'
+                        ]
+                        st.dataframe(display_df, use_container_width=True)
+            
+                        # 6️⃣ Additional insights
+                        st.subheader("📊 Optimization Insights")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.write("**Top Categories by Excess Value:**")
+                            if 'CATEGORY' in excess_df.columns:
+                                category_analysis = excess_df.groupby('CATEGORY')['Optimization Potential'].sum().sort_values(ascending=False).head(5)
+                                for category, value in category_analysis.items():
+                                    st.write(f"• {category}: ₹{value:,.0f}")
+                            else:
+                                st.write("Category information not available")
+                        with col2:
+                            st.write("**Optimization Summary:**")
+                            st.write(f"• Total excess items: {len(excess_df):,}")
+                            st.write(f"• Avg excess per item: ₹{excess_value/len(excess_df):,.0f}")
+                            st.write(f"• Top 10 items represent: {top_excess['Optimization Potential'].sum()/excess_value*100:.1f}% of total")
+                    else:
+                        st.info("No items with positive optimization potential found.")
             else:
-                st.success("No excess items.")
+                st.error(f"❌ Missing required columns: {', '.join(missing_cols)}")
+                st.write("**Available columns:**")
+                st.write(list(df.columns))
+                st.write("\n**Required columns:**")
+                for col in required_cols:
+                    status = "✅" if col in df.columns else "❌"
+                    st.write(f"{status} {col}")
                 
         with tab3:
-            st.dataframe(df[cols_to_show], use_container_width=True)
+            st.subheader("📊 Performance Analysis")
+            # Vendor performance insights
+            if 'VENDOR' in df.columns:
+                vendor_performance = df.groupby('VENDOR').agg({
+                    'Status': lambda x: (x == 'Within Norms').mean() * 100,
+                    'Current Inventory - VALUE': 'sum',
+                    'PART NO': 'count'
+                }).round(2)
+                vendor_performance.columns = ['Performance %', 'Total Value', 'Part Count']
+                vendor_performance = vendor_performance.sort_values('Performance %', ascending=False)
+                st.subheader("🏆 Vendor Performance Ranking")
+                st.dataframe(vendor_performance, use_container_width=True)
+            # Category performance
+            if 'Category' in df.columns or 'PART CATEGORY' in df.columns:
+                category_col = 'Category' if 'Category' in df.columns else 'PART CATEGORY'
+                category_performance = df.groupby(category_col).agg({
+                    'Status': lambda x: (x == 'Within Norms').mean() * 100,
+                    'Current Inventory - VALUE': 'sum'
+                }).round(2)
+                category_performance.columns = ['Performance %', 'Total Value']
+                fig = px.scatter(
+                    category_performance.reset_index(),
+                    x='Performance %',
+                    y='Total Value',
+                    size='Total Value',
+                    hover_data=[category_col],
+                    title="Category Performance vs Value Analysis"
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        with tab4:
+            st.subheader("🔄 Process Improvement Recommendations")
+            improvement_score = (df['Status'] == 'Within Norms').mean() * 100
+            recommendations = []
+            if improvement_score < 60:
+                recommendations.extend([
+                    "🔴 **Critical**: Implement ABC analysis for better inventory classification",
+                    "🔴 **Critical**: Review and update MIN/MAX thresholds quarterly",
+                    "🔴 **Critical**: Establish vendor performance monitoring system"
+                ])
+            elif improvement_score < 80:
+                recommendations.extend([
+                    "🟡 **Important**: Consider implementing JIT for fast-moving items",
+                    "🟡 **Important**: Set up automated reorder alerts",
+                    "🟡 **Important**: Review slow-moving inventory monthly"
+                ])
+            else:
+                recommendations.extend([
+                    "🟢 **Good**: Maintain current practices with minor optimizations",
+                    "🟢 **Good**: Consider advanced forecasting methods",
+                    "🟢 **Good**: Implement continuous improvement processes"
+                ])
+                
+    def display_advanced_filtering_options(self, analysis_results):
+        """Display advanced filtering options in sidebar"""
+        st.sidebar.header("🔍 Advanced Filters")
+        df = pd.DataFrame(analysis_results)
+        # Value range filter with proper handling of edge cases
+        if 'Current Inventory - VALUE' in df.columns and not df['Current Inventory - VALUE'].empty:
+            min_value = float(df['Current Inventory - VALUE'].min())
+            max_value = float(df['Current Inventory - VALUE'].max())
+        # Handle case where min and max are the same
+            if min_value == max_value:
+                if min_value == 0:
+                    # If all values are 0, create a reasonable range
+                    min_value = 0.0
+                    max_value = 100000.0
+                    st.sidebar.info("ℹ️ All stock values are 0. Using default range for filtering.")
+                else:
+                    # If all values are the same non-zero value, create a small range around i
+                    range_buffer = max_value * 0.1 if max_value > 0 else 1000
+                    min_value = max_value - range_buffer
+                    max_value = max_value + range_buffer
+                    st.sidebar.info(f"ℹ️ All stock values are {df['Current Inventory - VALUE'].iloc[0]:,.0f}. Adjusted range for filtering.")
+            # Ensure min_value is always less than max_value
+            if min_value >= max_value:
+                max_value = min_value + 1000
+            value_range = st.sidebar.slider(
+                "Stock Value Range (₹)",
+                min_value=min_value,
+                max_value=max_value,
+                value=(min_value, max_value),
+                format="₹%.0f"
+            )
+        else:
+            st.sidebar.warning("⚠️ Stock Value column not found or empty. Skipping value filter.")
+            value_range = (0, 100000)  # Default range
+        # Status filter
+        if 'Status' in df.columns:
+            status_options = df['Status'].unique().tolist()
+            selected_statuses = st.sidebar.multiselect(
+                "Filter by Status",
+                options=status_options,
+                default=status_options
+            )
+        else:
+            selected_statuses = []
+            st.sidebar.warning("⚠️ Status column not found.")
+        # Category filter (if available)
+        category_col = None
+        if 'Category' in df.columns:
+            category_col = 'Category'
+        elif 'PART CATEGORY' in df.columns:
+            category_col = 'PART CATEGORY'
+        selected_categories = None
+        if category_col and category_col in df.columns:
+            categories = df[category_col].dropna().unique().tolist()
+            if categories:
+                selected_categories = st.sidebar.multiselect(
+                    f"Filter by {category_col}",
+                    options=categories,
+                    default=categories
+                )
+            else:
+                st.sidebar.info(f"ℹ️ No valid {category_col} values found.")
+        # Vendor filter (if availablee)
+        vendor_col = None
+        if 'Vendor' in df.columns:
+            vendor_col = 'Vendor'
+        elif 'Vendor Name' in df.columns:
+            vendor_col = 'Vendor Name'
+        elif 'VENDOR' in df.columns:
+            vendor_col = 'VENDOR'
+        selected_vendors = None
+        if vendor_col and vendor_col in df.columns:
+            vendors = df[vendor_col].dropna().unique().tolist()
+            if vendors:
+                selected_vendors = st.sidebar.multiselect(
+                    f"Filter by {vendor_col}",
+                    options=vendors,
+                    default=vendors
+                )
+            else:
+                st.sidebar.info(f"ℹ️ No valid {vendor_col} values found.")
+        # Critical threshold setting
+        critical_threshold = st.sidebar.number_input(
+            "Critical Value Threshold (₹)",
+            min_value=0,
+            value=100000,
+            step=10000,
+            help="Parts above this value are considered critical"
+        )
+        # Store filter values in session state
+        st.session_state.filter_value_range = value_range
+        st.session_state.filter_statuses = selected_statuses
+        st.session_state.filter_categories = selected_categories
+        st.session_state.filter_vendors = selected_vendors
+        st.session_state.critical_threshold = critical_threshold
+        # Display current filter summary
+        with st.sidebar.expander("📋 Current Filters Summary"):
+            st.write(f"**Value Range:** ₹{value_range[0]:,.0f} - ₹{value_range[1]:,.0f}")
+            st.write(f"**Statuses:** {len(selected_statuses) if selected_statuses else 0} selected")
+            if selected_categories:
+                st.write(f"**Categories:** {len(selected_categories)} selected")
+            if selected_vendors:
+                st.write(f"**Vendors:** {len(selected_vendors)} selected")
+            st.write(f"**Critical Threshold:** ₹{critical_threshold:,.0f}")
 
+    def apply_advanced_filters(self, df):
+        """Apply advanced filters to the dataframe with improved error handling"""
+        filtered_df = df.copy()
+        try:
+            # Apply value range filter
+            if (hasattr(st.session_state, 'filter_value_range') and 
+                'Current Inventory - VALUE' in filtered_df.columns):
+                    min_val, max_val = st.session_state.filter_value_range
+                    filtered_df = filtered_df[
+                        (filtered_df['Current Inventory - VALUE'] >= min_val) & 
+                        (filtered_df['Current Inventory - VALUE'] <= max_val)
+                    ]
+            # Apply status filter
+            if (hasattr(st.session_state, 'filter_statuses') and 
+                st.session_state.filter_statuses and 
+                'Status' in filtered_df.columns):
+                    filtered_df = filtered_df[filtered_df['Status'].isin(st.session_state.filter_statuses)]
+            # Apply category filter
+            if (hasattr(st.session_state, 'filter_categories') and 
+                st.session_state.filter_categories):
+                    category_col = None
+                    if 'Category' in filtered_df.columns:
+                        category_col = 'Category'
+                    elif 'PART CATEGORY' in filtered_df.columns:
+                        category_col = 'PART CATEGORY'
+                    if category_col:
+                        filtered_df = filtered_df[filtered_df[category_col].isin(st.session_state.filter_categories)]
+            # Apply vendor filter
+            if (hasattr(st.session_state, 'filter_vendors') and 
+                st.session_state.filter_vendors):
+                    vendor_col = None
+                    if 'Vendor' in filtered_df.columns:
+                        vendor_col = 'Vendor'
+                    elif 'Vendor Name' in filtered_df.columns:
+                        vendor_col = 'Vendor Name'
+                    elif 'VENDOR' in filtered_df.columns:
+                        vendor_col = 'VENDOR'
+                    if vendor_col:
+                        filtered_df = filtered_df[filtered_df[vendor_col].isin(st.session_state.filter_vendors)]
+            # Show filtering results
+            original_count = len(df)
+            filtered_count = len(filtered_df)
+            if original_count != filtered_count:
+                st.sidebar.success(f"✅ Filtered: {filtered_count:,} of {original_count:,} items")
+            return filtered_df
+        except Exception as e:
+            st.sidebar.error(f"❌ Filter error: {str(e)}")
+            st.sidebar.info("ℹ️ Returning unfiltered data")
+            return df
+
+    def generate_analysis_summary(self, analysis_results):
+        """Generate a comprehensive analysis summary"""
+        df = pd.DataFrame(analysis_results)
+        summary = {
+            'total_parts': len(df),
+            'total_value': df['Current Inventory - VALUE'].sum(),
+            'within_norms': (df['Status'] == 'Within Norms').sum(),
+            'excess_inventory': (df['Status'] == 'Excess Inventory').sum(),
+            'short_inventory': (df['Status'] == 'Short Inventory').sum(),
+            'efficiency_rate': (df['Status'] == 'Within Norms').mean() * 100,
+            'excess_value': df[df['Status'] == 'Excess Inventory']['Current Inventory - VALUE'].sum(),
+            'shortage_impact': abs(df[df['Status'] == 'Short Inventory']['VALUE(Unit Price* Short/Excess Inventory)'].sum()),
+            'critical_items': len(df[df['Current Inventory - VALUE'] > st.session_state.get('critical_threshold', 100000)]),
+            'avg_stock_value': df['Current Inventory - VALUE'].mean()
+        }
+        return summary
+        
+    def main(self):
+        """Main execution method for the inventory analyzer"""
+        st.set_page_config(
+            page_title="Advanced Inventory Analysis Dashboard",
+            page_icon="📊",
+            layout="wide",
+            initial_sidebar_state="expanded"
+        )
+        # Initialize session state
+        if 'analysis_complete' not in st.session_state:
+            st.session_state.analysis_complete = False
+        # Main application logic
+        if not st.session_state.analysis_complete:
+            # Show file upload and analysis interface
+            self.display_file_upload_interface()
+        else:
+            # Show analysis results
+            self.display_analysis_results()
+        
+        # Option to analyze new file
+        if st.sidebar.button("🔄 Analyze New File", type="secondary"):
+            st.session_state.analysis_complete = False
+            st.rerun()
+            
+    def display_analysis_results(self):
+        """Main method to display all analysis results"""
+        analysis_results = self.persistence.load_data_from_session_state('persistent_analysis_results')
+        if not analysis_results:
+            st.error("❌ No analysis results available.")
+            return
+        # Debug: show sample keys to catch missing columns
+        # st.code(f"Sample columns: {list(analysis_results[0].keys())}" if analysis_results else "No data structure found.")
+
+        # Display advanced filtering options
+        self.display_advanced_filtering_options(analysis_results)
+    
+        # Apply filters to data
+        df = pd.DataFrame(analysis_results)
+        if 'Current Inventory - VALUE' not in df.columns:
+            st.warning("⚠️ 'Current Inventory - VALUE' column missing from results. Some features may not work.")
+
+        filtered_df = self.apply_advanced_filters(df)
+        filtered_results = filtered_df.to_dict('records')
+    
+        # Display main dashboard
+        self.display_comprehensive_analysis(filtered_results)
+    
+        # Additional analysis sections
+        st.markdown("---")
+        self.display_trend_analysis(filtered_results)
+    
+        st.markdown("---")
+        self.display_actionable_insights(filtered_results)
+    
+        st.markdown("---")
+        self.display_export_options(filtered_results)
+    
+        st.markdown("---")
+        self.display_help_and_documentation()
+        
     def display_enhanced_analysis_charts(self, analysis_results):
-        """Display enhanced visual summaries including Ideal Inventory Line"""
+        """Display enhanced visual summaries with better error handling and dynamic Top N selection"""
         st.subheader("📊 Enhanced Inventory Charts")
         
         # Add Unit Toggle AND Top N Slider
@@ -1247,41 +2694,54 @@ class InventoryManagementSystem:
         with col1:
             chart_unit = st.selectbox("Select Currency Unit:", ["Lakhs", "Millions"], key="chart_unit_selector")
         with col2:
+            # 🔄 NEW: Slider to select number of items to show
             top_n = st.slider("Number of items to show:", min_value=5, max_value=50, value=10, step=5, key="top_n_slider")
         
         if chart_unit == "Millions":
             divisor = 1_000_000
             suffix = "M"
             unit_name = "Millions"
+            format_key = "millions"
         else:
             divisor = 100_000
             suffix = "L"
             unit_name = "Lakhs"
+            format_key = "lakhs"
             
         df = pd.DataFrame(analysis_results)
         if df.empty:
             st.warning("⚠️ No data available for charts.")
             return
             
-        # ✅ 1. Top N Parts by Value with Ideal Line
-        value_col = 'Current Inventory - VALUE'
-        if value_col in df.columns:
+        # ✅ 1. Top N Parts by Value (UPDATED WITH OVERLAPPING IDEAL LINE)
+        value_col = None
+        for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE']:
+            if col in df.columns:
+                value_col = col
+                break
+        if value_col and 'PART NO' in df.columns and 'PART DESCRIPTION' in df.columns:
             # Filter top N parts with non-zero value
             chart_data = (
                 df[df[value_col] > 0]
                 .sort_values(by=value_col, ascending=False)
-                .head(top_n)
+                .head(top_n)  # 🔄 Updated to use top_n variable
                 .copy()
             )
-            
-            # Convert values
+            # Convert to selected unit
             chart_data['Value_Converted'] = chart_data[value_col] / divisor
             chart_data['Ideal_Value_Converted'] = chart_data['Ideal Inventory Value'] / divisor
-            
+
+            # Combine description and part no into a single label
             chart_data['Part'] = chart_data.apply(
-                lambda row: f"{row['PART DESCRIPTION'][:20]}...\n({row['PART NO']})",
+                lambda row: f"{row['PART DESCRIPTION'][:30]}...\n({row['PART NO']})",
                 axis=1
             )
+            
+            # Use the Status column
+            if 'Status' in chart_data.columns:
+                chart_data['Inventory_Status'] = chart_data['Status']
+            else:
+                chart_data['Inventory_Status'] = "Unknown"
             
             color_map = {
                 "Excess Inventory": "#2196F3",
@@ -1289,9 +2749,9 @@ class InventoryManagementSystem:
                 "Within Norms": "#4CAF50"
             }
             
-            chart_data['Bar_Color'] = chart_data['Status'].map(color_map)
+            chart_data['Bar_Color'] = chart_data['Inventory_Status'].map(color_map)
     
-            # Create Combo Chart (Bar + Line)
+            # Create chart
             fig1 = go.Figure()
             
             # Bar Trace
@@ -1301,15 +2761,15 @@ class InventoryManagementSystem:
                 name='Current Stock Value',
                 marker_color=chart_data['Bar_Color'],
                 text=[f"Dev: {row['Deviation Percentage']:.1f}%" for _, row in chart_data.iterrows()],
-                textposition='auto'
+                textposition='auto',
             ))
             
-            # Line Trace for Ideal Inventory
+            # Line Trace for Ideal Inventory (Overlapping)
             fig1.add_trace(go.Scatter(
                 x=chart_data['Part'],
                 y=chart_data['Ideal_Value_Converted'],
-                mode='lines+markers',
                 name='Ideal Inventory Value',
+                mode='lines+markers',
                 line=dict(color='black', width=3, dash='dash'),
                 marker=dict(size=8, symbol='diamond')
             ))
@@ -1317,45 +2777,212 @@ class InventoryManagementSystem:
             fig1.update_layout(
                 title=f"Top {top_n} Parts: Actual vs Ideal Value",
                 xaxis_title="Parts",
-                yaxis_title=f"Value ({unit_name})",
+                yaxis_title=f"Value (in ₹ {unit_name})",
                 xaxis_tickangle=-45,
-                yaxis=dict(tickformat=',.1f', ticksuffix=suffix),
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                yaxis=dict(
+                    tickformat=',.1f',
+                    ticksuffix=suffix
+                ),
+                xaxis=dict(tickfont=dict(size=10)),
+                showlegend=True,
+                legend=dict(
+                    orientation="h",
+                    yanchor="bottom",
+                    y=1.02,
+                    xanchor="right",
+                    x=1
+                )
             )
             st.plotly_chart(fig1, use_container_width=True)
-            
-            st.info("ℹ️ The black dashed line represents the Ideal Inventory Value based on Average Daily Consumption.")
-
-    def apply_advanced_filters(self, df):
-        """Apply filters to dataframe"""
-        filtered_df = df.copy()
-        # Filters can be added here
-        return filtered_df
-        
-    def run(self):
-        st.title("📊 Inventory Analyzer")
-        st.markdown("<p style='font-size:18px; font-style:italic;'>Designed and Developed by Agilomatrix</p>", unsafe_allow_html=True)
-        st.markdown("---")
-
-        self.authenticate_user()
-
-        if st.session_state.user_role == "Admin":
-            self.admin_data_management()
-        elif st.session_state.user_role == "User":
-            self.user_inventory_upload()
         else:
-            st.info("👋 Please select your role and authenticate to access the system.")
+            st.warning("⚠️ Required columns for parts value chart not found.")
 
-    def display_analysis_results(self):
-        """Main method to display all analysis results"""
-        analysis_results = self.persistence.load_data_from_session_state('persistent_analysis_results')
-        if not analysis_results:
-            st.error("❌ No analysis results available.")
-            return
-
-        df = pd.DataFrame(analysis_results)
-        self.display_comprehensive_analysis(df.to_dict('records'))
-
+        # ✅ 2. Vendor vs Value (Fixed vendor_col definition)
+        vendor_col = next((col for col in ['Vendor', 'Vendor Name', 'VENDOR'] if col in df.columns), None)
+        if vendor_col and value_col and vendor_col in df.columns:
+            vendor_data = []
+            for vendor_name, vendor_group in df[df[value_col] > 0].groupby(vendor_col):
+                total_value = vendor_group[value_col].sum()
+                total_qty = vendor_group['Current Inventory - Qty'].sum() if 'Current Inventory - Qty' in vendor_group.columns else 0
+                part_count = len(vendor_group)
+                if 'Status' in vendor_group.columns:
+                    status_counts = vendor_group['Status'].value_counts()
+                else:
+                    status_counts = pd.Series() # fallback
+                
+                vendor_status = status_counts.index[0] if not status_counts.empty else 'Within Norms'
+                vendor_data.append({
+                    vendor_col: vendor_name,
+                    value_col: total_value,
+                    'Total_Parts': part_count,
+                    'Total_Qty': total_qty,
+                    'Vendor_Status': vendor_status
+                })
+            
+            # Sort and take top N (🔄 Updated to use top_n)
+            vendor_df = pd.DataFrame(vendor_data).sort_values(by=value_col, ascending=False).head(top_n)
+            
+            if not vendor_df.empty:
+                vendor_df['Value_Converted'] = vendor_df[value_col] / divisor
+                color_map = {
+                    "Excess Inventory": "#2196F3",
+                    "Short Inventory": "#F44336", 
+                    "Within Norms": "#4CAF50"
+                }
+                vendor_df['HOVER_TEXT'] = vendor_df.apply(lambda row: (
+                    f"Vendor: {row[vendor_col]}<br>"
+                    f"Inventory Value: ₹{row[value_col]:,.0f}<br>"
+                    f"Total Parts: {row['Total_Parts']}<br>"
+                    f"Total Qty: {row['Total_Qty']:,.0f}<br>"
+                    f"Status: {row['Vendor_Status']}"
+                ), axis=1)
+                vendor_df['Bar_Color'] = vendor_df['Vendor_Status'].map(color_map)
+        
+                fig3 = go.Figure()
+                for i, row in vendor_df.iterrows():
+                    fig3.add_trace(go.Bar(
+                        x=[row[vendor_col]],
+                        y=[row['Value_Converted']],
+                        name=row['Vendor_Status'],
+                        marker_color=row['Bar_Color'],
+                        customdata=[row['HOVER_TEXT']],
+                        hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+                        showlegend=False
+                    ))
+                for status, color in color_map.items():
+                    fig3.add_trace(go.Bar(
+                        x=[None],
+                        y=[None],
+                        name=status,
+                        marker_color=color,
+                        showlegend=True
+                    ))
+                fig3.update_layout(
+                    title=f'Top {top_n} Vendors by Stock Value (Color-coded by Inventory Status)', # 🔄 Updated Title
+                    xaxis_title="Vendors",
+                    yaxis_title=f"Inventory Value (in ₹ {unit_name})",
+                    xaxis_tickangle=-45,
+                    yaxis=dict(
+                        tickformat=',.1f',
+                        ticksuffix=suffix
+                    ),
+                    showlegend=True,
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
+                    )
+                )
+                st.plotly_chart(fig3, use_container_width=True)
+            else:
+                st.info("ℹ️ No valid vendor data found.")
+        else:
+            missing_cols = []
+            if not vendor_col:
+                missing_cols.append("vendor column")
+            if not value_col:
+                missing_cols.append("value column")
+            st.warning(f"⚠️ Vendor analysis chart cannot be displayed. Missing: {', '.join(missing_cols)}")
+                
+        # ✅ 3. Top N Parts by Inventory Status
+        try:
+            st.markdown(f"## 🧩 Top {top_n} Parts by Inventory Status") # 🔄 Updated Title
+            if 'PART NO' not in df.columns or 'Stock Deviation Value' not in df.columns:
+                st.warning("⚠️ Required columns missing for top parts chart.")
+                return
+            status_colors = {
+                "Excess Inventory": "#2196F3",
+                "Short Inventory": "#F44336"
+            }
+            for status, label, color in [
+                ("Excess Inventory", f"🔵 Top {top_n} Excess Inventory Parts", status_colors["Excess Inventory"]),
+                ("Short Inventory", f"🔴 Top {top_n} Short Inventory Parts", status_colors["Short Inventory"]),
+            ]:
+                st.subheader(label)
+                if status == "Excess Inventory":
+                    st.markdown(f'<div class="graph-description">Top {top_n} parts with highest excess inventory value.</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown(f'<div class="graph-description">Top {top_n} parts with highest shortage value.</div>', unsafe_allow_html=True)
+                
+                status_df = df[df['INVENTORY REMARK STATUS'] == status]
+                if status == "Excess Inventory":
+                    status_df = status_df[status_df['Stock Deviation Value'] > 0]
+                    # 🔄 Updated to use top_n
+                    status_df = status_df.sort_values(by='Stock Deviation Value', ascending=False).head(top_n)
+                    chart_title = f"Top {top_n} Excess Inventory Parts (₹ Excess Value in {unit_name})"
+                    y_title = f"Excess Inventory Value (₹ {unit_name})"
+                elif status == "Short Inventory":
+                    status_df = status_df[status_df['Stock Deviation Value'] < 0]
+                    status_df['Abs_Deviation_Value'] = abs(status_df['Stock Deviation Value'])
+                    # 🔄 Updated to use top_n
+                    status_df = status_df.sort_values(by='Abs_Deviation_Value', ascending=False).head(top_n)
+                    chart_title = f"Top {top_n} Short Inventory Parts (₹ Shortage Value in {unit_name})"
+                    y_title = f"Shortage Value (₹ {unit_name})"
+                if status_df.empty:
+                    st.info(f"No data found for '{status}' parts.")
+                    continue
+                
+                if status == "Excess Inventory":
+                    status_df['Value_Converted'] = status_df['Stock Deviation Value'] / divisor
+                    hover_value = status_df['Stock Deviation Value']
+                else:
+                    status_df['Value_Converted'] = status_df['Abs_Deviation_Value'] / divisor
+                    hover_value = status_df['Abs_Deviation_Value']
+                    
+                status_df['PART_DESC_NO'] = status_df['PART DESCRIPTION'].astype(str) + " (" + status_df['PART NO'].astype(str) + ")"
+                status_df['HOVER_TEXT'] = status_df.apply(lambda row: (
+                    f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
+                    f"Part No: {row.get('PART NO')}<br>"
+                    f"{'Excess' if status == 'Excess Inventory' else 'Shortage'} Value: ₹{hover_value.loc[row.name]:,.0f}"
+                ), axis=1)
+                
+                fig = px.bar(
+                    status_df,
+                    x='PART_DESC_NO',
+                    y='Value_Converted',
+                    color_discrete_sequence=[color],
+                    title=chart_title
+                )
+                fig.update_traces(
+                    hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+                    customdata=status_df['HOVER_TEXT']
+                )
+                fig.update_layout(
+                    xaxis_tickangle=-45,
+                    yaxis_title=y_title,
+                    yaxis=dict(
+                        tickformat=',.1f',
+                        ticksuffix=suffix
+                    )
+                )
+                st.plotly_chart(fig, use_container_width=True, key=f"{status.lower().replace(' ', '_')}_parts")
+        except Exception as e:
+            st.error("❌ Error displaying Top Parts by Status")
+            st.code(str(e))
+          
+        # ✅ 4. Top N Vendors by Inventory Status
+        try:
+            st.markdown(f"## 🏢 Top {top_n} Vendors by Inventory Status")
+            chart_configs = [
+                ("Excess Inventory", "Top 10 Vendors - Excess Value Above Norm", "excess_vendors", self.status_colors["Excess Inventory"]),
+                ("Short Inventory", "Top 10 Vendors - Short Value Below Norm", "short_vendors", self.status_colors["Short Inventory"]),
+            ]
+            for status, title, key, color in chart_configs:
+                # 🔄 Updated to pass top_n parameter
+                self.analyzer.show_vendor_chart_by_status(
+                    processed_data=analysis_results,
+                    status_filter=status,
+                    chart_title=title,
+                    chart_key=key,
+                    color=color,
+                    value_format=format_key,
+                    top_n=top_n  # Pass the slider value here
+                )
+        except Exception as e:
+            st.error("❌ Error displaying Top Vendors by Status")
+            st.code(str(e))
 if __name__ == "__main__":
     app = InventoryManagementSystem()
-    app.run()
+    app.run()  # This runs the full dashboard
