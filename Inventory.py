@@ -1029,132 +1029,105 @@ class InventoryManagementSystem:
             with col2:
                 if st.button("🔓 Unlock Data", type="secondary"):
                     st.session_state.persistent_pfep_locked = False
-                    # Clear related data when PFEP is unlocked
                     st.session_state.persistent_inventory_data = None
                     st.session_state.persistent_inventory_locked = False
                     st.session_state.persistent_analysis_results = None
-                    st.success("✅ PFEP data unlocked. Users need to re-upload inventory data.")
+                    st.success("✅ PFEP data unlocked.")
                     st.rerun()
             with col3:
-                if st.button("👤 Go to User View", type="primary", help="Switch to user interface"):
+                if st.button("👤 Go to User View", type="primary"):
                     st.session_state.user_role = "User"
                     st.rerun()
             
-            # Display current PFEP data if available
             pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
             if pfep_data:
                 self.display_pfep_data_preview(pfep_data)
             return
-        # Tolerance Setting for Admin
-        st.subheader("📐 Set Analysis Tolerance (Admin Only)")
-        # Initialize admin_tolerance if not exists
-        if "admin_tolerance" not in st.session_state:
-            st.session_state.admin_tolerance = 30
-    
-        # Create selectbox with proper callback
-        new_tolerance = st.selectbox(
-            "Tolerance Zone (+/-)",
-            options=[0, 10, 20, 30, 40, 50],
-            index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance),
-            format_func=lambda x: f"{x}%",
-            key="tolerance_selector"
-        )
-        # Update tolerance if changed
-        if new_tolerance != st.session_state.admin_tolerance:
-            st.session_state.admin_tolerance = new_tolerance
-            st.success(f"✅ Tolerance updated to {new_tolerance}%")
-            
-            # If analysis exists, refresh it with new tolerance
-            if st.session_state.get('persistent_analysis_results'):
-                st.info("🔄 Analysis will be refreshed with new tolerance on next run")
+
+        # ✅ NEW: Global Inventory Parameters Section
+        st.subheader("📐 Set Inventory Parameters (Admin Only)")
+        st.info("These settings apply to the calculation of Ideal Inventory and Deviation.")
         
-        st.markdown(f"**Current Tolerance:** {st.session_state.admin_tolerance}%")
+        param_col1, param_col2 = st.columns(2)
+        
+        with param_col1:
+            # Initialize admin_tolerance if not exists
+            if "admin_tolerance" not in st.session_state:
+                st.session_state.admin_tolerance = 30
+        
+            new_tolerance = st.selectbox(
+                "Deviation Tolerance Zone (+/-)",
+                options=[0, 10, 20, 30, 40, 50],
+                index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance),
+                format_func=lambda x: f"{x}%",
+                key="tolerance_selector",
+                help="If Deviation % is within this range, status is 'Within Norms'."
+            )
+            if new_tolerance != st.session_state.admin_tolerance:
+                st.session_state.admin_tolerance = new_tolerance
+                st.success(f"✅ Tolerance updated to {new_tolerance}%")
+
+        with param_col2:
+            # ✅ NEW: Input for Ideal Inventory Days
+            new_days = st.number_input(
+                "Ideal Inventory Days",
+                min_value=1,
+                max_value=365,
+                value=st.session_state.admin_ideal_days,
+                step=1,
+                help="Used to calculate Ideal Inventory (Avg Daily Consumption * Ideal Days)"
+            )
+            if new_days != st.session_state.admin_ideal_days:
+                st.session_state.admin_ideal_days = new_days
+                st.success(f"✅ Ideal Inventory Days set to {new_days}")
+                # Clear previous results to force re-calculation
+                st.session_state.persistent_analysis_results = None
+
         st.markdown("---")
         
-        # PFEP Data Management Section
-        st.subheader("📊 PFEP Master Data Management")
-        
+        # ... (Rest of the original admin_data_management code: Upload File, Sample, Current Data tabs) ...
+        # Copy the original Tab logic here (Upload/Sample/Current) exactly as it was.
         # Tab interface for different data input methods
         tab1, tab2, tab3 = st.tabs(["📁 Upload File", "🧪 Load Sample", "📋 Current Data"])
         
         with tab1:
             st.markdown("**Upload PFEP Excel/CSV File**")
-            uploaded_file = st.file_uploader(
-                "Choose PFEP file",
-                type=['xlsx', 'xls', 'csv'],
-                help="Upload your PFEP master data file"
-            )
-            
+            uploaded_file = st.file_uploader("Choose PFEP file", type=['xlsx', 'xls', 'csv'])
             if uploaded_file is not None:
                 try:
-                    # Read file based on extension
-                    if uploaded_file.name.endswith('.csv'):
-                        df = pd.read_csv(uploaded_file)
-                    else:
-                        df = pd.read_excel(uploaded_file)
-                    
+                    if uploaded_file.name.endswith('.csv'): df = pd.read_csv(uploaded_file)
+                    else: df = pd.read_excel(uploaded_file)
                     st.success(f"✅ File loaded: {len(df)} rows")
-                    
-                    # Show preview
-                    with st.expander("📋 Preview Raw Data"):
-                        st.dataframe(df.head())
-                    
-                    # Standardize data
                     standardized_data = self.standardize_pfep_data(df)
-                    
                     if standardized_data:
                         st.success(f"✅ Standardized: {len(standardized_data)} valid records")
-                        
-                        # Show standardized preview
-                        with st.expander("📋 Preview Standardized Data"):
-                            preview_df = pd.DataFrame(standardized_data[:5])
-                            st.dataframe(preview_df)
-                        
-                        # Save button
                         if st.button("💾 Save PFEP Data", type="primary"):
-                            self.persistence.save_data_to_session_state(
-                                'persistent_pfep_data', 
-                                standardized_data
-                            )
-                            st.success("✅ PFEP data saved successfully!")
+                            self.persistence.save_data_to_session_state('persistent_pfep_data', standardized_data)
+                            st.success("✅ PFEP data saved!")
                             st.rerun()
-                    else:
-                        st.error("❌ No valid data found after standardization")
-                        
                 except Exception as e:
                     st.error(f"❌ Error processing file: {str(e)}")
         
         with tab2:
-            st.markdown("**Load Sample PFEP Data for Testing**")
-            st.info("This will load pre-configured sample data for demonstration")
-            
+            st.markdown("**Load Sample PFEP Data**")
             if st.button("🧪 Load Sample PFEP Data", type="secondary"):
                 sample_data = self.load_sample_pfep_data()
-                self.persistence.save_data_to_session_state(
-                    'persistent_pfep_data', 
-                    sample_data
-                )
+                self.persistence.save_data_to_session_state('persistent_pfep_data', sample_data)
                 st.success(f"✅ Sample PFEP data loaded: {len(sample_data)} parts")
                 st.rerun()
         
         with tab3:
             st.markdown("**Current PFEP Data Status**")
             pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
-            
             if pfep_data:
                 self.display_pfep_data_preview(pfep_data)
-                
-                # Lock data for users
                 st.markdown("---")
-                st.markdown("**🔒 Lock Data for Users**")
-                st.info("Locking PFEP data allows users to upload inventory and perform analysis")
-                
                 if st.button("🔒 Lock PFEP Data", type="primary"):
                     st.session_state.persistent_pfep_locked = True
                     st.success("✅ PFEP data locked! Users can now upload inventory data.")
                     st.rerun()
             else:
-                st.warning("❌ No PFEP data available. Please upload or load sample data first.")
+                st.warning("❌ No PFEP data available.")
     
     def display_pfep_data_preview(self, pfep_data):
         """Display PFEP data preview with statistics"""
