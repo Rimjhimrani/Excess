@@ -2800,7 +2800,7 @@ class InventoryManagementSystem:
         self.display_help_and_documentation()
         
     def display_enhanced_analysis_charts(self, analysis_results):
-        """Display enhanced visual summaries with better error handling and dynamic Top N selection"""
+        """Display enhanced visual summaries with Ideal Inventory Line Overlay"""
         st.subheader("📊 Enhanced Inventory Charts")
         
         # Add Unit Toggle AND Top N Slider
@@ -2808,89 +2808,112 @@ class InventoryManagementSystem:
         with col1:
             chart_unit = st.selectbox("Select Currency Unit:", ["Lakhs", "Millions"], key="chart_unit_selector")
         with col2:
-            # 🔄 NEW: Slider to select number of items to show
             top_n = st.slider("Number of items to show:", min_value=5, max_value=50, value=10, step=5, key="top_n_slider")
+        
+        # ✅ Get Admin Configured Ideal Days (Default to 30 if not set)
+        ideal_days = st.session_state.get('user_preferences', {}).get('ideal_inventory_days', 30)
         
         if chart_unit == "Millions":
             divisor = 1_000_000
             suffix = "M"
             unit_name = "Millions"
-            format_key = "millions"
         else:
             divisor = 100_000
             suffix = "L"
             unit_name = "Lakhs"
-            format_key = "lakhs"
             
         df = pd.DataFrame(analysis_results)
         if df.empty:
             st.warning("⚠️ No data available for charts.")
             return
             
-        # ✅ 1. Top N Parts by Value
+        # ✅ 1. Top N Parts by Value (with Ideal Inventory Overlay)
         value_col = None
         for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE']:
             if col in df.columns:
                 value_col = col
                 break
+                
         if value_col and 'PART NO' in df.columns and 'PART DESCRIPTION' in df.columns:
             # Filter top N parts with non-zero value
             chart_data = (
                 df[df[value_col] > 0]
                 .sort_values(by=value_col, ascending=False)
-                .head(top_n)  # 🔄 Updated to use top_n variable
+                .head(top_n)
                 .copy()
             )
             # Convert to selected unit
             chart_data['Value_Converted'] = chart_data[value_col] / divisor
-            # Combine description and part no into a single label
+            
+            # ✅ CALCULATE IDEAL INVENTORY & DEVIATION
+            def calculate_ideal_metrics(row):
+                try:
+                    avg_consumption = float(row.get('AVG CONSUMPTION/DAY', 0) or 0)
+                    unit_price = float(row.get('UNIT PRICE', 0) or 0)
+                    current_qty = float(row.get('Current Inventory - Qty', 0) or 0)
+                    
+                    # Ideal Inventory Calculation
+                    ideal_qty = avg_consumption * ideal_days
+                    ideal_value = ideal_qty * unit_price
+                    ideal_value_converted = ideal_value / divisor
+                    
+                    # Deviation % Calculation
+                    if ideal_qty > 0:
+                        deviation_pct = ((current_qty - ideal_qty) / ideal_qty) * 100
+                    else:
+                        deviation_pct = 0
+                        
+                    return ideal_qty, ideal_value_converted, deviation_pct
+                except:
+                    return 0, 0, 0
+
+            # Apply calculations
+            metrics = chart_data.apply(calculate_ideal_metrics, axis=1, result_type='expand')
+            chart_data['Ideal_Qty'] = metrics[0]
+            chart_data['Ideal_Value_Converted'] = metrics[1]
+            chart_data['Deviation_Pct'] = metrics[2]
+
+            # Combine description and part no
             chart_data['Part'] = chart_data.apply(
                 lambda row: f"{row['PART DESCRIPTION']}\n({row['PART NO']})",
                 axis=1
             )
-            # Use the Status column from analyze_inventory results
+            
+            # Use the Status column
             if 'Status' in chart_data.columns:
                 chart_data['Inventory_Status'] = chart_data['Status']
             elif 'INVENTORY REMARK STATUS' in chart_data.columns:
                 chart_data['Inventory_Status'] = chart_data['INVENTORY REMARK STATUS']
             else:
-                # Fallback: calculate status if bounds are available
-                def determine_status_from_bounds(row):
-                    current_qty = row.get('Current Inventory - Qty', 0)
-                    lower_bound = row.get('Lower Bound Qty', 0)
-                    upper_bound = row.get('Upper Bound Qty', 0)
-                    if lower_bound > 0 and upper_bound > 0:
-                        if current_qty < lower_bound:
-                            return 'Short Inventory'
-                        elif current_qty > upper_bound:
-                            return 'Excess Inventory'
-                        else:
-                            return 'Within Norms'
-                    else:
-                        return 'Within Norms'
-                chart_data['Inventory_Status'] = chart_data.apply(determine_status_from_bounds, axis=1)
+                chart_data['Inventory_Status'] = 'Within Norms' # Fallback
             
             color_map = {
                 "Excess Inventory": "#2196F3",
                 "Short Inventory": "#F44336", 
                 "Within Norms": "#4CAF50"
             }
-            # Enhanced hover text
+            
+            # ✅ Enhanced hover text with Ideal Inventory Details
             chart_data['HOVER_TEXT'] = chart_data.apply(lambda row: (
                 f"Description: {row['PART DESCRIPTION']}<br>"
                 f"Part No: {row['PART NO']}<br>"
-                f"Current Qty: {row.get('Current Inventory - Qty', 'N/A')}<br>"
-                f"RM Norm Qty: {row.get('RM Norm - In Qty', 'N/A')}<br>"
-                f"Lower Bound: {row.get('Lower Bound Qty', 'N/A')}<br>"
-                f"Upper Bound: {row.get('Upper Bound Qty', 'N/A')}<br>"
-                f"Value: ₹{row[value_col]:,.0f}<br>"
-                f"Status: {row['Inventory_Status']}"
+                f"<b>Current Status: {row['Inventory_Status']}</b><br>"
+                f"--------------------------------<br>"
+                f"Current Qty: {row.get('Current Inventory - Qty', 0):,.0f}<br>"
+                f"Current Value: ₹{row[value_col]:,.0f}<br>"
+                f"--------------------------------<br>"
+                f"<b>Ideal Inventory (Based on {ideal_days} Days):</b><br>"
+                f"Avg Daily Cons: {row.get('AVG CONSUMPTION/DAY', 0):.2f}<br>"
+                f"Ideal Qty: {row['Ideal_Qty']:,.0f}<br>"
+                f"<b>Deviation: {row['Deviation_Pct']:.1f}%</b>"
             ), axis=1)
             
             chart_data['Bar_Color'] = chart_data['Inventory_Status'].map(color_map)
     
-            # Create bar chart
+            # Create Figure
             fig1 = go.Figure()
+            
+            # 1. Add Bar Chart Traces (Existing Logic)
             for i, row in chart_data.iterrows():
                 fig1.add_trace(go.Bar(
                     x=[row['Part']],
@@ -2898,9 +2921,11 @@ class InventoryManagementSystem:
                     name=row['Inventory_Status'],
                     marker_color=row['Bar_Color'],
                     customdata=[row['HOVER_TEXT']],
-                    hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+                    hovertemplate='%{customdata}<extra></extra>',
                     showlegend=False
                 ))
+            
+            # 2. Add Legend Proxies (Existing Logic)
             for status, color in color_map.items():
                 fig1.add_trace(go.Bar(
                     x=[None],
@@ -2909,85 +2934,94 @@ class InventoryManagementSystem:
                     marker_color=color,
                     showlegend=True
                 ))
+                
+            # ✅ 3. ADD IDEAL INVENTORY LINE OVERLAY
+            fig1.add_trace(go.Scatter(
+                x=chart_data['Part'],
+                y=chart_data['Ideal_Value_Converted'],
+                mode='lines+markers',
+                name=f'Ideal Inventory ({ideal_days} Days)',
+                line=dict(color='black', width=2), # Black thin line
+                marker=dict(symbol='circle', size=6, color='black'),
+                hovertemplate=(
+                    f"<b>Ideal Inventory Target</b><br>" +
+                    f"Value: %{{y:.2f}} {suffix}<br>" +
+                    "<extra></extra>"
+                )
+            ))
+
             fig1.update_layout(
-                title=f"Top {top_n} Parts by Stock Value (Color-coded by Inventory Status)", # 🔄 Updated Title
+                title=f"Top {top_n} Parts by Stock Value vs Ideal Inventory Target",
                 xaxis_title="Parts",
                 yaxis_title=f"Stock Value (in ₹ {unit_name})",
                 xaxis_tickangle=-45,
-                yaxis=dict(
-                    tickformat=',.1f',
-                    ticksuffix=suffix
-                ),
+                yaxis=dict(tickformat=',.1f', ticksuffix=suffix),
                 xaxis=dict(tickfont=dict(size=10)),
                 showlegend=True,
-                legend=dict(
-                    orientation="h",
-                    yanchor="bottom",
-                    y=1.02,
-                    xanchor="right",
-                    x=1
-                )
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
             st.plotly_chart(fig1, use_container_width=True)
         else:
             st.warning("⚠️ Required columns for parts value chart not found.")
 
-        # ✅ 2. Vendor vs Value (Fixed vendor_col definition)
+        # ✅ 2. Vendor vs Value (Added Logic for Ideal Inventory Aggregation)
         vendor_col = next((col for col in ['Vendor', 'Vendor Name', 'VENDOR'] if col in df.columns), None)
         if vendor_col and value_col and vendor_col in df.columns:
             vendor_data = []
+            
+            # Group calculation to include Ideal Value per Vendor
             for vendor_name, vendor_group in df[df[value_col] > 0].groupby(vendor_col):
                 total_value = vendor_group[value_col].sum()
-                total_qty = vendor_group['Current Inventory - Qty'].sum() if 'Current Inventory - Qty' in vendor_group.columns else 0
-                part_count = len(vendor_group)
+                
+                # Calculate Ideal Value for the whole vendor (Sum of parts)
+                vendor_ideal_value_sum = 0
+                for _, v_row in vendor_group.iterrows():
+                     ac = float(v_row.get('AVG CONSUMPTION/DAY', 0) or 0)
+                     up = float(v_row.get('UNIT PRICE', 0) or 0)
+                     vendor_ideal_value_sum += (ac * ideal_days * up)
+
                 if 'Status' in vendor_group.columns:
                     status_counts = vendor_group['Status'].value_counts()
-                elif 'INVENTORY REMARK STATUS' in vendor_group.columns:
-                    status_counts = vendor_group['INVENTORY REMARK STATUS'].value_counts()
                 else:
-                    def calc_status(row):
-                        current_qty = row.get('Current Inventory - Qty', 0)
-                        lower_bound = row.get('Lower Bound Qty', 0)
-                        upper_bound = row.get('Upper Bound Qty', 0)
-                        if lower_bound > 0 and upper_bound > 0:
-                            if current_qty < lower_bound:
-                                return 'Short Inventory'
-                            elif current_qty > upper_bound:
-                                return 'Excess Inventory'
-                            else:
-                                return 'Within Norms'
-                        return 'Within Norms'
-                    vendor_group_status = vendor_group.apply(calc_status, axis=1)
-                    status_counts = vendor_group_status.value_counts()
+                    status_counts = pd.Series([0]) # Fallback
+
                 vendor_status = status_counts.index[0] if not status_counts.empty else 'Within Norms'
+                
                 vendor_data.append({
                     vendor_col: vendor_name,
                     value_col: total_value,
-                    'Total_Parts': part_count,
-                    'Total_Qty': total_qty,
+                    'Ideal_Value': vendor_ideal_value_sum,
                     'Vendor_Status': vendor_status
                 })
             
-            # Sort and take top N (🔄 Updated to use top_n)
             vendor_df = pd.DataFrame(vendor_data).sort_values(by=value_col, ascending=False).head(top_n)
             
             if not vendor_df.empty:
                 vendor_df['Value_Converted'] = vendor_df[value_col] / divisor
-                color_map = {
-                    "Excess Inventory": "#2196F3",
-                    "Short Inventory": "#F44336", 
-                    "Within Norms": "#4CAF50"
-                }
+                vendor_df['Ideal_Value_Converted'] = vendor_df['Ideal_Value'] / divisor
+                
+                # Calculate Deviation % for Vendor
+                vendor_df['Deviation_Pct'] = vendor_df.apply(
+                    lambda r: ((r[value_col] - r['Ideal_Value']) / r['Ideal_Value'] * 100) if r['Ideal_Value'] > 0 else 0, 
+                    axis=1
+                )
+
+                color_map = {"Excess Inventory": "#2196F3", "Short Inventory": "#F44336", "Within Norms": "#4CAF50"}
+                
+                # ✅ Enhanced Hover for Vendor
                 vendor_df['HOVER_TEXT'] = vendor_df.apply(lambda row: (
                     f"Vendor: {row[vendor_col]}<br>"
-                    f"Inventory Value: ₹{row[value_col]:,.0f}<br>"
-                    f"Total Parts: {row['Total_Parts']}<br>"
-                    f"Total Qty: {row['Total_Qty']:,.0f}<br>"
+                    f"Actual Value: ₹{row[value_col]:,.0f}<br>"
+                    f"Ideal Value: ₹{row['Ideal_Value']:,.0f}<br>"
+                    f"Deviation: {row['Deviation_Pct']:.1f}%<br>"
                     f"Status: {row['Vendor_Status']}"
                 ), axis=1)
+                
                 vendor_df['Bar_Color'] = vendor_df['Vendor_Status'].map(color_map)
         
                 fig3 = go.Figure()
+                
+                # Bar Traces
                 for i, row in vendor_df.iterrows():
                     fig3.add_trace(go.Bar(
                         x=[row[vendor_col]],
@@ -2995,45 +3029,37 @@ class InventoryManagementSystem:
                         name=row['Vendor_Status'],
                         marker_color=row['Bar_Color'],
                         customdata=[row['HOVER_TEXT']],
-                        hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+                        hovertemplate='%{customdata}<extra></extra>',
                         showlegend=False
                     ))
+                
+                # Legend Proxies
                 for status, color in color_map.items():
-                    fig3.add_trace(go.Bar(
-                        x=[None],
-                        y=[None],
-                        name=status,
-                        marker_color=color,
-                        showlegend=True
-                    ))
+                    fig3.add_trace(go.Bar(x=[None], y=[None], name=status, marker_color=color, showlegend=True))
+                
+                # ✅ ADD IDEAL INVENTORY LINE OVERLAY (VENDOR)
+                fig3.add_trace(go.Scatter(
+                    x=vendor_df[vendor_col],
+                    y=vendor_df['Ideal_Value_Converted'],
+                    mode='lines+markers',
+                    name=f'Ideal Inventory ({ideal_days} Days)',
+                    line=dict(color='black', width=2),
+                    hovertemplate='<b>Ideal Target</b><br>Value: %{y:.2f} ' + suffix + '<extra></extra>'
+                ))
+
                 fig3.update_layout(
-                    title=f'Top {top_n} Vendors by Stock Value (Color-coded by Inventory Status)', # 🔄 Updated Title
+                    title=f'Top {top_n} Vendors by Stock Value vs Ideal Inventory',
                     xaxis_title="Vendors",
                     yaxis_title=f"Inventory Value (in ₹ {unit_name})",
                     xaxis_tickangle=-45,
-                    yaxis=dict(
-                        tickformat=',.1f',
-                        ticksuffix=suffix
-                    ),
-                    showlegend=True,
-                    legend=dict(
-                        orientation="h",
-                        yanchor="bottom",
-                        y=1.02,
-                        xanchor="right",
-                        x=1
-                    )
+                    yaxis=dict(tickformat=',.1f', ticksuffix=suffix),
+                    showlegend=True
                 )
                 st.plotly_chart(fig3, use_container_width=True)
             else:
                 st.info("ℹ️ No valid vendor data found.")
         else:
-            missing_cols = []
-            if not vendor_col:
-                missing_cols.append("vendor column")
-            if not value_col:
-                missing_cols.append("value column")
-            st.warning(f"⚠️ Vendor analysis chart cannot be displayed. Missing: {', '.join(missing_cols)}")
+            st.warning(f"⚠️ Vendor analysis chart cannot be displayed.")
                 
         # ✅ 3. Top N Parts by Inventory Status
         try:
