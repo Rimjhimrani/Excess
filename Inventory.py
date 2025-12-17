@@ -2869,7 +2869,12 @@ class InventoryManagementSystem:
             chart_data['HOVER_TEXT'] = chart_data.apply(lambda row: (
                 f"Description: {row['PART DESCRIPTION']}<br>"
                 f"Part No: {row['PART NO']}<br>"
+                f"Current Qty: {row.get('Current Inventory - Qty', 'N/A')}<br>"
+                f"RM Norm Qty: {row.get('RM Norm - In Qty', 'N/A')}<br>"
+                f"Lower Bound: {row.get('Lower Bound Qty', 'N/A')}<br>"
+                f"Upper Bound: {row.get('Upper Bound Qty', 'N/A')}<br>"
                 f"Value: ₹{row[value_col]:,.0f}<br>"
+                f"Status: {row['Inventory_Status']}"
                 f"<b>Ideal Deviation: {row['Dev_Pct']:.1f}%</b><br>"
                 f"Status: {row['Inventory_Status']}"
             ), axis=1)
