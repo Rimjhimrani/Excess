@@ -27,6 +27,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+
 # Custom CSS for better styling
 st.markdown("""
 <style>
@@ -143,22 +144,17 @@ class InventoryAnalyzer:
         
     def analyze_inventory(self, pfep_data, current_inventory, tolerance=None):
         """Analyze inventory using PFEP and Inventory Dump data.
-        
-        UPDATED LOGIC:
-        1. Ideal Inventory = Avg Daily Consumption * Admin Ideal Days
-        2. Deviation % = ((Current - Ideal) / Ideal) * 100
+        Applies updated logic where:
+        - Short Inventory: < RM_IN_QTY × (1 - Tolerance%)
+        - Excess Inventory: > RM_IN_QTY × (1 + Tolerance%)
+        - Within Norms: between the above thresholds
         """
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)  # default to 30%
-        
-        # ✅ NEW: Get Admin Ideal Days
-        admin_ideal_days = st.session_state.get("admin_ideal_days", 30)
-
         results = []
         # Normalize and create lookup dictionaries
         pfep_dict = {str(item['Part_No']).strip().upper(): item for item in pfep_data}
         inventory_dict = {str(item['Part_No']).strip().upper(): item for item in current_inventory}
-        
         for part_no, inventory_item in inventory_dict.items():
             pfep_item = pfep_dict.get(part_no)
             if not pfep_item:
@@ -169,41 +165,28 @@ class InventoryAnalyzer:
                 part_desc = pfep_item.get('Description', '')
                 unit_price = float(pfep_item.get('unit_price', 0)) or 1.0
                 avg_per_day = self.safe_float_convert(pfep_item.get('AVG CONSUMPTION/DAY', 0))
-                
-                # ✅ NEW FORMULA 1: Ideal Inventory
-                ideal_inventory_qty = avg_per_day * admin_ideal_days
-                
-                # ✅ NEW FORMULA 2: Deviation Percentage
-                # ((Current - Ideal) / Ideal) * 100
-                if ideal_inventory_qty > 0:
-                    deviation_pct = ((current_qty - ideal_inventory_qty) / ideal_inventory_qty) * 100
-                    deviation_qty = current_qty - ideal_inventory_qty
-                else:
-                    # Handle division by zero
-                    if current_qty > 0:
-                        deviation_pct = 100.0 # Effectively infinite excess
-                        deviation_qty = current_qty
-                    else:
-                        deviation_pct = 0.0
-                        deviation_qty = 0.0
-
-                # Values
+                rm_days = self.safe_float_convert(pfep_item.get('RM_IN_DAYS', 0))
+                rm_qty = self.safe_float_convert(pfep_item.get('RM_IN_QTY', 0))
+                # Inventory value
                 current_value = current_qty * unit_price
-                ideal_value = ideal_inventory_qty * unit_price
-                deviation_value = deviation_qty * unit_price
                 
-                # Determine Status based on Deviation % and Tolerance
-                if deviation_pct > tolerance:
-                    status = 'Excess Inventory'
-                elif deviation_pct < -tolerance:
+                # Norms with tolerance (Rounding Up)
+                lower_bound = np.ceil(rm_qty * (1 - tolerance / 100))
+                upper_bound = np.ceil(rm_qty * (1 + tolerance / 100))
+
+                # Revised Norm shown for reference
+                revised_norm_qty = upper_bound  # you can rename if needed
+                # Deviation quantity and value
+                deviation_qty = current_qty - revised_norm_qty
+                deviation_value = deviation_qty * unit_price
+
+                # Status based on range
+                if current_qty < lower_bound:
                     status = 'Short Inventory'
+                elif current_qty > upper_bound:
+                    status = 'Excess Inventory'
                 else:
                     status = 'Within Norms'
-
-                # Calculate bounds for visualization reference
-                lower_bound = ideal_inventory_qty * (1 - tolerance / 100)
-                upper_bound = ideal_inventory_qty * (1 + tolerance / 100)
-
                 # Final result per part
                 result = {
                     'PART NO': part_no,
@@ -211,18 +194,16 @@ class InventoryAnalyzer:
                     'Vendor Name': pfep_item.get('Vendor_Name', 'Unknown'),
                     'Vendor_Code': pfep_item.get('Vendor_Code', ''),
                     'AVG CONSUMPTION/DAY': avg_per_day,
-                    'RM IN DAYS': admin_ideal_days,              # Showing Admin Days here
-                    'RM Norm - In Qty': ideal_inventory_qty,     # This is now the Ideal Qty
-                    'Revised Norm Qty': ideal_inventory_qty,     # Main comparator
-                    'Ideal Inventory Qty': ideal_inventory_qty,  # Explicit new key
-                    'Lower Bound Qty': lower_bound,
+                    'RM IN DAYS': rm_days,
+                    'RM Norm - In Qty': rm_qty,
+                    'Revised Norm Qty': revised_norm_qty,
+                    'Lower Bound Qty': lower_bound,                 # ✅ Added
                     'Upper Bound Qty': upper_bound,  
                     'UNIT PRICE': unit_price,
                     'Current Inventory - Qty': current_qty,
                     'Current Inventory - VALUE': current_value,
-                    'Ideal Inventory - VALUE': ideal_value,      # ✅ Added for Line Graph
                     'SHORT/EXCESS INVENTORY': deviation_qty,
-                    'Inventory Deviation %': deviation_pct,      # ✅ Calculated %
+                    'Stock Deviation Qty w.r.t Revised Norm': deviation_qty,
                     'Stock Deviation Value': deviation_value,
                     'Status': status,
                     'INVENTORY REMARK STATUS': status
@@ -254,7 +235,7 @@ class InventoryAnalyzer:
             stock_value = item.get('Stock_Value') or item.get('Current Inventory - VALUE') or 0
             # Get current quantity and norm values for calculating excess/short amounts
             current_qty = item.get('Current Inventory - QTY', 0)
-            norm_qty = item.get('Revised Norm Qty', 0)
+            norm_qty = item.get('Norm', 0)
             unit_price = 0
             try:
                 stock_value = float(stock_value)
@@ -301,8 +282,6 @@ class InventoryAnalyzer:
                 unit_price = float(item.get('UNIT PRICE', 0) or 0)
                 if unit_price == 0 and current_qty > 0:
                     unit_price = stock_value / current_qty
-                
-                # Calculate Deviation Value
                 if status_filter == "Excess Inventory" and current_qty > norm_qty:
                     deviation_value = (current_qty - norm_qty) * unit_price
                     vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + deviation_value
@@ -321,7 +300,7 @@ class InventoryAnalyzer:
             (vendor, vendor_totals[vendor], vendor_counts.get(vendor, 0))
             for vendor in vendor_totals
         ]
-        # Sort and take top N (Updated Logic Here)
+        # Sort and take top N by value (Updated Logic Here)
         top_vendors = sorted(combined, key=lambda x: x[1], reverse=True)[:top_n]
         vendor_names = [v[0] for v in top_vendors]
         raw_values = [v[1] for v in top_vendors]
@@ -409,13 +388,6 @@ class InventoryManagementSystem:
                 'chart_theme': 'plotly'
             }
         
-        # ✅ NEW: Initialize Admin Ideal Inventory Days
-        if 'admin_ideal_days' not in st.session_state:
-            st.session_state.admin_ideal_days = 30  # Default to 30 days
-        
-        if 'admin_tolerance' not in st.session_state:
-            st.session_state.admin_tolerance = 30
-
         # Initialize persistent data keys
         self.persistent_keys = [
             'persistent_pfep_data',
@@ -481,70 +453,136 @@ class InventoryManagementSystem:
             
     def create_top_parts_chart(self, data, status_filter, bar_color, key):
         """Top 10 parts chart by status — shows EXCESS/SHORT VALUE vs NORM VALUE comparison"""
-        # Kept for compatibility, but main dashboard uses display_enhanced_analysis_charts now
         df = pd.DataFrame(data)
+        # ✅ Check required columns
         if 'PART NO' not in df.columns or 'Stock Deviation Value' not in df.columns:
             st.warning("⚠️ Required columns missing for top parts chart.")
             return
+        # ✅ Filter by status
         df = df[df['INVENTORY REMARK STATUS'] == status_filter]
     
         if status_filter == "Excess Inventory":
+            # For excess inventory, show only positive deviation values (excess amount)
             df = df[df['Stock Deviation Value'] > 0]
             df = df.sort_values(by='Stock Deviation Value', ascending=False).head(10)
             chart_title = "Top 10 Excess Inventory Parts - Norm vs Actual (₹ in Lakhs)"
             y_title = "Inventory Value (₹ Lakhs)"
         elif status_filter == "Short Inventory":
+            # For short inventory, show absolute value of negative deviation
             df = df[df['Stock Deviation Value'] < 0]
             df['Abs_Deviation_Value'] = abs(df['Stock Deviation Value'])
             df = df.sort_values(by='Abs_Deviation_Value', ascending=False).head(10)
             chart_title = "Top 10 Short Inventory Parts - Norm vs Actual (₹ in Lakhs)"
             y_title = "Inventory Value (₹ Lakhs)"
         else:
+            st.info(f"No chart available for '{status_filter}' status.")
             return
         if df.empty:
             st.info(f"No data found for '{status_filter}' parts.")
             return
-        
+        # ✅ Prepare chart data with norm vs actual comparison
         if status_filter == "Excess Inventory":
-            df['Current_Stock_Value'] = df['Current Inventory - VALUE']
+            # Calculate norm value (current stock value - excess)
+            df['Current_Stock_Value'] = df['CURRENT STOCK VALUE'] if 'CURRENT STOCK VALUE' in df.columns else 0
             df['Norm_Value'] = df['Current_Stock_Value'] - df['Stock Deviation Value']
             df['Excess_Value'] = df['Stock Deviation Value']
+            # Convert to lakhs
             df['Norm_Value_Lakh'] = df['Norm_Value'] / 100000
             df['Current_Value_Lakh'] = df['Current_Stock_Value'] / 100000
+            df['Deviation_Value_Lakh'] = df['Excess_Value'] / 100000
         else:  # Short Inventory
-            df['Current_Stock_Value'] = df['Current Inventory - VALUE']
+            # Calculate what the stock value should be (current + shortage)
+            df['Current_Stock_Value'] = df['CURRENT STOCK VALUE'] if 'CURRENT STOCK VALUE' in df.columns else 0
             df['Norm_Value'] = df['Current_Stock_Value'] + df['Abs_Deviation_Value']
             df['Shortage_Value'] = df['Abs_Deviation_Value']
+        
+            # Convert to lakhs
             df['Norm_Value_Lakh'] = df['Norm_Value'] / 100000
             df['Current_Value_Lakh'] = df['Current_Stock_Value'] / 100000
-        
+            df['Deviation_Value_Lakh'] = df['Shortage_Value'] / 100000
+        # Prepare labels and hover text
         df['PART_DESC_NO'] = df['PART DESCRIPTION'].astype(str) + " (" + df['PART NO'].astype(str) + ")"
     
+        if status_filter == "Excess Inventory":
+            df['HOVER_TEXT_NORM'] = df.apply(lambda row: (
+                f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
+                f"Part No: {row.get('PART NO')}<br>"
+                f"Norm Value: ₹{row['Norm_Value']:,.0f}<br>"
+                f"Type: Within Norm Limit"
+            ), axis=1)
+        
+            df['HOVER_TEXT_CURRENT'] = df.apply(lambda row: (
+                f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
+                f"Part No: {row.get('PART NO')}<br>"
+                f"Current Value: ₹{row['Current_Stock_Value']:,.0f}<br>"
+                f"Excess Value: ₹{row['Excess_Value']:,.0f}<br>"
+                f"Type: Current Stock (Excess)"
+            ), axis=1)
+        else:  # Short Inventory
+            df['HOVER_TEXT_NORM'] = df.apply(lambda row: (
+                f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
+                f"Part No: {row.get('PART NO')}<br>"
+                f"Required Value: ₹{row['Norm_Value']:,.0f}<br>"
+                f"Type: Required Norm Level"
+            ), axis=1)
+        
+            df['HOVER_TEXT_CURRENT'] = df.apply(lambda row: (
+                f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
+                f"Part No: {row.get('PART NO')}<br>"
+                f"Current Value: ₹{row['Current_Stock_Value']:,.0f}<br>"
+                f"Shortage Value: ₹{row['Shortage_Value']:,.0f}<br>"
+                f"Type: Current Stock (Short)"
+            ), axis=1)
         fig = go.Figure()
+        # Add norm value bars
         fig.add_trace(go.Bar(
             x=df['PART_DESC_NO'],
             y=df['Norm_Value_Lakh'],
-            name='Norm Value',
-            marker_color='#4CAF50',
+            name='Norm Value' if status_filter == "Excess Inventory" else 'Required Value',
+            marker_color='#4CAF50',  # Green for norm
+            hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+            customdata=df['HOVER_TEXT_NORM']
         ))
+        # Add current value bars
         fig.add_trace(go.Bar(
             x=df['PART_DESC_NO'],
             y=df['Current_Value_Lakh'],
             name='Current Value',
             marker_color=bar_color,
+            hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+            customdata=df['HOVER_TEXT_CURRENT']
         ))
     
+        # ✅ Update chart formatting
         fig.update_layout(
             title=chart_title,
             xaxis_title="Part Description (Part No)",
             yaxis_title=y_title,
             xaxis_tickangle=-45,
-            barmode='group',
-            yaxis=dict(tickformat=',.1f', ticksuffix='L'),
+            barmode='group',  # Side-by-side bars
+            yaxis=dict(
+                tickformat=',.1f',
+                ticksuffix='L'
+            ),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            ),
             height=600,
             showlegend=True
         )
         st.plotly_chart(fig, use_container_width=True, key=key)
+    
+        # ✅ Add summary table showing the comparison
+        st.subheader(f"📊 Summary - {status_filter}")
+        summary_df = df[['PART NO', 'PART DESCRIPTION', 'Current_Value_Lakh', 'Norm_Value_Lakh', 'Deviation_Value_Lakh']].copy()
+        summary_df.columns = ['Part No', 'Part Description', 'Current Value (₹L)', 'Norm Value (₹L)', 
+                              'Excess Value (₹L)' if status_filter == "Excess Inventory" else 'Shortage Value (₹L)']
+        summary_df = summary_df.round(2)
+        st.dataframe(summary_df, use_container_width=True)
 
     def authenticate_user(self):
         """Enhanced authentication system with better UX and user switching"""
@@ -564,7 +602,7 @@ class InventoryManagementSystem:
                     col1, col2 = st.columns(2)
                     with col1:
                         if st.button("🔑 Login", key="admin_login"):
-                            if password == "Agilomatrix@123":  
+                            if password == "Agilomatrix@123":  # BUG: wrong password
                                 st.session_state.user_role = "Admin"
                                 st.success("✅ Admin authenticated!")
                                 st.rerun()
@@ -620,7 +658,7 @@ class InventoryManagementSystem:
             st.sidebar.markdown("---")
             if st.sidebar.button("🚪 Logout", key="logout_btn"):
                 # Only clear user session, not persistent data
-                keys_to_keep = self.persistent_keys + ['user_preferences', 'admin_ideal_days']
+                keys_to_keep = self.persistent_keys + ['user_preferences']
                 session_copy = {k: v for k, v in st.session_state.items() if k in keys_to_keep}
                 
                 # Clear all session state
@@ -790,7 +828,22 @@ class InventoryManagementSystem:
         if 'part_no' not in mapped_columns:
             st.error("❌ Part Number column not found. Please ensure your file has a Part Number column.")
             return []
-        
+        if 'rm_qty' not in mapped_columns:
+            st.error("❌ RM Quantity column not found. Please ensure your file has an RM/Required Quantity column.")
+            return []
+        # Warning for missing unit price
+        if 'unit_price' not in mapped_columns:
+            st.warning("⚠️ Unit Price column not found. Using default value of 100 for all parts.")
+            st.info("💡 Expected Unit Price column names: Unit Price, Price, Unit Cost, Rate, etc.")
+            
+        if 'avg_consumption_per_day' not in mapped_columns:
+            st.warning("⚠️ AVG CONSUMPTION/DAY column not found. This will be left empty.")
+            st.info("💡 Expected column names: AVG CONSUMPTION/DAY, Average Per Day, Daily Consumption, etc.")
+            
+        if self.debug:
+            st.write("🔍 DEBUG: Final column mappings:")
+            for k, v in mapped_columns.items():
+                st.write(f"  {k} -> '{v}'")
         # Standardize data
         standardized_data = []
         for idx, row in df.iterrows():
@@ -800,11 +853,21 @@ class InventoryManagementSystem:
                 if 'unit_price' in mapped_columns:
                     raw_price = row[mapped_columns['unit_price']]
                     unit_price_value = self.safe_float_convert(raw_price)
-                    
+                    if self.debug and idx < 3:  # Debug first 3 rows
+                        st.write(f"🔍 Row {idx+1} Unit Price: '{raw_price}' -> {unit_price_value}")
+                    # Extract AVG CONSUMPTION/DAY with proper handling
+                    avg_consumption_value = ""  # Default empty string
+                    if 'avg_consumption_per_day' in mapped_columns:
+                        raw_consumption = row[mapped_columns['avg_consumption_per_day']]
+                        # Handle different data types
+                        if pd.notna(raw_consumption) and str(raw_consumption).strip() != '':
+                            avg_consumption_value = self.safe_float_convert(raw_consumption)
+                        if self.debug and idx < 3:  # Debug first 3 rows
+                            st.write(f"🔍 Row {idx+1} AVG CONSUMPTION/DAY: '{raw_consumption}' -> {avg_consumption_value}")
                 item = {
                     'Part_No': str(row[mapped_columns['part_no']]).strip(),
                     'Description': str(row.get(mapped_columns.get('description', ''), '')).strip(),
-                    'RM_IN_QTY': self.safe_float_convert(row.get(mapped_columns.get('rm_qty', ''), 0)),
+                    'RM_IN_QTY': self.safe_float_convert(row[mapped_columns['rm_qty']]),
                     'RM_IN_DAYS': self.safe_float_convert(row.get(mapped_columns.get('rm_days', ''), 7)),  # Default 7 days
                     'unit_price': unit_price_value,  # Fixed: use lowercase to match analyzer expectation
                     'Vendor_Code': str(row.get(mapped_columns.get('vendor_code', ''), '')).strip(),
@@ -823,6 +886,30 @@ class InventoryManagementSystem:
                 continue
         # Summary of data processing
         st.success(f"✅ Processed {len(standardized_data)} PFEP records")
+        # Show unit price statistics
+        if standardized_data:
+            prices = [item['unit_price'] for item in standardized_data if item['unit_price'] > 0]
+            if prices:
+                avg_price = sum(prices) / len(prices)
+                st.info(f"💰 Unit Price Summary: {len(prices)} parts with prices, Average: ₹{avg_price:.2f}")
+            else:
+                st.warning("⚠️ No valid unit prices found in the data")
+            # Show AVG CONSUMPTION/DAY statistics
+            consumption_values = [
+                item.get('AVG CONSUMPTION/DAY')
+                for item in standardized_data
+                if item.get('AVG CONSUMPTION/DAY') not in (None, '', 'nan')
+            ]
+            if consumption_values:
+                # Convert strings to floats, skip zeros
+                numeric = [self.safe_float_convert(val) for val in consumption_values if self.safe_float_convert(val) > 0]
+                if numeric:
+                    avg_consumption = sum(numeric) / len(numeric)
+                    st.info(f"📊 AVG CONSUMPTION/DAY Summary: {len(numeric)} parts with consumption data, Average: {avg_consumption:.2f}")
+                else:
+                    st.warning("⚠️ All AVG CONSUMPTION/DAY values were zero or invalid.")
+            else:
+                st.warning("⚠️ No AVG CONSUMPTION/DAY data found in the file")
         return standardized_data
     
     def standardize_current_inventory(self, df):
@@ -847,7 +934,11 @@ class InventoryManagementSystem:
                 if variation.lower() in df_columns_lower:
                     mapped_columns[key] = df_columns_lower[variation.lower()]
                     break
-        
+        # Debug: show mappings
+        if self.debug:
+            st.write("🔍 DEBUG: Column mappings found:")
+            for key, col in mapped_columns.items():
+                st.write(f"  {key} → {col}")
         if 'part_no' not in mapped_columns or 'current_qty' not in mapped_columns:
             st.error("❌ Required columns not found. Please ensure your file has Part Number and Current Quantity columns.")
             return []
@@ -868,8 +959,14 @@ class InventoryManagementSystem:
                     'Batch': str(row.get(mapped_columns.get('batch', ''), '')).strip()
                 }
                 standardized_data.append(item)
+                if self.debug and i < 5:
+                    st.write(f"🔍 Row {i+1}:", item)
             except Exception as e:
+                if self.debug:
+                    st.write(f"⚠️ Error processing row {i+1}: {e}")
                 continue
+        if self.debug:
+            st.write(f"✅ Total standardized records: {len(standardized_data)}")
         return standardized_data
     
     def validate_inventory_against_pfep(self, inventory_data):
@@ -943,46 +1040,30 @@ class InventoryManagementSystem:
             if pfep_data:
                 self.display_pfep_data_preview(pfep_data)
             return
-
-        # ✅ NEW: Global Inventory Parameters Section
-        st.subheader("📐 Set Inventory Parameters (Admin Only)")
-        st.info("These settings apply to the calculation of Ideal Inventory and Deviation.")
+        # Tolerance Setting for Admin
+        st.subheader("📐 Set Analysis Tolerance (Admin Only)")
+        # Initialize admin_tolerance if not exists
+        if "admin_tolerance" not in st.session_state:
+            st.session_state.admin_tolerance = 30
+    
+        # Create selectbox with proper callback
+        new_tolerance = st.selectbox(
+            "Tolerance Zone (+/-)",
+            options=[0, 10, 20, 30, 40, 50],
+            index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance),
+            format_func=lambda x: f"{x}%",
+            key="tolerance_selector"
+        )
+        # Update tolerance if changed
+        if new_tolerance != st.session_state.admin_tolerance:
+            st.session_state.admin_tolerance = new_tolerance
+            st.success(f"✅ Tolerance updated to {new_tolerance}%")
+            
+            # If analysis exists, refresh it with new tolerance
+            if st.session_state.get('persistent_analysis_results'):
+                st.info("🔄 Analysis will be refreshed with new tolerance on next run")
         
-        param_col1, param_col2 = st.columns(2)
-        
-        with param_col1:
-            # Initialize admin_tolerance if not exists
-            if "admin_tolerance" not in st.session_state:
-                st.session_state.admin_tolerance = 30
-        
-            new_tolerance = st.selectbox(
-                "Deviation Tolerance Zone (+/-)",
-                options=[0, 10, 20, 30, 40, 50],
-                index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance),
-                format_func=lambda x: f"{x}%",
-                key="tolerance_selector",
-                help="If Deviation % is within this range, status is 'Within Norms'."
-            )
-            if new_tolerance != st.session_state.admin_tolerance:
-                st.session_state.admin_tolerance = new_tolerance
-                st.success(f"✅ Tolerance updated to {new_tolerance}%")
-
-        with param_col2:
-            # ✅ NEW: Input for Ideal Inventory Days
-            new_days = st.number_input(
-                "Ideal Inventory Days",
-                min_value=1,
-                max_value=365,
-                value=st.session_state.admin_ideal_days,
-                step=1,
-                help="Used to calculate Ideal Inventory (Avg Daily Consumption * Ideal Days)"
-            )
-            if new_days != st.session_state.admin_ideal_days:
-                st.session_state.admin_ideal_days = new_days
-                st.success(f"✅ Ideal Inventory Days set to {new_days}")
-                # Clear previous results to force re-calculation
-                st.session_state.persistent_analysis_results = None
-
+        st.markdown(f"**Current Tolerance:** {st.session_state.admin_tolerance}%")
         st.markdown("---")
         
         # PFEP Data Management Section
@@ -1291,19 +1372,17 @@ class InventoryManagementSystem:
         if not pfep_data or not inventory_data:
             st.error("❌ Required data not available. Please upload PFEP and Inventory data first.")
             return
-        
-        # Get tolerance and Ideal Days from admin settings
+        # Get tolerance from admin settings
         tolerance = st.session_state.get('admin_tolerance', 30)
-        admin_ideal_days = st.session_state.get('admin_ideal_days', 30)
-        
-        st.info(f"📐 Analysis Settings: Ideal Days = {admin_ideal_days} | Tolerance = ±{tolerance}%")
+        st.info(f"📐 Analysis Tolerance: ±{tolerance}% (Set by Admin)")
 
         # Check if analysis needs to be performed or updated
         analysis_data = self.persistence.load_data_from_session_state('persistent_analysis_results')
-        
-        # Simple re-analysis logic if results are missing
-        if not analysis_data:
-            st.info(f"🔄 Analyzing based on Ideal Inventory = Avg Daily Consump. × {admin_ideal_days} days...")
+        last_tolerance = st.session_state.get('last_analysis_tolerance', None)
+
+        # Auto re-analyze if tolerance changed or no data exists
+        if not analysis_data or last_tolerance != tolerance:
+            st.info(f"🔄 Re-analyzing with ±{tolerance}% tolerance...")
             with st.spinner("Analyzing inventory..."):
                 try:
                     analysis_results = self.analyzer.analyze_inventory(
@@ -1311,13 +1390,18 @@ class InventoryManagementSystem:
                         inventory_data,
                         tolerance=tolerance
                     )
-                    self.persistence.save_data_to_session_state('persistent_analysis_results', analysis_results)
-                    st.rerun()
                 except Exception as e:
                     st.error("❌ Error during inventory analysis")
                     st.code(str(e))
                     return
-        
+            if analysis_results:
+                self.persistence.save_data_to_session_state('persistent_analysis_results', analysis_results)
+                st.session_state.last_analysis_tolerance = tolerance
+                st.success("✅ Analysis completed successfully!")
+                st.rerun()
+            else:
+                st.error("❌ Analysis failed. No results generated.")
+                return
         # ✅ Use the full dashboard method
         try:
             self.display_analysis_results()
@@ -1740,7 +1824,6 @@ class InventoryManagementSystem:
             "Current Inventory - VALUE",
             "SHORT/EXCESS INVENTORY",
             "Stock Deviation Value",
-            "Inventory Deviation %",          # ✅ Added New % Column
             "INVENTORY REMARK STATUS"
         ]
         # Select columns that exist in the dataframe
@@ -1750,9 +1833,9 @@ class InventoryManagementSystem:
                 available_columns.append(col)
         # Add any remaining important columns not in priority list
         for col in df.columns:
-            if col not in available_columns and len(available_columns) < 12:
+            if col not in available_columns and len(available_columns) < 10:
                 available_columns.append(col)
-        return available_columns 
+        return available_columns # Limit to 10 c
         
     def _get_column_formatters(self,df=None):
         """Get column formatters for styling dataframes"""
@@ -1763,8 +1846,8 @@ class InventoryManagementSystem:
                     formatters[col] = lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
                 elif 'QTY' in col.upper() or 'QUANTITY' in col.upper():
                     formatters[col] = lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
-                elif 'PERCENTAGE' in col.upper() or 'SCORE' in col.upper() or '%' in col:
-                    formatters[col] = lambda x: f"{x:.2f}%" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
+                elif 'PERCENTAGE' in col.upper() or 'SCORE' in col.upper():
+                    formatters[col] = lambda x: f"{x:.1f}%" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
         else:
             # Default formatters when no dataframe is provided
             formatters = {
@@ -2734,11 +2817,13 @@ class InventoryManagementSystem:
             st.warning("⚠️ No data available for charts.")
             return
             
-        # ✅ 1. Top N Parts by Value - COMBO CHART (Bar + Line)
-        value_col = 'Current Inventory - VALUE'
-        ideal_val_col = 'Ideal Inventory - VALUE'
-        
-        if value_col in df.columns and 'PART NO' in df.columns:
+        # ✅ 1. Top N Parts by Value
+        value_col = None
+        for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE']:
+            if col in df.columns:
+                value_col = col
+                break
+        if value_col and 'PART NO' in df.columns and 'PART DESCRIPTION' in df.columns:
             # Filter top N parts with non-zero value
             chart_data = (
                 df[df[value_col] > 0]
@@ -2746,69 +2831,76 @@ class InventoryManagementSystem:
                 .head(top_n)  # 🔄 Updated to use top_n variable
                 .copy()
             )
-            
             # Convert to selected unit
-            chart_data['Current_Val_Conv'] = chart_data[value_col] / divisor
-            
-            # Calculate Ideal Value if column missing (backward compatibility)
-            if ideal_val_col not in chart_data.columns:
-                # If avg consumption and unit price exist
-                if 'AVG CONSUMPTION/DAY' in chart_data.columns and 'UNIT PRICE' in chart_data.columns:
-                     days = st.session_state.get("admin_ideal_days", 30)
-                     chart_data[ideal_val_col] = chart_data['AVG CONSUMPTION/DAY'] * days * chart_data['UNIT PRICE']
-                else:
-                     chart_data[ideal_val_col] = 0
-            
-            chart_data['Ideal_Val_Conv'] = chart_data[ideal_val_col] / divisor
-
+            chart_data['Value_Converted'] = chart_data[value_col] / divisor
             # Combine description and part no into a single label
             chart_data['Part'] = chart_data.apply(
-                lambda row: f"{row['PART DESCRIPTION'][:20]}... ({row['PART NO']})",
+                lambda row: f"{row['PART DESCRIPTION']}\n({row['PART NO']})",
                 axis=1
             )
+            # Use the Status column from analyze_inventory results
+            if 'Status' in chart_data.columns:
+                chart_data['Inventory_Status'] = chart_data['Status']
+            elif 'INVENTORY REMARK STATUS' in chart_data.columns:
+                chart_data['Inventory_Status'] = chart_data['INVENTORY REMARK STATUS']
+            else:
+                # Fallback: calculate status if bounds are available
+                def determine_status_from_bounds(row):
+                    current_qty = row.get('Current Inventory - Qty', 0)
+                    lower_bound = row.get('Lower Bound Qty', 0)
+                    upper_bound = row.get('Upper Bound Qty', 0)
+                    if lower_bound > 0 and upper_bound > 0:
+                        if current_qty < lower_bound:
+                            return 'Short Inventory'
+                        elif current_qty > upper_bound:
+                            return 'Excess Inventory'
+                        else:
+                            return 'Within Norms'
+                    else:
+                        return 'Within Norms'
+                chart_data['Inventory_Status'] = chart_data.apply(determine_status_from_bounds, axis=1)
             
             color_map = {
                 "Excess Inventory": "#2196F3",
                 "Short Inventory": "#F44336", 
                 "Within Norms": "#4CAF50"
             }
-            chart_data['Bar_Color'] = chart_data['Status'].map(color_map)
-
             # Enhanced hover text
             chart_data['HOVER_TEXT'] = chart_data.apply(lambda row: (
-                f"Part: {row['PART DESCRIPTION']}<br>"
-                f"Current Value: ₹{row[value_col]:,.0f}<br>"
-                f"Ideal Value: ₹{row[ideal_val_col]:,.0f}<br>"
-                f"<b>Deviation: {row.get('Inventory Deviation %', 0):.2f}%</b><br>"
-                f"Status: {row['Status']}"
+                f"Description: {row['PART DESCRIPTION']}<br>"
+                f"Part No: {row['PART NO']}<br>"
+                f"Current Qty: {row.get('Current Inventory - Qty', 'N/A')}<br>"
+                f"RM Norm Qty: {row.get('RM Norm - In Qty', 'N/A')}<br>"
+                f"Lower Bound: {row.get('Lower Bound Qty', 'N/A')}<br>"
+                f"Upper Bound: {row.get('Upper Bound Qty', 'N/A')}<br>"
+                f"Value: ₹{row[value_col]:,.0f}<br>"
+                f"Status: {row['Inventory_Status']}"
             ), axis=1)
             
-            # Create Combo Chart
+            chart_data['Bar_Color'] = chart_data['Inventory_Status'].map(color_map)
+    
+            # Create bar chart
             fig1 = go.Figure()
-            
-            # 1. Bar Trace (Current Inventory)
-            fig1.add_trace(go.Bar(
-                x=chart_data['Part'],
-                y=chart_data['Current_Val_Conv'],
-                name='Current Stock',
-                marker_color=chart_data['Bar_Color'],
-                customdata=chart_data['HOVER_TEXT'],
-                hovertemplate='%{customdata}<extra></extra>'
-            ))
-
-            # 2. Line Trace (Ideal Inventory)
-            fig1.add_trace(go.Scatter(
-                x=chart_data['Part'],
-                y=chart_data['Ideal_Val_Conv'],
-                mode='lines+markers',
-                name='Ideal Inventory',
-                line=dict(color='black', width=3, dash='dot'),
-                marker=dict(symbol='diamond', size=10, color='gold'),
-                hovertemplate='Ideal: ₹%{y:.2f}' + suffix + '<extra></extra>'
-            ))
-
+            for i, row in chart_data.iterrows():
+                fig1.add_trace(go.Bar(
+                    x=[row['Part']],
+                    y=[row['Value_Converted']],
+                    name=row['Inventory_Status'],
+                    marker_color=row['Bar_Color'],
+                    customdata=[row['HOVER_TEXT']],
+                    hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
+                    showlegend=False
+                ))
+            for status, color in color_map.items():
+                fig1.add_trace(go.Bar(
+                    x=[None],
+                    y=[None],
+                    name=status,
+                    marker_color=color,
+                    showlegend=True
+                ))
             fig1.update_layout(
-                title=f"Top {top_n} Parts: Current Stock vs Ideal Inventory",
+                title=f"Top {top_n} Parts by Stock Value (Color-coded by Inventory Status)", # 🔄 Updated Title
                 xaxis_title="Parts",
                 yaxis_title=f"Stock Value (in ₹ {unit_name})",
                 xaxis_tickangle=-45,
@@ -2816,14 +2908,15 @@ class InventoryManagementSystem:
                     tickformat=',.1f',
                     ticksuffix=suffix
                 ),
+                xaxis=dict(tickfont=dict(size=10)),
+                showlegend=True,
                 legend=dict(
                     orientation="h",
                     yanchor="bottom",
                     y=1.02,
                     xanchor="right",
                     x=1
-                ),
-                hovermode="x unified"
+                )
             )
             st.plotly_chart(fig1, use_container_width=True)
         else:
@@ -3031,4 +3124,4 @@ class InventoryManagementSystem:
             st.code(str(e))
 if __name__ == "__main__":
     app = InventoryManagementSystem()
-    app.run()
+    app.run()  # This runs the full dashboard
