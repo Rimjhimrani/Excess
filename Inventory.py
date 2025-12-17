@@ -146,7 +146,7 @@ class InventoryAnalyzer:
         """Analyze inventory using PFEP and Inventory Dump data.
         Applies logic:
         - Short/Excess based on Norms & Tolerance.
-        - UPDATED: Calculates Ideal Inventory and Deviation % based on Admin settings.
+        - Calculates Ideal Inventory and Deviation % based on Admin settings.
         """
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)
@@ -175,16 +175,15 @@ class InventoryAnalyzer:
                 # Inventory value
                 current_value = current_qty * unit_price
                 
-                # --- UPDATED: Ideal Inventory Calculation ---
+                # --- Ideal Inventory Calculation ---
                 ideal_inventory_qty = avg_per_day * ideal_days
                 ideal_inventory_value = ideal_inventory_qty * unit_price
                 
-                # --- UPDATED: Deviation Percentage Calculation ---
-                # Avoid division by zero
+                # --- Deviation Percentage Calculation ---
                 if ideal_inventory_qty > 0:
                     deviation_pct = ((current_qty - ideal_inventory_qty) / ideal_inventory_qty) * 100
                 else:
-                    deviation_pct = 0.0 if current_qty == 0 else 100.0 # Treat as 100% excess if ideal is 0 but stock exists
+                    deviation_pct = 0.0 if current_qty == 0 else 100.0
 
                 # Norms with tolerance (Rounding Up)
                 lower_bound = np.ceil(rm_qty * (1 - tolerance / 100))
@@ -193,7 +192,7 @@ class InventoryAnalyzer:
                 # Revised Norm shown for reference
                 revised_norm_qty = upper_bound 
                 
-                # Deviation quantity and value (Legacy logic for status classification)
+                # Deviation quantity and value
                 deviation_qty_norm = current_qty - revised_norm_qty
                 deviation_value_norm = deviation_qty_norm * unit_price
 
@@ -240,7 +239,7 @@ class InventoryAnalyzer:
         return results 
         
     def get_vendor_summary(self, processed_data):
-        """Summarize inventory by vendor using actual Stock_Value field from the file."""
+        """Summarize inventory by vendor"""
         from collections import defaultdict
         summary = defaultdict(lambda: {
             'total_parts': 0,
@@ -2197,11 +2196,14 @@ class InventoryManagementSystem:
         """Display enhanced visual summaries with better error handling and dynamic Top N selection"""
         st.subheader("📊 Enhanced Inventory Charts")
         
-        col1, col2, col3 = st.columns([1, 2, 3])
+        col1, col2, col3, col4 = st.columns([1, 2, 2, 1])
         with col1:
             chart_unit = st.selectbox("Select Currency Unit:", ["Lakhs", "Millions"], key="chart_unit_selector")
         with col2:
             top_n = st.slider("Number of items to show:", min_value=5, max_value=50, value=10, step=5, key="top_n_slider")
+        with col4:
+            # Added Checkbox for Log Scale
+            use_log_scale = st.checkbox("Use Log Scale", value=True, key="log_scale_check", help="Use logarithmic scale to see small values next to large outliers.")
         
         if chart_unit == "Millions":
             divisor = 1_000_000
@@ -2265,7 +2267,7 @@ class InventoryManagementSystem:
                 "Short Inventory": "#F44336", 
                 "Within Norms": "#4CAF50"
             }
-            # --- UPDATED HOVER TEXT WITH DEVIATION PERCENTAGE ---
+            # Enhanced Hover text
             chart_data['HOVER_TEXT'] = chart_data.apply(lambda row: (
                 f"Description: {row['PART DESCRIPTION']}<br>"
                 f"Part No: {row['PART NO']}<br>"
@@ -2278,8 +2280,21 @@ class InventoryManagementSystem:
             
             chart_data['Bar_Color'] = chart_data['Inventory_Status'].map(color_map)
     
-            # Create bar chart
             fig1 = go.Figure()
+
+            # --- ADD LINE TRACE FIRST (Background layer) ---
+            fig1.add_trace(go.Scatter(
+                x=chart_data['Part'],
+                y=chart_data['Ideal_Value_Converted'],
+                mode='lines+markers',
+                name='Ideal Inventory Value',
+                line=dict(color='#FFA500', width=3), # Orange color for visibility
+                marker=dict(symbol='diamond', size=8),
+                hovertemplate='<b>Ideal Value:</b> %{y:.1f} ' + suffix + '<extra></extra>'
+            ))
+            
+            # --- ADD BAR TRACES SECOND (Foreground layer) ---
+            # This ensures if there is overlap, bars are drawn on top of the line
             for i, row in chart_data.iterrows():
                 fig1.add_trace(go.Bar(
                     x=[row['Part']],
@@ -2290,17 +2305,6 @@ class InventoryManagementSystem:
                     hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
                     showlegend=False
                 ))
-            
-            # --- ADD LINE TRACE FOR IDEAL INVENTORY ---
-            fig1.add_trace(go.Scatter(
-                x=chart_data['Part'],
-                y=chart_data['Ideal_Value_Converted'],
-                mode='lines+markers',
-                name='Ideal Inventory Value',
-                line=dict(color='#FFA500', width=3), # Orange color for visibility
-                marker=dict(symbol='diamond', size=8),
-                hovertemplate='<b>Ideal Value:</b> %{y:.1f} ' + suffix + '<extra></extra>'
-            ))
 
             for status, color in color_map.items():
                 fig1.add_trace(go.Bar(
@@ -2310,6 +2314,8 @@ class InventoryManagementSystem:
                     marker_color=color,
                     showlegend=True
                 ))
+            
+            # Update Layout with Log Scale option
             fig1.update_layout(
                 title=f"Top {top_n} Parts by Stock Value vs Ideal Inventory",
                 xaxis_title="Parts",
@@ -2317,7 +2323,8 @@ class InventoryManagementSystem:
                 xaxis_tickangle=-45,
                 yaxis=dict(
                     tickformat=',.1f',
-                    ticksuffix=suffix
+                    ticksuffix=suffix,
+                    type='log' if use_log_scale else 'linear' # Use Log scale if checked
                 ),
                 xaxis=dict(tickfont=dict(size=10)),
                 showlegend=True,
@@ -2413,7 +2420,8 @@ class InventoryManagementSystem:
                     xaxis_tickangle=-45,
                     yaxis=dict(
                         tickformat=',.1f',
-                        ticksuffix=suffix
+                        ticksuffix=suffix,
+                        type='log' if use_log_scale else 'linear' # Use Log scale if checked
                     ),
                     showlegend=True,
                     legend=dict(
@@ -2501,7 +2509,8 @@ class InventoryManagementSystem:
                     yaxis_title=y_title,
                     yaxis=dict(
                         tickformat=',.1f',
-                        ticksuffix=suffix
+                        ticksuffix=suffix,
+                        type='log' if use_log_scale else 'linear' # Log scale support
                     )
                 )
                 st.plotly_chart(fig, use_container_width=True, key=f"{status.lower().replace(' ', '_')}_parts")
