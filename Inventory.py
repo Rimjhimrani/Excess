@@ -649,6 +649,16 @@ class InventoryManagementSystem:
                         "Default Tolerance", [0, 10, 20, 30, 40, 50], 
                         index=2, key="pref_tolerance"
                     )
+                    # ✅ NEW: Admin setting for Ideal Inventory Days
+                    st.session_state.user_preferences['ideal_inventory_days'] = st.number_input(
+                        "Ideal Inventory Days",
+                        min_value=1,
+                        value=30,
+                        step=1,
+                        help="Used to calculate Ideal Inventory (Avg Consumption * Days)",
+                        key="admin_ideal_days"
+                    )
+                    
                     st.session_state.user_preferences['chart_theme'] = st.selectbox(
                         "Chart Theme", ['plotly', 'plotly_white', 'plotly_dark'],
                         key="pref_theme"
