@@ -267,8 +267,8 @@ class InventoryAnalyzer:
                 summary[vendor]['normal_parts'] += 1
         return summary
         
-    def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color,value_format='lakhs'):
-        """Show top 10 vendors by deviation value and count of excess/short parts."""
+    def show_vendor_chart_by_status(self, processed_data, status_filter, chart_title, chart_key, color, value_format='lakhs', top_n=10):
+        """Show top N vendors by deviation value and count of excess/short parts."""
         # Filter by inventory status
         filtered = [item for item in processed_data if item.get('INVENTORY REMARK STATUS') == status_filter]
         vendor_totals = {}
@@ -300,12 +300,15 @@ class InventoryAnalyzer:
             (vendor, vendor_totals[vendor], vendor_counts.get(vendor, 0))
             for vendor in vendor_totals
         ]
-        # Sort and take top 10 by value
-        top_vendors = sorted(combined, key=lambda x: x[1], reverse=True)[:10]
+        # Sort and take top N by value (Updated Logic Here)
+        top_vendors = sorted(combined, key=lambda x: x[1], reverse=True)[:top_n]
         vendor_names = [v[0] for v in top_vendors]
         raw_values = [v[1] for v in top_vendors]
         counts = [v[2] for v in top_vendors]
         
+        # Update Title to reflect dynamic number
+        dynamic_title = chart_title.replace("Top 10", f"Top {top_n}")
+
         # Value formatting
         if value_format == 'lakhs':
             values = [v / 100000 for v in raw_values]
@@ -346,7 +349,7 @@ class InventoryAnalyzer:
             hovertemplate='<b>%{x}</b><br>%{text}<extra></extra>',
         ))
         fig.update_layout(
-            title=chart_title,
+            title=dynamic_title,
             xaxis_title="Vendor",
             yaxis_title=y_axis_title,
             showlegend=False,
