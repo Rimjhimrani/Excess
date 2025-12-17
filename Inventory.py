@@ -144,9 +144,14 @@ class InventoryAnalyzer:
         
     def analyze_inventory(self, pfep_data, current_inventory, tolerance=None):
         """Analyze inventory using PFEP and Inventory Dump data.
-        Applies logic:
-        - Calculates Ideal Inventory Qty based on Avg Daily Consumption & Ideal Days.
-        - Calculates Inventory Percentage = (Current / Ideal) * 100.
+        
+        UPDATED LOGIC:
+        1. Ideal Inventory Qty = AVG CONSUMPTION/DAY * Ideal Days
+        2. Inventory Percent = (Current Inventory / Ideal Inventory) * 100
+        3. Status Logic:
+           - Short: Percent < (100 - Tolerance)
+           - Excess: Percent > (100 + Tolerance)
+           - Within Norms: Between boundaries
         """
         if tolerance is None:
             tolerance = st.session_state.get("admin_tolerance", 30)
@@ -180,6 +185,7 @@ class InventoryAnalyzer:
                 ideal_inventory_value = ideal_inventory_qty * unit_price
                 
                 # --- NEW LOGIC: Ideal Inventory Percent ---
+                # Formula: (Current / Ideal) * 100
                 if ideal_inventory_qty > 0:
                     ideal_inventory_percent = (current_qty / ideal_inventory_qty) * 100
                 else:
@@ -203,10 +209,12 @@ class InventoryAnalyzer:
                     status = 'Within Norms'
                 
                 # Calculate deviation quantities for the summary table
+                # (Actual - Ideal)
                 deviation_qty_norm = current_qty - ideal_inventory_qty
                 deviation_value_norm = deviation_qty_norm * unit_price
 
-                # Norms with tolerance (for specific fields if needed)
+                # Norms with tolerance (for specific fields if needed, retaining structure)
+                # These are roughly where the tolerance bands sit
                 lower_bound_qty = np.ceil(ideal_inventory_qty * (1 - tolerance / 100))
                 upper_bound_qty = np.ceil(ideal_inventory_qty * (1 + tolerance / 100))
 
@@ -218,7 +226,7 @@ class InventoryAnalyzer:
                     'Vendor_Code': pfep_item.get('Vendor_Code', ''),
                     'AVG CONSUMPTION/DAY': avg_per_day,
                     'RM IN DAYS': rm_days,
-                    'RM Norm - In Qty': rm_qty,
+                    'RM Norm - In Qty': rm_qty, # Keeping original PFEP data
                     'Lower Bound Qty': lower_bound_qty,
                     'Upper Bound Qty': upper_bound_qty,  
                     'UNIT PRICE': unit_price,
@@ -261,7 +269,8 @@ class InventoryAnalyzer:
             status = item.get('INVENTORY REMARK STATUS', 'Unknown')
             stock_value = item.get('Stock_Value') or item.get('Current Inventory - VALUE') or 0
             current_qty = item.get('Current Inventory - QTY', 0)
-            norm_qty = item.get('Ideal Inventory Qty', 0) # Updated to use Ideal Qty
+            # Updated to use Ideal Qty for summary logic consistency
+            norm_qty = item.get('Ideal Inventory Qty', 0)
             unit_price = 0
             try:
                 stock_value = float(stock_value)
@@ -300,14 +309,13 @@ class InventoryAnalyzer:
             vendor = item.get('Vendor Name', 'Unknown')
             try:
                 current_qty = float(item.get('Current Inventory - Qty', 0) or 0)
-                # Updated to use Ideal Inventory Qty logic
+                # Use Ideal Qty
                 norm_qty = float(item.get('Ideal Inventory Qty', 0) or 0)
                 stock_value = float(item.get('Current Inventory - VALUE', 0) or 0)
                 unit_price = float(item.get('UNIT PRICE', 0) or 0)
-                
                 if unit_price == 0 and current_qty > 0:
                     unit_price = stock_value / current_qty
-                    
+                
                 if status_filter == "Excess Inventory" and current_qty > norm_qty:
                     deviation_value = (current_qty - norm_qty) * unit_price
                     vendor_totals[vendor] = vendor_totals.get(vendor, 0.0) + deviation_value
