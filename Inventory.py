@@ -2787,14 +2787,17 @@ class InventoryManagementSystem:
         self.display_help_and_documentation()
         
     def display_enhanced_analysis_charts(self, analysis_results):
-        """Display enhanced visual summaries with better error handling"""
+        """Display enhanced visual summaries with better error handling and dynamic Top N selection"""
         st.subheader("📊 Enhanced Inventory Charts")
         
-        # Add Unit Toggle
-        unit_col, _ = st.columns([1, 5])
-        with unit_col:
+        # Add Unit Toggle AND Top N Slider
+        col1, col2, col3 = st.columns([1, 2, 3])
+        with col1:
             chart_unit = st.selectbox("Select Currency Unit:", ["Lakhs", "Millions"], key="chart_unit_selector")
-
+        with col2:
+            # 🔄 NEW: Slider to select number of items to show
+            top_n = st.slider("Number of items to show:", min_value=5, max_value=50, value=10, step=5, key="top_n_slider")
+        
         if chart_unit == "Millions":
             divisor = 1_000_000
             suffix = "M"
@@ -2811,18 +2814,18 @@ class InventoryManagementSystem:
             st.warning("⚠️ No data available for charts.")
             return
             
-        # ✅ 1. Top 10 Parts by Value - Check for multiple possible value columns
+        # ✅ 1. Top N Parts by Value
         value_col = None
         for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE']:
             if col in df.columns:
                 value_col = col
                 break
         if value_col and 'PART NO' in df.columns and 'PART DESCRIPTION' in df.columns:
-            # Filter top 10 parts with non-zero value
+            # Filter top N parts with non-zero value
             chart_data = (
                 df[df[value_col] > 0]
                 .sort_values(by=value_col, ascending=False)
-                .head(10)
+                .head(top_n)  # 🔄 Updated to use top_n variable
                 .copy()
             )
             # Convert to selected unit
@@ -2833,7 +2836,6 @@ class InventoryManagementSystem:
                 axis=1
             )
             # Use the Status column from analyze_inventory results
-            # If Status column exists, use it; otherwise, determine based on bounds
             if 'Status' in chart_data.columns:
                 chart_data['Inventory_Status'] = chart_data['Status']
             elif 'INVENTORY REMARK STATUS' in chart_data.columns:
@@ -2844,7 +2846,7 @@ class InventoryManagementSystem:
                     current_qty = row.get('Current Inventory - Qty', 0)
                     lower_bound = row.get('Lower Bound Qty', 0)
                     upper_bound = row.get('Upper Bound Qty', 0)
-                    if lower_bound > 0 and upper_bound > 0:  # Valid bounds exist
+                    if lower_bound > 0 and upper_bound > 0:
                         if current_qty < lower_bound:
                             return 'Short Inventory'
                         elif current_qty > upper_bound:
@@ -2852,9 +2854,9 @@ class InventoryManagementSystem:
                         else:
                             return 'Within Norms'
                     else:
-                        return 'Within Norms'  # Default if no bounds
+                        return 'Within Norms'
                 chart_data['Inventory_Status'] = chart_data.apply(determine_status_from_bounds, axis=1)
-            # Create color mapping
+            
             color_map = {
                 "Excess Inventory": "#2196F3",
                 "Short Inventory": "#F44336", 
@@ -2871,13 +2873,11 @@ class InventoryManagementSystem:
                 f"Value: ₹{row[value_col]:,.0f}<br>"
                 f"Status: {row['Inventory_Status']}"
             ), axis=1)
-            # Create a list of colors for each bar based on status
+            
             chart_data['Bar_Color'] = chart_data['Inventory_Status'].map(color_map)
     
-            # Create bar chart with individual colors (not grouped by status)
+            # Create bar chart
             fig1 = go.Figure()
-    
-            # Add bars one by one to maintain value-based sorting
             for i, row in chart_data.iterrows():
                 fig1.add_trace(go.Bar(
                     x=[row['Part']],
@@ -2886,9 +2886,8 @@ class InventoryManagementSystem:
                     marker_color=row['Bar_Color'],
                     customdata=[row['HOVER_TEXT']],
                     hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                    showlegend=False  # We'll add legend manually
+                    showlegend=False
                 ))
-            # Add legend traces (invisible bars just for legend)
             for status, color in color_map.items():
                 fig1.add_trace(go.Bar(
                     x=[None],
@@ -2898,7 +2897,7 @@ class InventoryManagementSystem:
                     showlegend=True
                 ))
             fig1.update_layout(
-                title=f"Top 10 Parts by Stock Value (Color-coded by Inventory Status)",
+                title=f"Top {top_n} Parts by Stock Value (Color-coded by Inventory Status)", # 🔄 Updated Title
                 xaxis_title="Parts",
                 yaxis_title=f"Stock Value (in ₹ {unit_name})",
                 xaxis_tickangle=-45,
@@ -2906,9 +2905,7 @@ class InventoryManagementSystem:
                     tickformat=',.1f',
                     ticksuffix=suffix
                 ),
-                xaxis=dict(
-                    tickfont=dict(size=10)
-                ),
+                xaxis=dict(tickfont=dict(size=10)),
                 showlegend=True,
                 legend=dict(
                     orientation="h",
@@ -2922,24 +2919,19 @@ class InventoryManagementSystem:
         else:
             st.warning("⚠️ Required columns for parts value chart not found.")
 
-              
-        # ✅ 3. Vendor vs Value (Fixed vendor_col definition)
+        # ✅ 2. Vendor vs Value (Fixed vendor_col definition)
         vendor_col = next((col for col in ['Vendor', 'Vendor Name', 'VENDOR'] if col in df.columns), None)
         if vendor_col and value_col and vendor_col in df.columns:
-            # Get vendor data with status information
             vendor_data = []
-            # Group by vendor and calculate aggregated status
             for vendor_name, vendor_group in df[df[value_col] > 0].groupby(vendor_col):
                 total_value = vendor_group[value_col].sum()
                 total_qty = vendor_group['Current Inventory - Qty'].sum() if 'Current Inventory - Qty' in vendor_group.columns else 0
                 part_count = len(vendor_group)
-                # Determine vendor status based on majority of parts
                 if 'Status' in vendor_group.columns:
                     status_counts = vendor_group['Status'].value_counts()
                 elif 'INVENTORY REMARK STATUS' in vendor_group.columns:
                     status_counts = vendor_group['INVENTORY REMARK STATUS'].value_counts()
                 else:
-                    # Fallback calculation
                     def calc_status(row):
                         current_qty = row.get('Current Inventory - Qty', 0)
                         lower_bound = row.get('Lower Bound Qty', 0)
@@ -2954,7 +2946,6 @@ class InventoryManagementSystem:
                         return 'Within Norms'
                     vendor_group_status = vendor_group.apply(calc_status, axis=1)
                     status_counts = vendor_group_status.value_counts()
-                # Assign vendor status based on majority
                 vendor_status = status_counts.index[0] if not status_counts.empty else 'Within Norms'
                 vendor_data.append({
                     vendor_col: vendor_name,
@@ -2963,17 +2954,17 @@ class InventoryManagementSystem:
                     'Total_Qty': total_qty,
                     'Vendor_Status': vendor_status
                 })
-            # Convert to DataFrame and get top 10
-            vendor_df = pd.DataFrame(vendor_data).sort_values(by=value_col, ascending=False).head(10)
+            
+            # Sort and take top N (🔄 Updated to use top_n)
+            vendor_df = pd.DataFrame(vendor_data).sort_values(by=value_col, ascending=False).head(top_n)
+            
             if not vendor_df.empty:
                 vendor_df['Value_Converted'] = vendor_df[value_col] / divisor
-                # Create color mapping
                 color_map = {
                     "Excess Inventory": "#2196F3",
                     "Short Inventory": "#F44336", 
                     "Within Norms": "#4CAF50"
                 }
-                # Enhanced hover text
                 vendor_df['HOVER_TEXT'] = vendor_df.apply(lambda row: (
                     f"Vendor: {row[vendor_col]}<br>"
                     f"Inventory Value: ₹{row[value_col]:,.0f}<br>"
@@ -2981,13 +2972,9 @@ class InventoryManagementSystem:
                     f"Total Qty: {row['Total_Qty']:,.0f}<br>"
                     f"Status: {row['Vendor_Status']}"
                 ), axis=1)
-                # Create color list based on status
                 vendor_df['Bar_Color'] = vendor_df['Vendor_Status'].map(color_map)
         
-                # Create bar chart with individual colors
                 fig3 = go.Figure()
-        
-                # Add bars one by one to maintain value-based sorting
                 for i, row in vendor_df.iterrows():
                     fig3.add_trace(go.Bar(
                         x=[row[vendor_col]],
@@ -2996,9 +2983,8 @@ class InventoryManagementSystem:
                         marker_color=row['Bar_Color'],
                         customdata=[row['HOVER_TEXT']],
                         hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                        showlegend=False  # We'll add legend manually
+                        showlegend=False
                     ))
-                # Add legend traces (invisible bars just for legend)
                 for status, color in color_map.items():
                     fig3.add_trace(go.Bar(
                         x=[None],
@@ -3008,7 +2994,7 @@ class InventoryManagementSystem:
                         showlegend=True
                     ))
                 fig3.update_layout(
-                    title=f'Top 10 Vendors by Stock Value (Color-coded by Inventory Status)',
+                    title=f'Top {top_n} Vendors by Stock Value (Color-coded by Inventory Status)', # 🔄 Updated Title
                     xaxis_title="Vendors",
                     yaxis_title=f"Inventory Value (in ₹ {unit_name})",
                     xaxis_tickangle=-45,
@@ -3027,7 +3013,7 @@ class InventoryManagementSystem:
                 )
                 st.plotly_chart(fig3, use_container_width=True)
             else:
-                st.info("ℹ️ No valid vendor data found (all values are 0).")
+                st.info("ℹ️ No valid vendor data found.")
         else:
             missing_cols = []
             if not vendor_col:
@@ -3036,59 +3022,58 @@ class InventoryManagementSystem:
                 missing_cols.append("value column")
             st.warning(f"⚠️ Vendor analysis chart cannot be displayed. Missing: {', '.join(missing_cols)}")
                 
-        # ✅ 4. Top 10 Parts by Inventory Status
+        # ✅ 3. Top N Parts by Inventory Status
         try:
-            st.markdown("## 🧩 Top 10 Parts by Inventory Status")
-            # Check if required columns exist
+            st.markdown(f"## 🧩 Top {top_n} Parts by Inventory Status") # 🔄 Updated Title
             if 'PART NO' not in df.columns or 'Stock Deviation Value' not in df.columns:
                 st.warning("⚠️ Required columns missing for top parts chart.")
                 return
-            # Define status colors
             status_colors = {
                 "Excess Inventory": "#2196F3",
                 "Short Inventory": "#F44336"
             }
             for status, label, color in [
-                ("Excess Inventory", "🔵 Top 10 Excess Inventory Parts", status_colors["Excess Inventory"]),
-                ("Short Inventory", "🔴 Top 10 Short Inventory Parts", status_colors["Short Inventory"]),
+                ("Excess Inventory", f"🔵 Top {top_n} Excess Inventory Parts", status_colors["Excess Inventory"]),
+                ("Short Inventory", f"🔴 Top {top_n} Short Inventory Parts", status_colors["Short Inventory"]),
             ]:
                 st.subheader(label)
                 if status == "Excess Inventory":
-                    st.markdown(f'<div class="graph-description">Top 10 parts with highest excess inventory value (₹ above allowed norm).</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="graph-description">Top {top_n} parts with highest excess inventory value (₹ above allowed norm).</div>', unsafe_allow_html=True)
                 else:
-                    st.markdown(f'<div class="graph-description">Top 10 parts with highest shortage value (₹ below required norm).</div>', unsafe_allow_html=True)
-                # Filter by status
+                    st.markdown(f'<div class="graph-description">Top {top_n} parts with highest shortage value (₹ below required norm).</div>', unsafe_allow_html=True)
+                
                 status_df = df[df['INVENTORY REMARK STATUS'] == status]
                 if status == "Excess Inventory":
-                    # For excess inventory, show only positive deviation values (excess amount)
                     status_df = status_df[status_df['Stock Deviation Value'] > 0]
-                    status_df = status_df.sort_values(by='Stock Deviation Value', ascending=False).head(10)
-                    chart_title = f"Top 10 Excess Inventory Parts (₹ Excess Value in {unit_name})"
+                    # 🔄 Updated to use top_n
+                    status_df = status_df.sort_values(by='Stock Deviation Value', ascending=False).head(top_n)
+                    chart_title = f"Top {top_n} Excess Inventory Parts (₹ Excess Value in {unit_name})"
                     y_title = f"Excess Inventory Value (₹ {unit_name})"
                 elif status == "Short Inventory":
-                    # For short inventory, show absolute value of negative deviation
                     status_df = status_df[status_df['Stock Deviation Value'] < 0]
                     status_df['Abs_Deviation_Value'] = abs(status_df['Stock Deviation Value'])
-                    status_df = status_df.sort_values(by='Abs_Deviation_Value', ascending=False).head(10)
-                    chart_title = f"Top 10 Short Inventory Parts (₹ Shortage Value in {unit_name})"
+                    # 🔄 Updated to use top_n
+                    status_df = status_df.sort_values(by='Abs_Deviation_Value', ascending=False).head(top_n)
+                    chart_title = f"Top {top_n} Short Inventory Parts (₹ Shortage Value in {unit_name})"
                     y_title = f"Shortage Value (₹ {unit_name})"
                 if status_df.empty:
                     st.info(f"No data found for '{status}' parts.")
                     continue
-                # Prepare chart data
+                
                 if status == "Excess Inventory":
-                    status_df['Value_Converted'] = status_df['Stock Deviation Value'] / divisor  # Excess value
+                    status_df['Value_Converted'] = status_df['Stock Deviation Value'] / divisor
                     hover_value = status_df['Stock Deviation Value']
-                else:  # Short Inventory
-                    status_df['Value_Converted'] = status_df['Abs_Deviation_Value'] / divisor  # Shortage value
+                else:
+                    status_df['Value_Converted'] = status_df['Abs_Deviation_Value'] / divisor
                     hover_value = status_df['Abs_Deviation_Value']
+                    
                 status_df['PART_DESC_NO'] = status_df['PART DESCRIPTION'].astype(str) + " (" + status_df['PART NO'].astype(str) + ")"
                 status_df['HOVER_TEXT'] = status_df.apply(lambda row: (
                     f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
                     f"Part No: {row.get('PART NO')}<br>"
                     f"{'Excess' if status == 'Excess Inventory' else 'Shortage'} Value: ₹{hover_value.loc[row.name]:,.0f}"
                 ), axis=1)
-                # Build chart
+                
                 fig = px.bar(
                     status_df,
                     x='PART_DESC_NO',
@@ -3096,7 +3081,6 @@ class InventoryManagementSystem:
                     color_discrete_sequence=[color],
                     title=chart_title
                 )
-                # Update chart formatting
                 fig.update_traces(
                     hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
                     customdata=status_df['HOVER_TEXT']
@@ -3114,29 +3098,27 @@ class InventoryManagementSystem:
             st.error("❌ Error displaying Top Parts by Status")
             st.code(str(e))
           
-        # ✅ 5. Top 10 Vendors by Inventory Status (₹ Lakhs)
+        # ✅ 4. Top N Vendors by Inventory Status
         try:
-            st.markdown("## 🏢 Top Vendors by Inventory Status")
-            # Define chart config: status → chart title, key, color
+            st.markdown(f"## 🏢 Top {top_n} Vendors by Inventory Status")
             chart_configs = [
                 ("Excess Inventory", "Top 10 Vendors - Excess Value Above Norm", "excess_vendors", self.status_colors["Excess Inventory"]),
                 ("Short Inventory", "Top 10 Vendors - Short Value Below Norm", "short_vendors", self.status_colors["Short Inventory"]),
             ]
-            # ✅ Loop through both excess and short charts
             for status, title, key, color in chart_configs:
-                # ✅ FIXED: Call method from analyzer, not self
+                # 🔄 Updated to pass top_n parameter
                 self.analyzer.show_vendor_chart_by_status(
                     processed_data=analysis_results,
                     status_filter=status,
                     chart_title=title,
                     chart_key=key,
                     color=color,
-                    value_format=format_key  # Pass dynamically selected format
+                    value_format=format_key,
+                    top_n=top_n  # Pass the slider value here
                 )
         except Exception as e:
             st.error("❌ Error displaying Top Vendors by Status")
             st.code(str(e))
-
 if __name__ == "__main__":
     app = InventoryManagementSystem()
     app.run()  # This runs the full dashboard
