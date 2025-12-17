@@ -1365,54 +1365,50 @@ class InventoryManagementSystem:
     def display_analysis_interface(self):
         """Main analysis interface for users"""
         st.subheader("📈 Inventory Analysis Results")
-        # Get PFEP and Inventory data
+        
         try:
             pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
             inventory_data = self.persistence.load_data_from_session_state('persistent_inventory_data')
         except Exception as e:
-            st.error("❌ Error loading PFEP or Inventory data.")
-            st.code(str(e))
+            st.error("❌ Error loading Data.")
             return
+
         if not pfep_data or not inventory_data:
-            st.error("❌ Required data not available. Please upload PFEP and Inventory data first.")
+            st.error("❌ Required data not available.")
             return
-        # Get tolerance from admin settings
+            
+        # Get settings
         tolerance = st.session_state.get('admin_tolerance', 30)
-        st.info(f"📐 Analysis Tolerance: ±{tolerance}% (Set by Admin)")
+        admin_ideal_days = st.session_state.get('admin_ideal_days', 30)
+        
+        st.info(f"📐 Settings: Ideal Days = {admin_ideal_days} | Tolerance = ±{tolerance}%")
 
-        # Check if analysis needs to be performed or updated
+        # Check if re-analysis is needed
         analysis_data = self.persistence.load_data_from_session_state('persistent_analysis_results')
-        last_tolerance = st.session_state.get('last_analysis_tolerance', None)
-
-        # Auto re-analyze if tolerance changed or no data exists
-        if not analysis_data or last_tolerance != tolerance:
-            st.info(f"🔄 Re-analyzing with ±{tolerance}% tolerance...")
-            with st.spinner("Analyzing inventory..."):
-                try:
-                    analysis_results = self.analyzer.analyze_inventory(
-                        pfep_data,
-                        inventory_data,
-                        tolerance=tolerance
-                    )
-                except Exception as e:
-                    st.error("❌ Error during inventory analysis")
-                    st.code(str(e))
-                    return
-            if analysis_results:
+        
+        # We need to re-run if tolerance changed OR ideal days changed
+        # (You might want to store last_ideal_days in session state to track changes accurately)
+        
+        st.info(f"🔄 Analyzing based on Ideal Inventory = Avg Daily Consump. × {admin_ideal_days} days...")
+        with st.spinner("Analyzing inventory..."):
+            try:
+                analysis_results = self.analyzer.analyze_inventory(
+                    pfep_data,
+                    inventory_data,
+                    tolerance=tolerance
+                )
                 self.persistence.save_data_to_session_state('persistent_analysis_results', analysis_results)
-                st.session_state.last_analysis_tolerance = tolerance
-                st.success("✅ Analysis completed successfully!")
-                st.rerun()
-            else:
-                st.error("❌ Analysis failed. No results generated.")
+            except Exception as e:
+                st.error("❌ Error during inventory analysis")
+                st.code(str(e))
                 return
-        # ✅ Use the full dashboard method
+
+        # Display Dashboard
         try:
             self.display_analysis_results()
         except Exception as e:
             st.error("❌ Unexpected error during analysis results display")
             st.code(str(e))
-            return
             
     def display_comprehensive_analysis(self, analysis_results):
         """Display comprehensive analysis results with enhanced features"""
