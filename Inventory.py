@@ -388,6 +388,10 @@ class InventoryManagementSystem:
                 'chart_theme': 'plotly'
             }
         
+        # ✅ NEW: Initialize Admin Ideal Inventory Days
+        if 'admin_ideal_days' not in st.session_state:
+            st.session_state.admin_ideal_days = 30  # Default to 30 days
+        
         # Initialize persistent data keys
         self.persistent_keys = [
             'persistent_pfep_data',
@@ -400,7 +404,8 @@ class InventoryManagementSystem:
         # Initialize persistent data if not exists
         for key in self.persistent_keys:
             if key not in st.session_state:
-                st.session_state[key] = None  # BUG: should be None, not empty list
+                st.session_state[key] = None
+                
     def safe_print(self, message):
         """Safely print to streamlit or console"""
         try:
