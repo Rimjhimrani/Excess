@@ -143,105 +143,79 @@ class InventoryAnalyzer:
         }
         
     def analyze_inventory(self, pfep_data, current_inventory, tolerance=None):
-        """Analyze inventory using Admin defined Ideal Days.
-        
-        Formulas:
-        1. Ideal Inventory = Average Daily Consumption * Admin Ideal Days
-        2. Deviation % = (Current Inventory - Ideal Inventory) / Ideal Inventory
-        3. Status: 
-           - Positive Deviation > Tolerance = Excess
-           - Negative Deviation < -Tolerance = Short
+        """Analyze inventory using PFEP and Inventory Dump data.
+        Applies updated logic where:
+        - Short Inventory: < RM_IN_QTY × (1 - Tolerance%)
+        - Excess Inventory: > RM_IN_QTY × (1 + Tolerance%)
+        - Within Norms: between the above thresholds
         """
         if tolerance is None:
-            tolerance = st.session_state.get("admin_tolerance", 30)
-        
-        # ✅ NEW: Get Admin Ideal Days
-        admin_ideal_days = st.session_state.get("admin_ideal_days", 30)
-        
+            tolerance = st.session_state.get("admin_tolerance", 30)  # default to 30%
         results = []
+        # Normalize and create lookup dictionaries
         pfep_dict = {str(item['Part_No']).strip().upper(): item for item in pfep_data}
         inventory_dict = {str(item['Part_No']).strip().upper(): item for item in current_inventory}
-        
         for part_no, inventory_item in inventory_dict.items():
             pfep_item = pfep_dict.get(part_no)
             if not pfep_item:
-                continue
-                
+                continue  # Skip unmatched parts
             try:
-                # Basic Data
+                # From Inventory & PFEP
                 current_qty = float(inventory_item.get('Current_QTY', 0)) or 0.0
                 part_desc = pfep_item.get('Description', '')
                 unit_price = float(pfep_item.get('unit_price', 0)) or 1.0
-                
-                # Consumption Data
                 avg_per_day = self.safe_float_convert(pfep_item.get('AVG CONSUMPTION/DAY', 0))
+                rm_days = self.safe_float_convert(pfep_item.get('RM_IN_DAYS', 0))
+                rm_qty = self.safe_float_convert(pfep_item.get('RM_IN_QTY', 0))
+                # Inventory value
+                current_value = current_qty * unit_price
                 
-                # ✅ NEW CALCULATION: Ideal Inventory
-                # Ideal Inventory = Avg Daily Consumption * Ideal Inventory Days (Admin defined)
-                ideal_inventory_qty = avg_per_day * admin_ideal_days
-                
-                # ✅ NEW CALCULATION: Deviation Percentage
-                # (Current - Ideal) / Ideal
-                if ideal_inventory_qty > 0:
-                    deviation_pct = (current_qty - ideal_inventory_qty) / ideal_inventory_qty
-                    deviation_qty = current_qty - ideal_inventory_qty
-                else:
-                    # Handle cases where Ideal is 0 (no consumption)
-                    if current_qty > 0:
-                        deviation_pct = 1.0 # 100% excess effectively (or infinity)
-                        deviation_qty = current_qty
-                    else:
-                        deviation_pct = 0.0
-                        deviation_qty = 0.0
+                # Norms with tolerance (Rounding Up)
+                lower_bound = np.ceil(rm_qty * (1 - tolerance / 100))
+                upper_bound = np.ceil(rm_qty * (1 + tolerance / 100))
 
+                # Revised Norm shown for reference
+                revised_norm_qty = upper_bound  # you can rename if needed
+                # Deviation quantity and value
+                deviation_qty = current_qty - revised_norm_qty
                 deviation_value = deviation_qty * unit_price
-                
-                # Determine Status based on Deviation % and Tolerance
-                # Tolerance is treated as a percentage (e.g., 30 = 0.30)
-                tolerance_decimal = tolerance / 100.0
-                
-                if deviation_pct > tolerance_decimal:
-                    status = 'Excess Inventory'
-                elif deviation_pct < -tolerance_decimal:
+
+                # Status based on range
+                if current_qty < lower_bound:
                     status = 'Short Inventory'
+                elif current_qty > upper_bound:
+                    status = 'Excess Inventory'
                 else:
                     status = 'Within Norms'
-
-                # Calculate bounds for visualization (optional, but helpful for graphs)
-                lower_bound = ideal_inventory_qty * (1 - tolerance_decimal)
-                upper_bound = ideal_inventory_qty * (1 + tolerance_decimal)
-
                 # Final result per part
-                # Mapping new calculations to keys expected by the dashboard
                 result = {
                     'PART NO': part_no,
                     'PART DESCRIPTION': part_desc,
                     'Vendor Name': pfep_item.get('Vendor_Name', 'Unknown'),
                     'Vendor_Code': pfep_item.get('Vendor_Code', ''),
                     'AVG CONSUMPTION/DAY': avg_per_day,
-                    'RM IN DAYS': admin_ideal_days,              # Showing Admin Days here
-                    'RM Norm - In Qty': ideal_inventory_qty,     # This is now the Ideal Qty
-                    'Revised Norm Qty': ideal_inventory_qty,     # Main comparator
-                    'Ideal Inventory Qty': ideal_inventory_qty,  # Explicit new key
-                    'Lower Bound Qty': lower_bound,
+                    'RM IN DAYS': rm_days,
+                    'RM Norm - In Qty': rm_qty,
+                    'Revised Norm Qty': revised_norm_qty,
+                    'Lower Bound Qty': lower_bound,                 # ✅ Added
                     'Upper Bound Qty': upper_bound,  
                     'UNIT PRICE': unit_price,
                     'Current Inventory - Qty': current_qty,
-                    'Current Inventory - VALUE': current_qty * unit_price,
+                    'Current Inventory - VALUE': current_value,
                     'SHORT/EXCESS INVENTORY': deviation_qty,
-                    'Inventory Deviation %': deviation_pct * 100, # Store as percentage (e.g., 25.5 for 25.5%)
+                    'Stock Deviation Qty w.r.t Revised Norm': deviation_qty,
                     'Stock Deviation Value': deviation_value,
                     'Status': status,
                     'INVENTORY REMARK STATUS': status
                 }
+                # ✅ Add these two lines
                 results.append(result)
             except Exception as e:
                 st.warning(f"⚠️ Error analyzing part {part_no}: {e}")
                 continue
-                
         if not results:
-            st.error("❌ No analysis results generated.")
-        return results
+            st.error("❌ No analysis results generated. Please check data for mismatches or missing fields.")
+        return results 
         
     def get_vendor_summary(self, processed_data):
         """Summarize inventory by vendor using actual Stock_Value field from the file."""
@@ -414,10 +388,6 @@ class InventoryManagementSystem:
                 'chart_theme': 'plotly'
             }
         
-        # ✅ NEW: Initialize Admin Ideal Inventory Days
-        if 'admin_ideal_days' not in st.session_state:
-            st.session_state.admin_ideal_days = 30  # Default to 30 days
-        
         # Initialize persistent data keys
         self.persistent_keys = [
             'persistent_pfep_data',
@@ -430,8 +400,7 @@ class InventoryManagementSystem:
         # Initialize persistent data if not exists
         for key in self.persistent_keys:
             if key not in st.session_state:
-                st.session_state[key] = None
-                
+                st.session_state[key] = None  # BUG: should be None, not empty list
     def safe_print(self, message):
         """Safely print to streamlit or console"""
         try:
@@ -1055,105 +1024,132 @@ class InventoryManagementSystem:
             with col2:
                 if st.button("🔓 Unlock Data", type="secondary"):
                     st.session_state.persistent_pfep_locked = False
+                    # Clear related data when PFEP is unlocked
                     st.session_state.persistent_inventory_data = None
                     st.session_state.persistent_inventory_locked = False
                     st.session_state.persistent_analysis_results = None
-                    st.success("✅ PFEP data unlocked.")
+                    st.success("✅ PFEP data unlocked. Users need to re-upload inventory data.")
                     st.rerun()
             with col3:
-                if st.button("👤 Go to User View", type="primary"):
+                if st.button("👤 Go to User View", type="primary", help="Switch to user interface"):
                     st.session_state.user_role = "User"
                     st.rerun()
             
+            # Display current PFEP data if available
             pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
             if pfep_data:
                 self.display_pfep_data_preview(pfep_data)
             return
-
-        # ✅ NEW: Global Inventory Parameters Section
-        st.subheader("📐 Set Inventory Parameters (Admin Only)")
-        st.info("These settings apply to the calculation of Ideal Inventory and Deviation.")
+        # Tolerance Setting for Admin
+        st.subheader("📐 Set Analysis Tolerance (Admin Only)")
+        # Initialize admin_tolerance if not exists
+        if "admin_tolerance" not in st.session_state:
+            st.session_state.admin_tolerance = 30
+    
+        # Create selectbox with proper callback
+        new_tolerance = st.selectbox(
+            "Tolerance Zone (+/-)",
+            options=[0, 10, 20, 30, 40, 50],
+            index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance),
+            format_func=lambda x: f"{x}%",
+            key="tolerance_selector"
+        )
+        # Update tolerance if changed
+        if new_tolerance != st.session_state.admin_tolerance:
+            st.session_state.admin_tolerance = new_tolerance
+            st.success(f"✅ Tolerance updated to {new_tolerance}%")
+            
+            # If analysis exists, refresh it with new tolerance
+            if st.session_state.get('persistent_analysis_results'):
+                st.info("🔄 Analysis will be refreshed with new tolerance on next run")
         
-        param_col1, param_col2 = st.columns(2)
-        
-        with param_col1:
-            # Initialize admin_tolerance if not exists
-            if "admin_tolerance" not in st.session_state:
-                st.session_state.admin_tolerance = 30
-        
-            new_tolerance = st.selectbox(
-                "Deviation Tolerance Zone (+/-)",
-                options=[0, 10, 20, 30, 40, 50],
-                index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance),
-                format_func=lambda x: f"{x}%",
-                key="tolerance_selector",
-                help="If Deviation % is within this range, status is 'Within Norms'."
-            )
-            if new_tolerance != st.session_state.admin_tolerance:
-                st.session_state.admin_tolerance = new_tolerance
-                st.success(f"✅ Tolerance updated to {new_tolerance}%")
-
-        with param_col2:
-            # ✅ NEW: Input for Ideal Inventory Days
-            new_days = st.number_input(
-                "Ideal Inventory Days",
-                min_value=1,
-                max_value=365,
-                value=st.session_state.admin_ideal_days,
-                step=1,
-                help="Used to calculate Ideal Inventory (Avg Daily Consumption * Ideal Days)"
-            )
-            if new_days != st.session_state.admin_ideal_days:
-                st.session_state.admin_ideal_days = new_days
-                st.success(f"✅ Ideal Inventory Days set to {new_days}")
-                # Clear previous results to force re-calculation
-                st.session_state.persistent_analysis_results = None
-
+        st.markdown(f"**Current Tolerance:** {st.session_state.admin_tolerance}%")
         st.markdown("---")
         
-        # ... (Rest of the original admin_data_management code: Upload File, Sample, Current Data tabs) ...
-        # Copy the original Tab logic here (Upload/Sample/Current) exactly as it was.
+        # PFEP Data Management Section
+        st.subheader("📊 PFEP Master Data Management")
+        
         # Tab interface for different data input methods
         tab1, tab2, tab3 = st.tabs(["📁 Upload File", "🧪 Load Sample", "📋 Current Data"])
         
         with tab1:
             st.markdown("**Upload PFEP Excel/CSV File**")
-            uploaded_file = st.file_uploader("Choose PFEP file", type=['xlsx', 'xls', 'csv'])
+            uploaded_file = st.file_uploader(
+                "Choose PFEP file",
+                type=['xlsx', 'xls', 'csv'],
+                help="Upload your PFEP master data file"
+            )
+            
             if uploaded_file is not None:
                 try:
-                    if uploaded_file.name.endswith('.csv'): df = pd.read_csv(uploaded_file)
-                    else: df = pd.read_excel(uploaded_file)
+                    # Read file based on extension
+                    if uploaded_file.name.endswith('.csv'):
+                        df = pd.read_csv(uploaded_file)
+                    else:
+                        df = pd.read_excel(uploaded_file)
+                    
                     st.success(f"✅ File loaded: {len(df)} rows")
+                    
+                    # Show preview
+                    with st.expander("📋 Preview Raw Data"):
+                        st.dataframe(df.head())
+                    
+                    # Standardize data
                     standardized_data = self.standardize_pfep_data(df)
+                    
                     if standardized_data:
                         st.success(f"✅ Standardized: {len(standardized_data)} valid records")
+                        
+                        # Show standardized preview
+                        with st.expander("📋 Preview Standardized Data"):
+                            preview_df = pd.DataFrame(standardized_data[:5])
+                            st.dataframe(preview_df)
+                        
+                        # Save button
                         if st.button("💾 Save PFEP Data", type="primary"):
-                            self.persistence.save_data_to_session_state('persistent_pfep_data', standardized_data)
-                            st.success("✅ PFEP data saved!")
+                            self.persistence.save_data_to_session_state(
+                                'persistent_pfep_data', 
+                                standardized_data
+                            )
+                            st.success("✅ PFEP data saved successfully!")
                             st.rerun()
+                    else:
+                        st.error("❌ No valid data found after standardization")
+                        
                 except Exception as e:
                     st.error(f"❌ Error processing file: {str(e)}")
         
         with tab2:
-            st.markdown("**Load Sample PFEP Data**")
+            st.markdown("**Load Sample PFEP Data for Testing**")
+            st.info("This will load pre-configured sample data for demonstration")
+            
             if st.button("🧪 Load Sample PFEP Data", type="secondary"):
                 sample_data = self.load_sample_pfep_data()
-                self.persistence.save_data_to_session_state('persistent_pfep_data', sample_data)
+                self.persistence.save_data_to_session_state(
+                    'persistent_pfep_data', 
+                    sample_data
+                )
                 st.success(f"✅ Sample PFEP data loaded: {len(sample_data)} parts")
                 st.rerun()
         
         with tab3:
             st.markdown("**Current PFEP Data Status**")
             pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
+            
             if pfep_data:
                 self.display_pfep_data_preview(pfep_data)
+                
+                # Lock data for users
                 st.markdown("---")
+                st.markdown("**🔒 Lock Data for Users**")
+                st.info("Locking PFEP data allows users to upload inventory and perform analysis")
+                
                 if st.button("🔒 Lock PFEP Data", type="primary"):
                     st.session_state.persistent_pfep_locked = True
                     st.success("✅ PFEP data locked! Users can now upload inventory data.")
                     st.rerun()
             else:
-                st.warning("❌ No PFEP data available.")
+                st.warning("❌ No PFEP data available. Please upload or load sample data first.")
     
     def display_pfep_data_preview(self, pfep_data):
         """Display PFEP data preview with statistics"""
@@ -1365,50 +1361,54 @@ class InventoryManagementSystem:
     def display_analysis_interface(self):
         """Main analysis interface for users"""
         st.subheader("📈 Inventory Analysis Results")
-        
+        # Get PFEP and Inventory data
         try:
             pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
             inventory_data = self.persistence.load_data_from_session_state('persistent_inventory_data')
         except Exception as e:
-            st.error("❌ Error loading Data.")
+            st.error("❌ Error loading PFEP or Inventory data.")
+            st.code(str(e))
             return
-
         if not pfep_data or not inventory_data:
-            st.error("❌ Required data not available.")
+            st.error("❌ Required data not available. Please upload PFEP and Inventory data first.")
             return
-            
-        # Get settings
+        # Get tolerance from admin settings
         tolerance = st.session_state.get('admin_tolerance', 30)
-        admin_ideal_days = st.session_state.get('admin_ideal_days', 30)
-        
-        st.info(f"📐 Settings: Ideal Days = {admin_ideal_days} | Tolerance = ±{tolerance}%")
+        st.info(f"📐 Analysis Tolerance: ±{tolerance}% (Set by Admin)")
 
-        # Check if re-analysis is needed
+        # Check if analysis needs to be performed or updated
         analysis_data = self.persistence.load_data_from_session_state('persistent_analysis_results')
-        
-        # We need to re-run if tolerance changed OR ideal days changed
-        # (You might want to store last_ideal_days in session state to track changes accurately)
-        
-        st.info(f"🔄 Analyzing based on Ideal Inventory = Avg Daily Consump. × {admin_ideal_days} days...")
-        with st.spinner("Analyzing inventory..."):
-            try:
-                analysis_results = self.analyzer.analyze_inventory(
-                    pfep_data,
-                    inventory_data,
-                    tolerance=tolerance
-                )
-                self.persistence.save_data_to_session_state('persistent_analysis_results', analysis_results)
-            except Exception as e:
-                st.error("❌ Error during inventory analysis")
-                st.code(str(e))
-                return
+        last_tolerance = st.session_state.get('last_analysis_tolerance', None)
 
-        # Display Dashboard
+        # Auto re-analyze if tolerance changed or no data exists
+        if not analysis_data or last_tolerance != tolerance:
+            st.info(f"🔄 Re-analyzing with ±{tolerance}% tolerance...")
+            with st.spinner("Analyzing inventory..."):
+                try:
+                    analysis_results = self.analyzer.analyze_inventory(
+                        pfep_data,
+                        inventory_data,
+                        tolerance=tolerance
+                    )
+                except Exception as e:
+                    st.error("❌ Error during inventory analysis")
+                    st.code(str(e))
+                    return
+            if analysis_results:
+                self.persistence.save_data_to_session_state('persistent_analysis_results', analysis_results)
+                st.session_state.last_analysis_tolerance = tolerance
+                st.success("✅ Analysis completed successfully!")
+                st.rerun()
+            else:
+                st.error("❌ Analysis failed. No results generated.")
+                return
+        # ✅ Use the full dashboard method
         try:
             self.display_analysis_results()
         except Exception as e:
             st.error("❌ Unexpected error during analysis results display")
             st.code(str(e))
+            return
             
     def display_comprehensive_analysis(self, analysis_results):
         """Display comprehensive analysis results with enhanced features"""
