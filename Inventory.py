@@ -143,79 +143,105 @@ class InventoryAnalyzer:
         }
         
     def analyze_inventory(self, pfep_data, current_inventory, tolerance=None):
-        """Analyze inventory using PFEP and Inventory Dump data.
-        Applies updated logic where:
-        - Short Inventory: < RM_IN_QTY × (1 - Tolerance%)
-        - Excess Inventory: > RM_IN_QTY × (1 + Tolerance%)
-        - Within Norms: between the above thresholds
+        """Analyze inventory using Admin defined Ideal Days.
+        
+        Formulas:
+        1. Ideal Inventory = Average Daily Consumption * Admin Ideal Days
+        2. Deviation % = (Current Inventory - Ideal Inventory) / Ideal Inventory
+        3. Status: 
+           - Positive Deviation > Tolerance = Excess
+           - Negative Deviation < -Tolerance = Short
         """
         if tolerance is None:
-            tolerance = st.session_state.get("admin_tolerance", 30)  # default to 30%
+            tolerance = st.session_state.get("admin_tolerance", 30)
+        
+        # ✅ NEW: Get Admin Ideal Days
+        admin_ideal_days = st.session_state.get("admin_ideal_days", 30)
+        
         results = []
-        # Normalize and create lookup dictionaries
         pfep_dict = {str(item['Part_No']).strip().upper(): item for item in pfep_data}
         inventory_dict = {str(item['Part_No']).strip().upper(): item for item in current_inventory}
+        
         for part_no, inventory_item in inventory_dict.items():
             pfep_item = pfep_dict.get(part_no)
             if not pfep_item:
-                continue  # Skip unmatched parts
+                continue
+                
             try:
-                # From Inventory & PFEP
+                # Basic Data
                 current_qty = float(inventory_item.get('Current_QTY', 0)) or 0.0
                 part_desc = pfep_item.get('Description', '')
                 unit_price = float(pfep_item.get('unit_price', 0)) or 1.0
-                avg_per_day = self.safe_float_convert(pfep_item.get('AVG CONSUMPTION/DAY', 0))
-                rm_days = self.safe_float_convert(pfep_item.get('RM_IN_DAYS', 0))
-                rm_qty = self.safe_float_convert(pfep_item.get('RM_IN_QTY', 0))
-                # Inventory value
-                current_value = current_qty * unit_price
                 
-                # Norms with tolerance (Rounding Up)
-                lower_bound = np.ceil(rm_qty * (1 - tolerance / 100))
-                upper_bound = np.ceil(rm_qty * (1 + tolerance / 100))
+                # Consumption Data
+                avg_per_day = self.safe_float_convert(pfep_item.get('AVG CONSUMPTION/DAY', 0))
+                
+                # ✅ NEW CALCULATION: Ideal Inventory
+                # Ideal Inventory = Avg Daily Consumption * Ideal Inventory Days (Admin defined)
+                ideal_inventory_qty = avg_per_day * admin_ideal_days
+                
+                # ✅ NEW CALCULATION: Deviation Percentage
+                # (Current - Ideal) / Ideal
+                if ideal_inventory_qty > 0:
+                    deviation_pct = (current_qty - ideal_inventory_qty) / ideal_inventory_qty
+                    deviation_qty = current_qty - ideal_inventory_qty
+                else:
+                    # Handle cases where Ideal is 0 (no consumption)
+                    if current_qty > 0:
+                        deviation_pct = 1.0 # 100% excess effectively (or infinity)
+                        deviation_qty = current_qty
+                    else:
+                        deviation_pct = 0.0
+                        deviation_qty = 0.0
 
-                # Revised Norm shown for reference
-                revised_norm_qty = upper_bound  # you can rename if needed
-                # Deviation quantity and value
-                deviation_qty = current_qty - revised_norm_qty
                 deviation_value = deviation_qty * unit_price
-
-                # Status based on range
-                if current_qty < lower_bound:
-                    status = 'Short Inventory'
-                elif current_qty > upper_bound:
+                
+                # Determine Status based on Deviation % and Tolerance
+                # Tolerance is treated as a percentage (e.g., 30 = 0.30)
+                tolerance_decimal = tolerance / 100.0
+                
+                if deviation_pct > tolerance_decimal:
                     status = 'Excess Inventory'
+                elif deviation_pct < -tolerance_decimal:
+                    status = 'Short Inventory'
                 else:
                     status = 'Within Norms'
+
+                # Calculate bounds for visualization (optional, but helpful for graphs)
+                lower_bound = ideal_inventory_qty * (1 - tolerance_decimal)
+                upper_bound = ideal_inventory_qty * (1 + tolerance_decimal)
+
                 # Final result per part
+                # Mapping new calculations to keys expected by the dashboard
                 result = {
                     'PART NO': part_no,
                     'PART DESCRIPTION': part_desc,
                     'Vendor Name': pfep_item.get('Vendor_Name', 'Unknown'),
                     'Vendor_Code': pfep_item.get('Vendor_Code', ''),
                     'AVG CONSUMPTION/DAY': avg_per_day,
-                    'RM IN DAYS': rm_days,
-                    'RM Norm - In Qty': rm_qty,
-                    'Revised Norm Qty': revised_norm_qty,
-                    'Lower Bound Qty': lower_bound,                 # ✅ Added
+                    'RM IN DAYS': admin_ideal_days,              # Showing Admin Days here
+                    'RM Norm - In Qty': ideal_inventory_qty,     # This is now the Ideal Qty
+                    'Revised Norm Qty': ideal_inventory_qty,     # Main comparator
+                    'Ideal Inventory Qty': ideal_inventory_qty,  # Explicit new key
+                    'Lower Bound Qty': lower_bound,
                     'Upper Bound Qty': upper_bound,  
                     'UNIT PRICE': unit_price,
                     'Current Inventory - Qty': current_qty,
-                    'Current Inventory - VALUE': current_value,
+                    'Current Inventory - VALUE': current_qty * unit_price,
                     'SHORT/EXCESS INVENTORY': deviation_qty,
-                    'Stock Deviation Qty w.r.t Revised Norm': deviation_qty,
+                    'Inventory Deviation %': deviation_pct * 100, # Store as percentage (e.g., 25.5 for 25.5%)
                     'Stock Deviation Value': deviation_value,
                     'Status': status,
                     'INVENTORY REMARK STATUS': status
                 }
-                # ✅ Add these two lines
                 results.append(result)
             except Exception as e:
                 st.warning(f"⚠️ Error analyzing part {part_no}: {e}")
                 continue
+                
         if not results:
-            st.error("❌ No analysis results generated. Please check data for mismatches or missing fields.")
-        return results 
+            st.error("❌ No analysis results generated.")
+        return results
         
     def get_vendor_summary(self, processed_data):
         """Summarize inventory by vendor using actual Stock_Value field from the file."""
