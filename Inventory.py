@@ -2874,7 +2874,7 @@ class InventoryManagementSystem:
                 f"Lower Bound: {row.get('Lower Bound Qty', 'N/A')}<br>"
                 f"Upper Bound: {row.get('Upper Bound Qty', 'N/A')}<br>"
                 f"Value: ₹{row[value_col]:,.0f}<br>"
-                f"Status: {row['Inventory_Status']}"
+                f"Status: {row['Inventory_Status']}<br>"
                 f"<b>Ideal Deviation: {row['Dev_Pct']:.1f}%</b><br>"
                 f"Status: {row['Inventory_Status']}"
             ), axis=1)
