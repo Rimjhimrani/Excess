@@ -3168,23 +3168,110 @@ class InventoryManagementSystem:
             st.error("❌ Error displaying Top Parts by Status")
             st.code(str(e))
           
-        # ✅ 4. Top N Vendors by Inventory Status
+        # ✅ 4. Top N Vendors by Inventory Status (With Ideal Line Overlay)
         try:
             st.markdown(f"## 🏢 Top {top_n} Vendors by Inventory Status")
+            
+            # Define configurations for the two charts
             chart_configs = [
-                ("Excess Inventory", "Top 10 Vendors - Excess Value Above Norm", "excess_vendors", self.status_colors["Excess Inventory"]),
-                ("Short Inventory", "Top 10 Vendors - Short Value Below Norm", "short_vendors", self.status_colors["Short Inventory"]),
+                ("Excess Inventory", "Excess Value Above Norm", self.status_colors["Excess Inventory"]),
+                ("Short Inventory", "Short Value Below Norm", self.status_colors["Short Inventory"]),
             ]
-            for status, title, key, color in chart_configs:
-                self.analyzer.show_vendor_chart_by_status(
-                    processed_data=analysis_results,
-                    status_filter=status,
-                    chart_title=title,
-                    chart_key=key,
-                    color=color,
-                    value_format=format_key, # ✅ This variable is now defined
-                    top_n=top_n
+            
+            for status, metric_name, color in chart_configs:
+                # 1. Filter Data for specific status
+                status_df = df[df['INVENTORY REMARK STATUS'] == status].copy()
+                
+                if status_df.empty:
+                    st.info(f"No vendors found for {status}")
+                    continue
+
+                # 2. Group by Vendor and Calculate Metrics
+                vendor_stats = []
+                
+                # Check which column holds the Vendor Name
+                v_col = next((c for c in ['Vendor Name', 'Vendor', 'VENDOR'] if c in df.columns), 'Vendor Name')
+
+                for vendor, group in status_df.groupby(v_col):
+                    # Calculate Deviation Value (Excess amount or Shortage amount)
+                    deviation_sum = 0
+                    ideal_sum = 0
+                    
+                    for _, row in group.iterrows():
+                        # Extract basic metrics
+                        curr_qty = float(row.get('Current Inventory - Qty', 0) or 0)
+                        norm_qty = float(row.get('Revised Norm Qty', 0) or 0) # Use Revised Norm
+                        unit_price = float(row.get('UNIT PRICE', 0) or 0)
+                        avg_cons = float(row.get('AVG CONSUMPTION/DAY', 0) or 0)
+                        
+                        # Calculate Deviation Value
+                        if status == "Excess Inventory":
+                            # Value of stock ABOVE the norm
+                            if curr_qty > norm_qty:
+                                deviation_sum += (curr_qty - norm_qty) * unit_price
+                        else: # Short Inventory
+                            # Value of stock BELOW the norm
+                            if norm_qty > curr_qty:
+                                deviation_sum += (norm_qty - curr_qty) * unit_price
+                        
+                        # Calculate Ideal Inventory Value for these specific parts
+                        ideal_sum += (avg_cons * ideal_days * unit_price)
+
+                    if deviation_sum > 0:
+                        vendor_stats.append({
+                            'Vendor': vendor,
+                            'Deviation_Value': deviation_sum,
+                            'Ideal_Value': ideal_sum
+                        })
+
+                # 3. Create DataFrame, Sort and Slice Top N
+                if not vendor_stats:
+                    st.info(f"No significant values found for {status}")
+                    continue
+                    
+                v_df = pd.DataFrame(vendor_stats)
+                v_df = v_df.sort_values(by='Deviation_Value', ascending=False).head(top_n)
+                
+                # 4. Convert Units
+                v_df['Val_Converted'] = v_df['Deviation_Value'] / divisor
+                v_df['Ideal_Converted'] = v_df['Ideal_Value'] / divisor
+                
+                # 5. Build Graph
+                fig = go.Figure()
+                
+                # Bar: Deviation Value
+                fig.add_trace(go.Bar(
+                    x=v_df['Vendor'],
+                    y=v_df['Val_Converted'],
+                    name=metric_name,
+                    marker_color=color,
+                    hovertemplate=f'<b>{{x}}</b><br>{metric_name}: ₹{{y:,.1f}} {suffix}<extra></extra>'
+                ))
+                
+                # Line: Ideal Inventory
+                fig.add_trace(go.Scatter(
+                    x=v_df['Vendor'],
+                    y=v_df['Ideal_Converted'],
+                    mode='lines+markers',
+                    name=f'Ideal Inventory ({ideal_days} Days)',
+                    line=dict(color='black', width=1.5),
+                    marker=dict(symbol='circle', size=6, color='black'),
+                    hovertemplate=f'<b>Ideal Target</b><br>Value: ₹{{y:,.1f}} {suffix}<extra></extra>'
+                ))
+                
+                # Update Layout
+                fig.update_layout(
+                    title=f"Top {top_n} Vendors - {metric_name} vs Ideal Target",
+                    xaxis_title="Vendor",
+                    yaxis_title=f"Value (₹ {unit_name})",
+                    xaxis_tickangle=-45,
+                    yaxis=dict(tickformat=',.1f', ticksuffix=suffix),
+                    height=600, # Fixed height
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                 )
+                
+                st.plotly_chart(fig, use_container_width=True, key=f"vendor_{status}_chart")
+
         except Exception as e:
             st.error("❌ Error displaying Top Vendors by Status")
             st.code(str(e))
