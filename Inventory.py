@@ -1093,87 +1093,49 @@ class InventoryManagementSystem:
                 self.display_pfep_data_preview(pfep_data)
             return
         
-        # Tab interface for different data input methods
+        st.subheader("📊 PFEP Master Data Management")
         tab1, tab2, tab3 = st.tabs(["📁 Upload File", "🧪 Load Sample", "📋 Current Data"])
-        
+    
         with tab1:
             st.markdown("**Upload PFEP Excel/CSV File**")
-            uploaded_file = st.file_uploader
-                "Choose PFEP file",
-                type=['xlsx', 'xls', 'csv'],
-                help="Upload your PFEP master data file"
-            )
-            
+            uploaded_file = st.file_uploader("Choose PFEP file", type=['xlsx', 'xls', 'csv'])
             if uploaded_file is not None:
                 try:
-                    # Read file based on extension
-                    if uploaded_file.name.endswith('.csv'):
-                        df = pd.read_csv(uploaded_file)
-                    else:
-                        df = pd.read_excel(uploaded_file)
-                    
+                    df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
                     st.success(f"✅ File loaded: {len(df)} rows")
-                    
-                    # Show preview
                     with st.expander("📋 Preview Raw Data"):
                         st.dataframe(df.head())
-                    
-                    # Standardize data
                     standardized_data = self.standardize_pfep_data(df)
-                    
                     if standardized_data:
                         st.success(f"✅ Standardized: {len(standardized_data)} valid records")
-                        
-                        # Show standardized preview
-                        with st.expander("📋 Preview Standardized Data"):
-                            preview_df = pd.DataFrame(standardized_data[:5])
-                            st.dataframe(preview_df)
-                        
-                        # Save button
                         if st.button("💾 Save PFEP Data", type="primary"):
-                            self.persistence.save_data_to_session_state(
-                                'persistent_pfep_data', 
-                                standardized_data
-                            )
+                            self.persistence.save_data_to_session_state('persistent_pfep_data', standardized_data)
                             st.success("✅ PFEP data saved successfully!")
                             st.rerun()
-                    else:
-                        st.error("❌ No valid data found after standardization")
-                        
                 except Exception as e:
-                    st.error(f"❌ Error processing file: {str(e)}")
-        
+                    st.error(f"❌ Error: {str(e)}")
+
         with tab2:
             st.markdown("**Load Sample PFEP Data for Testing**")
-            st.info("This will load pre-configured sample data for demonstration")
-            
             if st.button("🧪 Load Sample PFEP Data", type="secondary"):
                 sample_data = self.load_sample_pfep_data()
-                self.persistence.save_data_to_session_state(
-                    'persistent_pfep_data', 
-                    sample_data
-                )
+                self.persistence.save_data_to_session_state('persistent_pfep_data', sample_data)
                 st.success(f"✅ Sample PFEP data loaded: {len(sample_data)} parts")
                 st.rerun()
-        
+
         with tab3:
             st.markdown("**Current PFEP Data Status**")
             pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
-            
             if pfep_data:
                 self.display_pfep_data_preview(pfep_data)
-                
-                # Lock data for users
                 st.markdown("---")
                 st.markdown("**🔒 Lock Data for Users**")
-                st.info("Locking PFEP data allows users to upload inventory and perform analysis")
-                
                 if st.button("🔒 Lock PFEP Data", type="primary"):
                     st.session_state.persistent_pfep_locked = True
-                    st.success("✅ PFEP data locked! Users can now upload inventory data.")
+                    st.success("✅ PFEP data locked!")
                     st.rerun()
             else:
-                st.warning("❌ No PFEP data available. Please upload or load sample data first.")
+                st.warning("❌ No PFEP data available.")
     
     def display_pfep_data_preview(self, pfep_data):
         """Display PFEP data preview with statistics"""
