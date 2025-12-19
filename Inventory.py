@@ -378,16 +378,29 @@ class InventoryManagementSystem:
         }
         
     def initialize_session_state(self):
-        """Update 1: Initializing the Ideal Days preference"""
-        if 'user_role' not in st.session_state: st.session_state.user_role = None
+        """Initialize session state variables"""
+        if 'user_role' not in st.session_state:
+            st.session_state.user_role = None
+        
         if 'user_preferences' not in st.session_state:
             st.session_state.user_preferences = {
                 'default_tolerance': 30,
-                'ideal_inventory_days': 30  # Default value
+                'chart_theme': 'plotly'
             }
-        for k in ['persistent_pfep_data', 'persistent_pfep_locked', 'persistent_inventory_data', 'persistent_inventory_locked', 'persistent_analysis_results']:
-            if k not in st.session_state: st.session_state[k] = None
-                
+        
+        # Initialize persistent data keys
+        self.persistent_keys = [
+            'persistent_pfep_data',
+            'persistent_pfep_locked',
+            'persistent_inventory_data', 
+            'persistent_inventory_locked',
+            'persistent_analysis_results'
+        ]
+        
+        # Initialize persistent data if not exists
+        for key in self.persistent_keys:
+            if key not in st.session_state:
+                st.session_state[key] = None  # BUG: should be None, not empty list
     def safe_print(self, message):
         """Safely print to streamlit or console"""
         try:
@@ -640,8 +653,10 @@ class InventoryManagementSystem:
                     st.session_state.user_preferences['ideal_inventory_days'] = st.number_input(
                         "Ideal Inventory Days",
                         min_value=1,
-                        value=st.session_state.user_preferences.get('ideal_inventory_days', 22),
-                        help="Used to calculate Ideal Target Line (Avg Consumption * Days)"
+                        value=30,
+                        step=1,
+                        help="Used to calculate Ideal Inventory (Avg Consumption * Days)",
+                        key="admin_ideal_days"
                     )
                     
                     st.session_state.user_preferences['chart_theme'] = st.selectbox(
