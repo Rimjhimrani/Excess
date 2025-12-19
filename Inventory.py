@@ -640,7 +640,7 @@ class InventoryManagementSystem:
                     st.session_state.user_preferences['ideal_inventory_days'] = st.number_input(
                         "Ideal Inventory Days",
                         min_value=1,
-                        value=st.session_state.user_preferences.get('ideal_inventory_days', 30),
+                        value=st.session_state.user_preferences.get('ideal_inventory_days', 22),
                         help="Used to calculate Ideal Target Line (Avg Consumption * Days)"
                     )
                     
