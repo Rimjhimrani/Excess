@@ -385,6 +385,7 @@ class InventoryManagementSystem:
         if 'user_preferences' not in st.session_state:
             st.session_state.user_preferences = {
                 'default_tolerance': 30,
+                'ideal_inventory_days': 30,  # <-- ADD THIS LINE
                 'chart_theme': 'plotly'
             }
         
