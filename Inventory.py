@@ -378,30 +378,16 @@ class InventoryManagementSystem:
         }
         
     def initialize_session_state(self):
-        """Initialize session state variables"""
-        if 'user_role' not in st.session_state:
-            st.session_state.user_role = None
-        
+        """Update 1: Initializing the Ideal Days preference"""
+        if 'user_role' not in st.session_state: st.session_state.user_role = None
         if 'user_preferences' not in st.session_state:
             st.session_state.user_preferences = {
                 'default_tolerance': 30,
-                'ideal_inventory_days': 30,  # <-- ADD THIS LINE
-                'chart_theme': 'plotly'
+                'ideal_inventory_days': 30  # Default value
             }
-        
-        # Initialize persistent data keys
-        self.persistent_keys = [
-            'persistent_pfep_data',
-            'persistent_pfep_locked',
-            'persistent_inventory_data', 
-            'persistent_inventory_locked',
-            'persistent_analysis_results'
-        ]
-        
-        # Initialize persistent data if not exists
-        for key in self.persistent_keys:
-            if key not in st.session_state:
-                st.session_state[key] = None  # BUG: should be None, not empty list
+        for k in ['persistent_pfep_data', 'persistent_pfep_locked', 'persistent_inventory_data', 'persistent_inventory_locked', 'persistent_analysis_results']:
+            if k not in st.session_state: st.session_state[k] = None
+                
     def safe_print(self, message):
         """Safely print to streamlit or console"""
         try:
