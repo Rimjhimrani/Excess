@@ -1022,6 +1022,48 @@ class InventoryManagementSystem:
     def admin_data_management(self):
         """Admin-only PFEP data management interface"""
         st.header("🔧 Admin Dashboard - PFEP Data Management")
+        st.markdown("### ⚙️ Global Analysis Settings")
+        config_col1, config_col2 = st.columns(2)
+
+        with config_col1:
+            st.subheader("📐 Analysis Tolerance")
+            # Initialize admin_tolerance if not exists
+            if "admin_tolerance" not in st.session_state:
+                st.session_state.admin_tolerance = 30
+
+            new_tolerance = st.selectbox(
+                "Tolerance Zone (+/-)",
+                options=[0, 10, 20, 30, 40, 50],
+                index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance),
+                format_func=lambda x: f"{x}%",
+                key="tolerance_selector_main",
+                help="Defines the range for 'Within Norms' status."
+            )
+            if new_tolerance != st.session_state.admin_tolerance:
+                st.session_state.admin_tolerance = new_tolerance
+                st.success(f"✅ Tolerance updated to {new_tolerance}%")
+                if st.session_state.get('persistent_analysis_results'):
+                    st.info("🔄 Analysis will refresh on next run.")
+
+        with config_col2:
+            st.subheader("📅 Ideal Inventory Target")
+            # Ensure the key exists in session state
+            if 'user_preferences' not in st.session_state:
+                st.session_state.user_preferences = {'ideal_inventory_days': 30}
+        
+            # Centered input for Ideal Days
+            st.session_state.user_preferences['ideal_inventory_days'] = st.number_input(
+                "Ideal Inventory Days",
+                min_value=1,
+                max_value=365,
+                value=st.session_state.user_preferences.get('ideal_inventory_days', 30),
+                step=1,
+                help="Used to calculate the black 'Ideal Inventory Line' on charts (Avg Consumption * Days)",
+                key="admin_ideal_days_main"
+            )
+            st.info(f"Target: {st.session_state.user_preferences['ideal_inventory_days']} Days of Stock")
+
+        st.markdown("---")
         
         # Check if PFEP data is locked
         pfep_locked = st.session_state.get('persistent_pfep_locked', False)
@@ -1050,41 +1092,13 @@ class InventoryManagementSystem:
             if pfep_data:
                 self.display_pfep_data_preview(pfep_data)
             return
-        # Tolerance Setting for Admin
-        st.subheader("📐 Set Analysis Tolerance (Admin Only)")
-        # Initialize admin_tolerance if not exists
-        if "admin_tolerance" not in st.session_state:
-            st.session_state.admin_tolerance = 30
-    
-        # Create selectbox with proper callback
-        new_tolerance = st.selectbox(
-            "Tolerance Zone (+/-)",
-            options=[0, 10, 20, 30, 40, 50],
-            index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance),
-            format_func=lambda x: f"{x}%",
-            key="tolerance_selector"
-        )
-        # Update tolerance if changed
-        if new_tolerance != st.session_state.admin_tolerance:
-            st.session_state.admin_tolerance = new_tolerance
-            st.success(f"✅ Tolerance updated to {new_tolerance}%")
-            
-            # If analysis exists, refresh it with new tolerance
-            if st.session_state.get('persistent_analysis_results'):
-                st.info("🔄 Analysis will be refreshed with new tolerance on next run")
-        
-        st.markdown(f"**Current Tolerance:** {st.session_state.admin_tolerance}%")
-        st.markdown("---")
-        
-        # PFEP Data Management Section
-        st.subheader("📊 PFEP Master Data Management")
         
         # Tab interface for different data input methods
         tab1, tab2, tab3 = st.tabs(["📁 Upload File", "🧪 Load Sample", "📋 Current Data"])
         
         with tab1:
             st.markdown("**Upload PFEP Excel/CSV File**")
-            uploaded_file = st.file_uploader(
+            uploaded_file = st.file_uploader
                 "Choose PFEP file",
                 type=['xlsx', 'xls', 'csv'],
                 help="Upload your PFEP master data file"
