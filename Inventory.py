@@ -2892,7 +2892,7 @@ class InventoryManagementSystem:
         fig2.update_layout(yaxis_title=f"Value (₹ {unit_name})", height=500, xaxis_tickangle=-45)
         st.plotly_chart(fig2, use_container_width=True)
 
-        # --- 3. Top N Parts by Status (The requested Excess/Short logic) ---
+        # --- 3. Top N Parts by Status ---
         st.markdown(f"## 🧩 Top {top_n} Parts by Category")
         for status in ["Excess Inventory", "Short Inventory"]:
             color = color_map[status]
@@ -2912,32 +2912,32 @@ class InventoryManagementSystem:
                 fig.add_trace(go.Scatter(x=status_df['Label'], y=status_df['Ideal_Plot'], name="Ideal Target", mode='lines+markers',
                                          line=dict(color='black', width=2), hoverinfo='skip'))
                 
-                # Logic check: If Short, Bar is low, Line is high. If Excess, Bar is high, Line is low.
                 fig.update_layout(title=f"{status}: Actual vs Ideal Target", yaxis_title=f"Value (₹ {unit_name})", height=500, xaxis_tickangle=-45)
                 st.plotly_chart(fig, use_container_width=True, key=f"chart_{status}")
 
         # --- 4. Top N Vendors by Status ---
-        st.markdown(f"## 🏢 Top {top_n} Vendors by Inventory Status")
-        for status in ["Excess Inventory", "Short Inventory"]:
-            color = color_map[status]
-            v_status_df = df[df[status_col] == status].groupby(v_col).apply(lambda x: pd.Series({
-                'Actual_Sum': x[value_col].sum() / divisor,
-                'Ideal_Sum': x.apply(lambda r: (float(r.get('AVG CONSUMPTION/DAY', 0) or 0) * ideal_days * float(r.get('UNIT PRICE', 0) or 0)), axis=1).sum() / divisor,
-                'Impact': x['Stock Deviation Value'].abs().sum()
-            })).sort_values('Impact', ascending=False).head(top_n).reset_index()
+        try:
+            st.markdown(f"## 🏢 Top {top_n} Vendors by Inventory Status")
+            for status in ["Excess Inventory", "Short Inventory"]:
+                color = color_map[status]
+                v_status_df = df[df[status_col] == status].groupby(v_col).apply(lambda x: pd.Series({
+                    'Actual_Sum': x[value_col].sum() / divisor,
+                    'Ideal_Sum': x.apply(lambda r: (float(r.get('AVG CONSUMPTION/DAY', 0) or 0) * ideal_days * float(r.get('UNIT PRICE', 0) or 0)), axis=1).sum() / divisor,
+                    'Impact': x['Stock Deviation Value'].abs().sum()
+                })).sort_values('Impact', ascending=False).head(top_n).reset_index()
 
-            if not v_status_df.empty:
-                st.subheader(f"Top {top_n} Vendors: {status}")
-                fig_v = go.Figure()
-                fig_v.add_trace(go.Bar(x=v_status_df[v_col], y=v_status_df['Actual_Sum'], name="Vendor Actual", marker_color=color,
-                                       hovertemplate="Vendor: %{x}<br>Actual: ₹%{y:.2f}" + suffix + "<extra></extra>"))
-                fig_v.add_trace(go.Scatter(x=v_status_df[v_col], y=v_status_df['Ideal_Sum'], name="Vendor Ideal", mode='lines+markers', line=dict(color='black', width=2)))
-                fig_v.update_layout(yaxis_title=f"Value (₹ {unit_name})", height=500, xaxis_tickangle=-45)
-                st.plotly_chart(fig_v, use_container_width=True, key=f"vendor_chart_{status}")
+                if not v_status_df.empty:
+                    st.subheader(f"Top {top_n} Vendors: {status}")
+                    fig_v = go.Figure()
+                    fig_v.add_trace(go.Bar(x=v_status_df[v_col], y=v_status_df['Actual_Sum'], name="Vendor Actual", marker_color=color,
+                                           hovertemplate="Vendor: %{x}<br>Actual: ₹%{y:.2f}" + suffix + "<extra></extra>"))
+                    fig_v.add_trace(go.Scatter(x=v_status_df[v_col], y=v_status_df['Ideal_Sum'], name="Vendor Ideal", mode='lines+markers', line=dict(color='black', width=2)))
+                    fig_v.update_layout(yaxis_title=f"Value (₹ {unit_name})", height=500, xaxis_tickangle=-45)
+                    st.plotly_chart(fig_v, use_container_width=True, key=f"vendor_chart_{status}")
         except Exception as e:
             st.error("❌ Error displaying Top Vendors by Status")
             st.code(str(e))
-
+            
 if __name__ == "__main__":
     app = InventoryManagementSystem()
     app.run()  # This runs the full dashboard
