@@ -654,10 +654,8 @@ class InventoryManagementSystem:
                     st.session_state.user_preferences['ideal_inventory_days'] = st.number_input(
                         "Ideal Inventory Days",
                         min_value=1,
-                        value=30,
-                        step=1,
-                        help="Used to calculate Ideal Inventory (Avg Consumption * Days)",
-                        key="admin_ideal_days"
+                        value=st.session_state.user_preferences.get('ideal_inventory_days', 30),
+                        help="Used to calculate Ideal Target Line (Avg Consumption * Days)"
                     )
                     
                     st.session_state.user_preferences['chart_theme'] = st.selectbox(
