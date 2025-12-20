@@ -1969,188 +1969,122 @@ class InventoryManagementSystem:
         return filtered_df
             
     def display_trend_analysis(self, analysis_results):
-        """Display trend analysis and forecasting"""
-        st.header("📈 Trend Analysis & Forecasting")
+        """
+        REPLACED: This section now focuses exclusively on Inventory Coverage 
+        and Reorder Points based on actual consumption data.
+        """
+        st.header("📈 Inventory Coverage & Reorder Point Analysis")
         df = pd.DataFrame(analysis_results)
-        # Create trend analysis tabs
-        tab1, tab2, tab3 = st.tabs(["📊 Status Trends", "💹 Value Trends", "🔮 Forecasting"])
-        with tab1:
-            # Status distribution over time (if timestamp data available)
-            status_counts = df['Status'].value_counts()
-            fig = px.pie(
-                values=status_counts.values,
-                names=status_counts.index,
-                title="Current Inventory Status Distribution",
-                color=status_counts.index, 
-                color_discrete_map={
-                    'Within Norms': '#4CAF50',
-                    'Excess Inventory': '#2196F3',
-                    'Short Inventory': '#F44336'
-                }
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            # Status by category if available
-            if 'Category' in df.columns or 'PART CATEGORY' in df.columns:
-                category_col = 'Category' if 'Category' in df.columns else 'PART CATEGORY'
-                status_category = df.groupby([category_col, 'Status']).size().unstack(fill_value=0)
-                fig = px.bar(
-                    status_category,
-                    title="Status Distribution by Category",
-                    color_discrete_map={
-                        'Within Norms': '#4CAF50',
-                        'Excess Inventory': '#2196F3',
-                        'Short Inventory': '#F44336'
-                    }
-                )
-                st.plotly_chart(fig, use_container_width=True)
-            with tab2:
-                df['VALUE_LAKH'] = df['Current Inventory - VALUE'] / 100000
-                # ✅ 1️⃣ Value Distribution Analysis (Bar Chart)
-                value_ranges = pd.cut(df['VALUE_LAKH'], bins=5, labels=['Very Low', 'Low', 'Medium', 'High', 'Very High'])
-                value_status = pd.crosstab(value_ranges, df['Status'])
-                fig1 = px.bar(
-                    value_status,
-                    title="Status Distribution by Value Range (in ₹ Lakhs)",
-                    color_discrete_map={
-                        'Within Norms': '#4CAF50',
-                        'Excess Inventory': '#2196F3',
-                        'Short Inventory': '#F44336'
-                    },
-                    barmode='stack'
-                )
-                fig1.update_layout(yaxis_title="Number of Parts")
-                st.plotly_chart(fig1, use_container_width=True)
-                # ✅ 2️⃣ Top Value Contributors (Scatter Plot)
-                top_value_parts = df.nlargest(20, 'VALUE_LAKH')
-                fig2 = px.scatter(
-                    top_value_parts,
-                    x='Current Inventory - Qty',
-                    y='VALUE_LAKH',
-                    color='Status',
-                    size='VALUE_LAKH',
-                    hover_data=['PART NO', 'PART DESCRIPTION'],
-                    title="Top 20 Parts by Value - Quantity vs Value Analysis",
-                    color_discrete_map={
-                        'Within Norms': '#4CAF50',
-                        'Excess Inventory': '#2196F3',
-                        'Short Inventory': '#F44336'
-                    }
-                )
-                fig2.update_layout(
-                    xaxis_title="Inventory Quantity",
-                    yaxis_title="Inventory Value (in ₹ Lakhs)",
-                    yaxis=dict(tickformat=',.0f', ticksuffix='L')
-                )
-                st.plotly_chart(fig2, use_container_width=True)
+        
+        # 1. Calculation Logic for Real Coverage
+        def calculate_inventory_metrics(row):
+            qty = float(row.get('Current Inventory - Qty', 0) or 0)
+            cons = float(row.get('AVG CONSUMPTION/DAY', 0) or 0)
+            target_days = float(row.get('RM IN DAYS', 7) or 7)
+            
+            # Days of Coverage
+            if cons > 0:
+                coverage_days = qty / cons
+            else:
+                coverage_days = 999  # Infinite coverage if no consumption
+            
+            # Reorder Recommendation Logic
+            if coverage_days == 999:
+                status = "⚪ No Consumption"
+                color = "#f0f2f6"
+            elif coverage_days <= target_days:
+                status = "🔴 REORDER NOW"
+                color = "#ffcccc"
+            elif coverage_days <= (target_days * 1.5):
+                status = "🟡 MONITOR"
+                color = "#fff4cc"
+            else:
+                status = "🟢 SUFFICIENT"
+                color = "#e8f5e8"
+                
+            return pd.Series([coverage_days, status, color])
 
-            with tab3:
-                st.subheader("🔮 Predictive Insights")
-                # Create two columns for better layout
-                col1, col2 = st.columns(2)
-                with col1:
-                    # Calculate reorder predictions
-                    reorder_candidates = df[
-                        (df['Status'] == 'Within Norms') & 
-                        (df['Current Inventory - Qty'] <= df['Current Inventory - VALUE'] * 1.2)
-                    ]
-                    if not reorder_candidates.empty:
-                        st.warning(f"📋 **Reorder Alert**: {len(reorder_candidates)} parts may need reordering soon")
-                        # Display reorder table
-                        reorder_display = reorder_candidates[['PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty', 
-                                                              'Current Inventory - VALUE']].copy()
-                        reorder_display['Days to Reorder'] = np.random.randint(5, 30, len(reorder_display))  # Simulated
-                        reorder_display['Priority'] = np.where(
-                            reorder_display['Current Inventory - VALUE'] > reorder_display['Current Inventory - VALUE'].median(),
-                            'High', 'Medium'
-                        )
-                        st.dataframe(reorder_display, use_container_width=True)
-                    else:
-                        st.info("✅ No immediate reorder candidates identified")
-                with col2:
-                    # Excess Inventory Reorder Point Analysis
-                    excess_inventory = df[df['Status'] == 'Excess Inventory'].copy()
-                    if not excess_inventory.empty:
-                        st.error(f"🚨 **Excess Inventory Alert**: {len(excess_inventory)} parts have excess stock")
-                        # Calculate excess reorder metrics
-                        excess_inventory['Excess_Qty'] = excess_inventory['Current Inventory - Qty'] - (
-                            excess_inventory['Current Inventory - Qty'] * 0.7  # Assuming 70% as optimal level
-                        )
-                        excess_inventory['Excess_Value_Lakh'] = (excess_inventory['Excess_Qty'] * 
-                                                                 excess_inventory['Current Inventory - VALUE'] / 
-                                                                 excess_inventory['Current Inventory - Qty']) / 100000
-                        excess_inventory['Reorder_Days'] = np.random.randint(60, 180, len(excess_inventory))  # Days until next reorder needed
-                        excess_inventory['Action_Required'] = np.where(
-                            excess_inventory['Excess_Value_Lakh'] > 1, 'Urgent', 'Monitor'
-                        )
-                
-                        # Display excess reorder days table
-                        excess_display = excess_inventory[['PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty', 
-                                                           'Excess_Qty', 'Excess_Value_Lakh', 'Reorder_Days', 
-                                                           'Action_Required']].copy()
-                        excess_display.columns = ['Part No', 'Description', 'Current Qty', 'Excess Qty', 
-                                                  'Excess Value (₹L)', 'Days Until Reorder', 'Action']
-                        st.dataframe(excess_display, use_container_width=True)
-                
-                        # Summary metrics for excess inventory
-                        total_excess_value = excess_inventory['Excess_Value_Lakh'].sum()
-                        urgent_actions = len(excess_inventory[excess_inventory['Action_Required'] == 'Urgent'])
-                    else:
-                        st.success("✅ No excess inventory detected")
-                # Combined Forecasting Table
-                st.subheader("📊 Comprehensive Forecasting Analysis")
+        # Apply calculations
+        df[['Coverage_Days', 'Reorder_Status', 'Row_Color']] = df.apply(calculate_inventory_metrics, axis=1)
+
+        # 2. Executive Summary Metrics
+        m1, m2, m3, m4 = st.columns(4)
+        with m1:
+            critical_count = len(df[df['Reorder_Status'] == "🔴 REORDER NOW"])
+            st.metric("Critical Reorders", critical_count, delta_color="inverse")
+        with m2:
+            monitor_count = len(df[df['Reorder_Status'] == "🟡 MONITOR"])
+            st.metric("Monitor Closely", monitor_count)
+        with m3:
+            # Average coverage of parts that actually have consumption
+            avg_cov = df[df['Coverage_Days'] < 999]['Coverage_Days'].mean()
+            st.metric("Avg. System Coverage", f"{avg_cov:.1f} Days")
+        with m4:
+            st.metric("Total Items", len(df))
+
+        st.markdown("---")
+
+        # 3. Comprehensive Analysis Table
+        st.subheader("📋 Inventory Coverage Details")
         
-                # Create comprehensive forecasting dataframe
-                forecasting_df = df.copy()
-                forecasting_df['Predicted_Demand'] = np.random.randint(10, 500, len(forecasting_df))  # Simulated
-                forecasting_df['Lead_Time_Days'] = np.random.randint(7, 45, len(forecasting_df))  # Simulated
-                forecasting_df['Safety_Stock'] = forecasting_df['Current Inventory - Qty'] * 0.2  # 20% safety stock
-                forecasting_df['Optimal_Reorder_Days'] = (
-                    forecasting_df['Current Inventory - Qty'] / forecasting_df['Predicted_Demand'] * 30
-                ).round(0)  # Days until reorder needed based on consumption rate
-                forecasting_df['Reorder_Recommendation'] = np.where(
-                    forecasting_df['Optimal_Reorder_Days'] <= forecasting_df['Lead_Time_Days'],
-                    'Reorder Now',
-                    np.where(
-                        forecasting_df['Optimal_Reorder_Days'] <= forecasting_df['Lead_Time_Days'] * 1.5,
-                        'Monitor Closely',
-                        'Sufficient Stock'
-                    )
-                )
-                # Display comprehensive table
-                comprehensive_display = forecasting_df[[
-                    'PART NO', 'PART DESCRIPTION', 'Status', 'Current Inventory - Qty',
-                    'Predicted_Demand', 'Optimal_Reorder_Days', 'Lead_Time_Days', 'Reorder_Recommendation'
-                ]].copy()
-                comprehensive_display.columns = [
-                    'Part No', 'Description', 'Current Status', 'Current Qty',
-                    'Predicted Monthly Demand', 'Days Until Reorder', 'Lead Time (Days)', 'Recommendation'
-                ]
-                # Add color coding for recommendations
-                def color_recommendation(val):
-                    if val == 'Reorder Now':
-                        return 'background-color: #ffebee; color: #c62828'
-                    elif val == 'Monitor Closely':
-                        return 'background-color: #fff3e0; color: #ef6c00'
-                    else:
-                        return 'background-color: #e8f5e8; color: #2e7d32'
-                styled_df = comprehensive_display.style.applymap(color_recommendation, subset=['Recommendation'])
-                st.dataframe(styled_df, use_container_width=True)
+        # Prepare display dataframe
+        display_df = df[[
+            'PART NO', 
+            'PART DESCRIPTION', 
+            'Vendor Name',
+            'AVG CONSUMPTION/DAY', 
+            'Current Inventory - Qty', 
+            'RM IN DAYS', 
+            'Coverage_Days', 
+            'Reorder_Status'
+        ]].copy()
+
+        # Format columns for readability
+        display_df['Coverage_Days'] = display_df['Coverage_Days'].apply(lambda x: "∞" if x == 999 else f"{x:.1f}")
         
-                # Seasonal analysis placeholder
-                st.info("📊 **Seasonal Analysis**: Historical data integration required for advanced forecasting")
-        
-                # Key insights summary
-                st.subheader("🔍 Key Insights")
-                insights_col1, insights_col2, insights_col3 = st.columns(3)
-                with insights_col1:
-                    reorder_now_count = len(forecasting_df[forecasting_df['Reorder_Recommendation'] == 'Reorder Now'])
-                    st.metric("Parts Needing Reorder", reorder_now_count)
-                with insights_col2:
-                    monitor_count = len(forecasting_df[forecasting_df['Reorder_Recommendation'] == 'Monitor Closely'])
-                    st.metric("Parts to Monitor", monitor_count)
-                with insights_col3:
-                    sufficient_count = len(forecasting_df[forecasting_df['Reorder_Recommendation'] == 'Sufficient Stock'])
-                    st.metric("Parts with Sufficient Stock", sufficient_count)
+        display_df.columns = [
+            'Part No', 
+            'Description', 
+            'Vendor',
+            'Daily Cons.', 
+            'Current Qty', 
+            'Target Days (Lead Time)', 
+            'Current Coverage (Days)', 
+            'Action Recommendation'
+        ]
+
+        # Styling function for the Action column
+        def style_action_col(val):
+            if "REORDER" in str(val): return 'background-color: #ffcccc; color: #990000; font-weight: bold;'
+            if "MONITOR" in str(val): return 'background-color: #fff4cc; color: #996600;'
+            if "SUFFICIENT" in str(val): return 'background-color: #e8f5e8; color: #006600;'
+            return ''
+
+        st.dataframe(
+            display_df.style.applymap(style_action_col, subset=['Action Recommendation']),
+            use_container_width=True,
+            height=500
+        )
+
+        # 4. Coverage Distribution Chart
+        st.subheader("📊 Coverage Visualization")
+        fig = px.bar(
+            df[df['Coverage_Days'] < 100], # Filter out infinite/extreme values for better chart scaling
+            x='PART NO',
+            y='Coverage_Days',
+            color='Reorder_Status',
+            title="Days of Inventory Remaining by Part (Zoomed to < 100 days)",
+            color_discrete_map={
+                "🔴 REORDER NOW": "#F44336",
+                "🟡 MONITOR": "#FF9800",
+                "🟢 SUFFICIENT": "#4CAF50",
+                "⚪ No Consumption": "#9E9E9E"
+            },
+            labels={'Coverage_Days': 'Days Remaining', 'PART NO': 'Part Number'}
+        )
+        # Add a target line for reference
+        fig.add_hline(y=df['RM IN DAYS'].median(), line_dash="dot", annotation_text="Avg Target Days", line_color="black")
+        st.plotly_chart(fig, use_container_width=True)
                     
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
