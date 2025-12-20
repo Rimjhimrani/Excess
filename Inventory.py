@@ -2489,9 +2489,6 @@ class InventoryManagementSystem:
         self.display_trend_analysis(filtered_results)
     
         st.markdown("---")
-        self.display_actionable_insights(filtered_results)
-    
-        st.markdown("---")
         self.display_export_options(filtered_results)
     
         st.markdown("---")
