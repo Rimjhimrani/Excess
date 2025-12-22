@@ -1970,8 +1970,8 @@ class InventoryManagementSystem:
             
     def display_trend_analysis(self, analysis_results):
         """
-        REPLACED: This section now implements the Stock Coverage Report 
-        exactly as requested in the reference image.
+        UPDATED: Stock Coverage Report with Dynamic Category Selection.
+        Defaults to 'Stock Less Than 3 Days' as requested.
         """
         st.header("📈 Stock Coverage Report")
         df = pd.DataFrame(analysis_results)
@@ -1993,18 +1993,10 @@ class InventoryManagementSystem:
         def get_coverage_category(row):
             qty = float(row.get('Current Inventory - Qty', 0) or 0)
             cons = float(row.get('AVG CONSUMPTION/DAY', 0) or 0)
+            if cons <= 0: return "No Consumption Parts"
+            if qty <= 0: return "Stock Out Items"
             
-            # Case 1: No consumption defined or zero consumption
-            if cons <= 0:
-                return "No Consumption Parts"
-            
-            # Case 2: Out of stock
-            if qty <= 0:
-                return "Stock Out Items"
-            
-            # Case 3: Calculate days of coverage
             days = qty / cons
-            
             if days < 3: return "Stock Less Than 3 Days"
             if 3 <= days < 7: return "Stock 3-7 Days"
             if 7 <= days < 15: return "Stock 7-15 Days"
@@ -2014,72 +2006,65 @@ class InventoryManagementSystem:
             if 180 <= days <= 365: return "Stock 180 - 365 Days"
             return "Stock More than Year"
 
-        # Apply the logic
         df['Coverage Category'] = df.apply(get_coverage_category, axis=1)
 
-        # 2. Generate Summary Table (Matching your image)
+        # 2. Visual Summary (Table and Multi-Color Chart)
         summary_counts = df['Coverage Category'].value_counts().reindex(categories_order, fill_value=0).reset_index()
         summary_counts.columns = ['Coverage Category', 'No. of Items']
-        summary_counts.insert(0, 'S.N.', range(1, 11))
-
-        col1, col2 = st.columns([1, 2])
         
-        with col1:
-            st.subheader("📋 Summary Table")
-            st.table(summary_counts)
+        sum_col1, sum_col2 = st.columns([1, 2])
+        with sum_col1:
+            st.subheader("📋 Summary")
+            st.dataframe(summary_counts, hide_index=True, use_container_width=True)
 
-        with col2:
-            st.subheader("📊 Coverage Distribution")
-            # Distinct colors for each bar
-            colors = [
-                '#d62728', '#ff7f0e', '#fdb462', '#e7ba52', '#bcbd22', 
-                '#1f77b4', '#17becf', '#9467bd', '#8c564b', '#7f7f7f'
-            ]
-            
-            fig = px.bar(
-                summary_counts, 
-                x='Coverage Category', 
-                y='No. of Items',
-                color='Coverage Category',
-                color_discrete_sequence=colors,
-                title="Inventory Count by Coverage Bucket",
-                text='No. of Items'
-            )
-            fig.update_layout(showlegend=False, xaxis_tickangle=-45)
+        with sum_col2:
+            colors = ['#d62728', '#ff7f0e', '#fdb462', '#e7ba52', '#bcbd22', '#1f77b4', '#17becf', '#9467bd', '#8c564b', '#7f7f7f']
+            fig = px.bar(summary_counts, x='Coverage Category', y='No. of Items', color='Coverage Category',
+                         color_discrete_sequence=colors, text='No. of Items', height=350)
+            fig.update_layout(showlegend=False, xaxis_tickangle=-45, margin=dict(t=20, b=20, l=20, r=20))
             st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("---")
 
-        # 3. Critical Parts Lists (Drill-down)
-        st.subheader("🚨 Critical Shortage Lists")
+        # 3. Dynamic Part List Selector (Drag Box)
+        st.subheader("🔍 Detailed Part List by Category")
         
-        # Part List for Stock Less Than 3 Days
-        short_parts = df[df['Coverage Category'] == "Stock Less Than 3 Days"]
-        with st.expander(f"🔴 Parts with Stock Less Than 3 Days ({len(short_parts)} Items)", expanded=True):
-            if not short_parts.empty:
-                display_df = short_parts[['PART NO', 'PART DESCRIPTION', 'Vendor Name', 'AVG CONSUMPTION/DAY', 'Current Inventory - Qty']]
-                # Calculate exact coverage days for this view
-                display_df['Coverage (Days)'] = (display_df['Current Inventory - Qty'] / display_df['AVG CONSUMPTION/DAY']).round(1)
-                st.dataframe(display_df, use_container_width=True)
-            else:
-                st.success("No parts are currently in the 'Less than 3 Days' bucket.")
-
-        # Part List for Stock Out
-        stock_out = df[df['Coverage Category'] == "Stock Out Items"]
-        with st.expander(f"⚫ Stock Out Items ({len(stock_out)} Items)"):
-            if not stock_out.empty:
-                st.dataframe(stock_out[['PART NO', 'PART DESCRIPTION', 'Vendor Name', 'AVG CONSUMPTION/DAY']], use_container_width=True)
-            else:
-                st.success("Great! No items are currently out of stock.")
-
-        # Export Button specifically for this report
-        csv = summary_counts.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            "📥 Download Stock Coverage Summary",
-            data=csv,
-            file_name="stock_coverage_report.csv",
-            mime="text/csv"
+        # We set 'Stock Less Than 3 Days' as the default selection (index 1)
+        selected_cat = st.selectbox(
+            "Select Coverage Category to view items:",
+            options=categories_order,
+            index=1, 
+            help="Choose a category to filter the table below. Default is 'Stock Less Than 3 Days'."
         )
+
+        # Filter and show the list
+        filtered_list = df[df['Coverage Category'] == selected_cat].copy()
+
+        if not filtered_list.empty:
+            st.info(f"Showing **{len(filtered_list)}** items for category: **{selected_cat}**")
+            
+            # Prepare columns for the detail view
+            display_cols = ['PART NO', 'PART DESCRIPTION', 'Vendor Name', 'AVG CONSUMPTION/DAY', 'Current Inventory - Qty']
+            
+            # Add a 'Days of Stock' column for clarity (except for No Consumption)
+            if selected_cat != "No Consumption Parts":
+                filtered_list['Coverage (Days)'] = filtered_list.apply(
+                    lambda r: round(float(r['Current Inventory - Qty'])/float(r['AVG CONSUMPTION/DAY']), 1) if float(r['AVG CONSUMPTION/DAY']) > 0 else 0, axis=1
+                )
+                display_cols.append('Coverage (Days)')
+
+            st.dataframe(filtered_list[display_cols], use_container_width=True, height=400)
+            
+            # Category-specific Export
+            csv_data = filtered_list[display_cols].to_csv(index=False).encode('utf-8')
+            st.download_button(
+                f"📥 Download {selected_cat} List",
+                data=csv_data,
+                file_name=f"{selected_cat.lower().replace(' ', '_')}.csv",
+                mime="text/csv"
+            )
+        else:
+            st.success(f"✅ No items found in the '{selected_cat}' category.")
                     
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
