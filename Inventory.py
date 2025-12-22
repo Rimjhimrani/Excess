@@ -2079,111 +2079,124 @@ class InventoryManagementSystem:
             st.success(f"✅ No items found in the '{selected_cat}' category.")
 
     def display_forecasting_module(self):
-        """Implement the Forecasting module based on Excel patterns"""
-        st.header("🔮 Demand Forecasting Analysis")
-        st.markdown('<div class="graph-description">Predict future inventory requirements based on historical consumption trends.</div>', unsafe_allow_html=True)
-        
-        # Get PFEP data to select parts
-        pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
-        if not pfep_data:
-            st.warning("⚠️ Please load PFEP master data first to select parts for forecasting.")
-            return
+        """
+        NEW MODULE: Demand Forecasting
+        Implements Simple, Moving, Weighted, and Seasonal methods.
+        """
+        st.header("🔮 Demand Forecasting Dashboard")
+        st.markdown('<div class="graph-description">Select a forecasting technique and horizon to predict future inventory demand based on historical data.</div>', unsafe_allow_html=True)
 
-        # Selection Sidebar for Forecasting
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("📈 Forecast Settings")
+        # 1. Forecasting Configuration (The Selection Boxes)
+        st.subheader("⚙️ Forecast Configuration")
+        col1, col2, col3 = st.columns(3)
         
-        part_list = [f"{p['Part_No']} - {p['Description']}" for p in pfep_data]
-        selected_part_str = st.sidebar.selectbox("Select Part to Forecast", part_list)
-        selected_part_no = selected_part_str.split(" - ")[0]
-        part_info = next(p for p in pfep_data if p['Part_No'] == selected_part_no)
-        
-        tech = st.sidebar.selectbox("Select Forecasting Technique", 
-                            ["Simple Average", "Moving Average", "Weightage Average", "Seasonal Average"])
-        
-        horizon_map = {
-            "One Month": 1, "Three Month (Quarter)": 3, "Six Month": 6, 
-            "Twelve Month (Year)": 12, "3 Year": 36, "5 Year": 60
-        }
-        horizon_label = st.sidebar.selectbox("Select Forecast Horizon", list(horizon_map.keys()), index=3)
-        horizon_months = horizon_map[horizon_label]
-        
-        # Technique Descriptions
-        tech_desc = {
-            "Simple Average": "Uses the arithmetic mean of all historical data points to predict a constant future demand.",
-            "Moving Average": "Calculates the average of the most recent 'n' periods, smoothing out short-term fluctuations.",
-            "Weightage Average": "Assigns higher importance (weights) to recent periods, making the forecast more responsive to new trends.",
-            "Seasonal Average": "Repeats the historical cycle from the previous year, adjusted by a growth/increase factor."
-        }
-        
-        st.info(f"**Current Technique:** {tech}\n\n**Description:** {tech_desc[tech]}")
+        with col1:
+            tech = st.selectbox(
+                "1. Select Forecasting Technique",
+                ["Simple Average", "Moving Average", "Weightage Average", "Seasonal Average"],
+                help="Choose the mathematical model for prediction."
+            )
+            
+            # Brief Descriptions (from your Excel)
+            descriptions = {
+                "Simple Average": "Uses the mean of all past data points.",
+                "Moving Average": "Uses the average of the most recent specific period.",
+                "Weightage Average": "Applies specific weights to recent months (e.g., 50% for last month).",
+                "Seasonal Average": "Repeat previous year patterns with a growth factor."
+            }
+            st.caption(f"**Brief Description:** {descriptions[tech]}")
 
-        # Historical Data Input
-        st.subheader("📅 Historical Monthly Demand (Jan-25 to Dec-25)")
-        # Default mock data based on Excel screenshot values
-        default_history = [25, 26, 32, 22, 26, 27, 27, 26, 27, 27, 27, 27]
-        months_labels = ["Jan-25", "Feb-25", "Mar-25", "Apr-25", "May-25", "Jun-25", 
-                         "Jul-25", "Aug-25", "Sep-25", "Oct-25", "Nov-25", "Dec-25"]
-        
-        hist_df = pd.DataFrame({"Month": months_labels, "Demand": default_history})
-        edited_hist = st.data_editor(hist_df, num_rows="fixed", use_container_width=True)
-        history_values = edited_hist["Demand"].tolist()
+        with col2:
+            horizon_map = {
+                "One Month": 1, "Three Month ( Quarter )": 3, "Six Month": 6,
+                "Twelve Month ( Year )": 12, "3 Year": 36, "5 Year": 60
+            }
+            selected_horizon = st.selectbox("2. Select Forecast Horizon", list(horizon_map.keys()), index=1)
+            horizon_months = horizon_map[selected_horizon]
+            
+        with col3:
+            period_type = st.selectbox("3. Available Data Type", ["Month", "Day", "Year"], index=0)
 
-        # Calculation Logic
-        forecast_values = []
-        forecast_months = []
+        st.markdown("---")
+
+        # 2. Historical Data Entry (Default values from your Jan-Dec 2025 Excel)
+        st.subheader(f"📅 Step 1: Input Historical Demand (Past 12 {period_type}s)")
         
-        # Generate future months for the horizon
+        hist_months = ["Jan-25", "Feb-25", "Mar-25", "Apr-25", "May-25", "Jun-25", 
+                       "Jul-25", "Aug-25", "Sep-25", "Oct-25", "Nov-25", "Dec-25"]
+        # Default demand values from your screenshot
+        default_vals = [25, 26, 32, 22, 26, 26, 26, 26, 26, 26, 26, 26]
+        
+        # Using data_editor so user can change historical data easily
+        hist_df = pd.DataFrame({"Period": hist_months, "Historical Demand": default_vals})
+        edited_hist = st.data_editor(hist_df, use_container_width=True, hide_index=True)
+        history = edited_hist["Historical Demand"].tolist()
+
+        # 3. Method-Specific Settings
+        st.subheader(f"🧮 Step 2: Configure {tech} & Predict")
+        
+        forecast_results = []
+        future_labels = []
         start_date = datetime(2026, 1, 1)
-        for i in range(horizon_months):
-            curr_date = start_date + pd.DateOffset(months=i)
-            forecast_months.append(curr_date.strftime("%b-%y"))
 
+        # Logic for each Technique
         if tech == "Simple Average":
-            avg = sum(history_values) / len(history_values)
-            forecast_values = [avg] * horizon_months
+            prediction = sum(history) / len(history)
+            forecast_results = [prediction] * horizon_months
 
         elif tech == "Moving Average":
-            window = st.number_input("Window Size (Months)", 1, 12, 4)
-            avg = sum(history_values[-window:]) / window
-            forecast_values = [avg] * horizon_months
+            window = st.slider("Select Window Size (Months)", 2, 6, 4)
+            prediction = sum(history[-window:]) / window
+            forecast_results = [prediction] * horizon_months
 
         elif tech == "Weightage Average":
-            st.markdown("#### Assign Weights (%)")
             w_cols = st.columns(4)
-            # Default weights matching your Excel (50%, 40%, 5%, 5%)
-            w1 = w_cols[0].number_input("Last Month", value=50) / 100
-            w2 = w_cols[1].number_input("2nd Last", value=40) / 100
-            w3 = w_cols[2].number_input("3rd Last", value=5) / 100
-            w4 = w_cols[3].number_input("4th Last", value=5) / 100
+            # Default weights from your Excel screenshot
+            w1 = w_cols[0].number_input("Weight 1 (Last Month %)", value=50) / 100
+            w2 = w_cols[1].number_input("Weight 2 (2nd Last %)", value=40) / 100
+            w3 = w_cols[2].number_input("Weight 3 (3rd Last %)", value=5) / 100
+            w4 = w_cols[3].number_input("Weight 4 (4th Last %)", value=5) / 100
             
-            w_avg = (history_values[-1]*w1 + history_values[-2]*w2 + history_values[-3]*w3 + history_values[-4]*w4)
-            forecast_values = [w_avg] * horizon_months
+            if (w1 + w2 + w3 + w4) != 1.0:
+                st.warning("⚠️ Total weightage should equal 100% (currently {:.0f}%)".format((w1+w2+w3+w4)*100))
+            
+            prediction = (history[-1]*w1 + history[-2]*w2 + history[-3]*w3 + history[-4]*w4)
+            forecast_results = [prediction] * horizon_months
 
         elif tech == "Seasonal Average":
-            growth = st.number_input("Increase Demand Factor (%)", value=0) / 100
+            growth_factor = st.number_input("Increase Demand Factor (%)", value=0) / 100
             for i in range(horizon_months):
-                idx = i % 12
-                forecast_values.append(history_values[idx] * (1 + growth))
+                source_idx = i % 12
+                val = history[source_idx] * (1 + growth_factor)
+                forecast_results.append(val)
 
-        # Visualization
-        st.subheader("📊 Forecast Chart")
+        # 4. Generate Results and Charts
+        for i in range(horizon_months):
+            curr_date = start_date + pd.DateOffset(months=i)
+            future_labels.append(curr_date.strftime("%b-%y"))
+
+        # Prepare Plot Data
         plot_df = pd.DataFrame({
-            "Period": months_labels + forecast_months,
-            "Type": ["Historical"] * 12 + ["Forecast"] * horizon_months,
-            "Demand": history_values + forecast_values
+            "Period": hist_months + future_labels,
+            "Demand": history + forecast_results,
+            "Category": ["Historical"] * 12 + ["Forecasted"] * horizon_months
         })
-        
-        fig = px.line(plot_df, x="Period", y="Demand", color="Type", markers=True,
-                      title=f"Demand Projection for {selected_part_no}",
-                      color_discrete_map={"Historical": "blue", "Forecast": "red"})
+
+        # Chart
+        fig = px.line(plot_df, x="Period", y="Demand", color="Category", markers=True,
+                      title=f"Demand Forecast Result using {tech}",
+                      color_discrete_map={"Historical": "#1f77b4", "Forecasted": "#d62728"})
         fig.add_vline(x="Dec-25", line_dash="dash", line_color="black")
         st.plotly_chart(fig, use_container_width=True)
 
-        # Output Table
-        with st.expander("📋 View Detailed Forecast Table"):
-            output_df = pd.DataFrame({"Month": forecast_months, "Forecasted Demand": forecast_values})
-            st.dataframe(output_df.style.format({"Forecasted Demand": "{:.2f}"}), use_container_width=True)
+        # Result Table
+        with st.expander("📋 View Forecast Table"):
+            res_df = pd.DataFrame({"Forecast Period": future_labels, "Predicted Demand": forecast_results})
+            st.dataframe(res_df.style.format({"Predicted Demand": "{:.2f}"}), use_container_width=True)
+
+        # Download button
+        csv = res_df.to_csv(index=False).encode('utf-8')
+        st.download_button("📥 Download Forecast Data", data=csv, file_name="inventory_forecast.csv", mime="text/csv")
                     
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
