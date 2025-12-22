@@ -2048,7 +2048,7 @@ class InventoryManagementSystem:
             'Vendor',
             'Daily Cons.', 
             'Current Qty', 
-            'Target Days (Lead Time)', 
+            'RM in Days', 
             'Current Coverage (Days)', 
             'Action Recommendation'
         ]
