@@ -1970,121 +1970,116 @@ class InventoryManagementSystem:
             
     def display_trend_analysis(self, analysis_results):
         """
-        REPLACED: This section now focuses exclusively on Inventory Coverage 
-        and Reorder Points based on actual consumption data.
+        REPLACED: This section now implements the Stock Coverage Report 
+        exactly as requested in the reference image.
         """
-        st.header("📈 Inventory Coverage & Reorder Point Analysis")
+        st.header("📈 Stock Coverage Report")
         df = pd.DataFrame(analysis_results)
         
-        # 1. Calculation Logic for Real Coverage
-        def calculate_inventory_metrics(row):
+        # 1. Define the Categories and Binning Logic
+        categories_order = [
+            "Stock Out Items",
+            "Stock Less Than 3 Days",
+            "Stock 3-7 Days",
+            "Stock 7-15 Days",
+            "Stock 15-30 Days",
+            "Stock 30-90 Days",
+            "Stock 90-180 Days",
+            "Stock 180 - 365 Days",
+            "Stock More than Year",
+            "No Consumption Parts"
+        ]
+
+        def get_coverage_category(row):
             qty = float(row.get('Current Inventory - Qty', 0) or 0)
             cons = float(row.get('AVG CONSUMPTION/DAY', 0) or 0)
-            target_days = float(row.get('RM IN DAYS', 7) or 7)
             
-            # Days of Coverage
-            if cons > 0:
-                coverage_days = qty / cons
-            else:
-                coverage_days = 999  # Infinite coverage if no consumption
+            # Case 1: No consumption defined or zero consumption
+            if cons <= 0:
+                return "No Consumption Parts"
             
-            # Reorder Recommendation Logic
-            if coverage_days == 999:
-                status = "⚪ No Consumption"
-                color = "#f0f2f6"
-            elif coverage_days <= target_days:
-                status = "🔴 REORDER NOW"
-                color = "#ffcccc"
-            elif coverage_days <= (target_days * 1.5):
-                status = "🟡 MONITOR"
-                color = "#fff4cc"
-            else:
-                status = "🟢 SUFFICIENT"
-                color = "#e8f5e8"
-                
-            return pd.Series([coverage_days, status, color])
+            # Case 2: Out of stock
+            if qty <= 0:
+                return "Stock Out Items"
+            
+            # Case 3: Calculate days of coverage
+            days = qty / cons
+            
+            if days < 3: return "Stock Less Than 3 Days"
+            if 3 <= days < 7: return "Stock 3-7 Days"
+            if 7 <= days < 15: return "Stock 7-15 Days"
+            if 15 <= days < 30: return "Stock 15-30 Days"
+            if 30 <= days < 90: return "Stock 30-90 Days"
+            if 90 <= days < 180: return "Stock 90-180 Days"
+            if 180 <= days <= 365: return "Stock 180 - 365 Days"
+            return "Stock More than Year"
 
-        # Apply calculations
-        df[['Coverage_Days', 'Reorder_Status', 'Row_Color']] = df.apply(calculate_inventory_metrics, axis=1)
+        # Apply the logic
+        df['Coverage Category'] = df.apply(get_coverage_category, axis=1)
 
-        # 2. Executive Summary Metrics
-        m1, m2, m3, m4 = st.columns(4)
-        with m1:
-            critical_count = len(df[df['Reorder_Status'] == "🔴 REORDER NOW"])
-            st.metric("Critical Reorders", critical_count, delta_color="inverse")
-        with m2:
-            monitor_count = len(df[df['Reorder_Status'] == "🟡 MONITOR"])
-            st.metric("Monitor Closely", monitor_count)
-        with m3:
-            # Average coverage of parts that actually have consumption
-            avg_cov = df[df['Coverage_Days'] < 999]['Coverage_Days'].mean()
-            st.metric("Avg. System Coverage", f"{avg_cov:.1f} Days")
-        with m4:
-            st.metric("Total Items", len(df))
+        # 2. Generate Summary Table (Matching your image)
+        summary_counts = df['Coverage Category'].value_counts().reindex(categories_order, fill_value=0).reset_index()
+        summary_counts.columns = ['Coverage Category', 'No. of Items']
+        summary_counts.insert(0, 'S.N.', range(1, 11))
+
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.subheader("📋 Summary Table")
+            st.table(summary_counts)
+
+        with col2:
+            st.subheader("📊 Coverage Distribution")
+            # Distinct colors for each bar
+            colors = [
+                '#d62728', '#ff7f0e', '#fdb462', '#e7ba52', '#bcbd22', 
+                '#1f77b4', '#17becf', '#9467bd', '#8c564b', '#7f7f7f'
+            ]
+            
+            fig = px.bar(
+                summary_counts, 
+                x='Coverage Category', 
+                y='No. of Items',
+                color='Coverage Category',
+                color_discrete_sequence=colors,
+                title="Inventory Count by Coverage Bucket",
+                text='No. of Items'
+            )
+            fig.update_layout(showlegend=False, xaxis_tickangle=-45)
+            st.plotly_chart(fig, use_container_width=True)
 
         st.markdown("---")
 
-        # 3. Comprehensive Analysis Table
-        st.subheader("📋 Inventory Coverage Details")
+        # 3. Critical Parts Lists (Drill-down)
+        st.subheader("🚨 Critical Shortage Lists")
         
-        # Prepare display dataframe
-        display_df = df[[
-            'PART NO', 
-            'PART DESCRIPTION', 
-            'Vendor Name',
-            'AVG CONSUMPTION/DAY', 
-            'Current Inventory - Qty', 
-            'RM IN DAYS', 
-            'Coverage_Days', 
-            'Reorder_Status'
-        ]].copy()
+        # Part List for Stock Less Than 3 Days
+        short_parts = df[df['Coverage Category'] == "Stock Less Than 3 Days"]
+        with st.expander(f"🔴 Parts with Stock Less Than 3 Days ({len(short_parts)} Items)", expanded=True):
+            if not short_parts.empty:
+                display_df = short_parts[['PART NO', 'PART DESCRIPTION', 'Vendor Name', 'AVG CONSUMPTION/DAY', 'Current Inventory - Qty']]
+                # Calculate exact coverage days for this view
+                display_df['Coverage (Days)'] = (display_df['Current Inventory - Qty'] / display_df['AVG CONSUMPTION/DAY']).round(1)
+                st.dataframe(display_df, use_container_width=True)
+            else:
+                st.success("No parts are currently in the 'Less than 3 Days' bucket.")
 
-        # Format columns for readability
-        display_df['Coverage_Days'] = display_df['Coverage_Days'].apply(lambda x: "∞" if x == 999 else f"{x:.1f}")
-        
-        display_df.columns = [
-            'Part No', 
-            'Description', 
-            'Vendor',
-            'Daily Cons.', 
-            'Current Qty', 
-            'RM in Days', 
-            'Current Coverage (Days)', 
-            'Action Recommendation'
-        ]
+        # Part List for Stock Out
+        stock_out = df[df['Coverage Category'] == "Stock Out Items"]
+        with st.expander(f"⚫ Stock Out Items ({len(stock_out)} Items)"):
+            if not stock_out.empty:
+                st.dataframe(stock_out[['PART NO', 'PART DESCRIPTION', 'Vendor Name', 'AVG CONSUMPTION/DAY']], use_container_width=True)
+            else:
+                st.success("Great! No items are currently out of stock.")
 
-        # Styling function for the Action column
-        def style_action_col(val):
-            if "REORDER" in str(val): return 'background-color: #ffcccc; color: #990000; font-weight: bold;'
-            if "MONITOR" in str(val): return 'background-color: #fff4cc; color: #996600;'
-            if "SUFFICIENT" in str(val): return 'background-color: #e8f5e8; color: #006600;'
-            return ''
-
-        st.dataframe(
-            display_df.style.applymap(style_action_col, subset=['Action Recommendation']),
-            use_container_width=True,
-            height=500
+        # Export Button specifically for this report
+        csv = summary_counts.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "📥 Download Stock Coverage Summary",
+            data=csv,
+            file_name="stock_coverage_report.csv",
+            mime="text/csv"
         )
-
-        # 4. Coverage Distribution Chart
-        st.subheader("📊 Coverage Visualization")
-        fig = px.bar(
-            df[df['Coverage_Days'] < 100], # Filter out infinite/extreme values for better chart scaling
-            x='PART NO',
-            y='Coverage_Days',
-            color='Reorder_Status',
-            title="Days of Inventory Remaining by Part (Zoomed to < 100 days)",
-            color_discrete_map={
-                "🔴 REORDER NOW": "#F44336",
-                "🟡 MONITOR": "#FF9800",
-                "🟢 SUFFICIENT": "#4CAF50",
-                "⚪ No Consumption": "#9E9E9E"
-            },
-            labels={'Coverage_Days': 'Days Remaining', 'PART NO': 'Part Number'}
-        )
-        # Add a target line for reference
-        fig.add_hline(y=df['RM IN DAYS'].median(), line_dash="dot", annotation_text="Avg Target Days", line_color="black")
-        st.plotly_chart(fig, use_container_width=True)
                     
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
