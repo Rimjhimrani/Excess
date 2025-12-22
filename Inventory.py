@@ -1284,23 +1284,35 @@ class InventoryManagementSystem:
                     st.success(f"✅ Sample inventory data loaded and locked: {len(sample_data)} parts")
                     st.rerun()
     def run(self):
-        st.title("📊 Inventory Analyzer")
+        st.title("📊 Inventory Analyzer & Forecaster")
         st.markdown(
             "<p style='font-size:18px; font-style:italic;'>Designed and Developed by Agilomatrix</p>",
             unsafe_allow_html=True
         )
         st.markdown("---")
 
+        # Sidebar Navigation
+        menu = st.sidebar.radio("Navigation", ["Home & Data Management", "Inventory Analysis", "Demand Forecasting"])
+
         # Authenticate user
         self.authenticate_user()
 
-        # Show UI based on role
-        if st.session_state.user_role == "Admin":
-            self.admin_data_management()
-        elif st.session_state.user_role == "User":
-            self.user_inventory_upload()
-        else:
+        if st.session_state.user_role is None:
             st.info("👋 Please select your role and authenticate to access the system.")
+            return
+
+        if menu == "Home & Data Management":
+            if st.session_state.user_role == "Admin":
+                self.admin_data_management()
+            else:
+                self.user_inventory_upload()
+        
+        elif menu == "Inventory Analysis":
+            if st.session_state.user_role in ["Admin", "User"]:
+                self.display_analysis_interface()
+                
+        elif menu == "Demand Forecasting":
+            self.display_forecasting_module()
     
     def display_validation_results(self, validation_result):
         """Display inventory validation results"""
