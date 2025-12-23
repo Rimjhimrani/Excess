@@ -2080,123 +2080,117 @@ class InventoryManagementSystem:
 
     def display_forecasting_module(self):
         """
-        NEW MODULE: Demand Forecasting
-        Implements Simple, Moving, Weighted, and Seasonal methods.
+        UPDATED MODULE: Demand Forecasting & Inventory Planning
+        Calculates Forecasted Demand, Safety Stock, and Reorder Points using 
+        standard inventory management formulas.
         """
-        st.header("🔮 Demand Forecasting Dashboard")
-        st.markdown('<div class="graph-description">Select a forecasting technique and horizon to predict future inventory demand based on historical data.</div>', unsafe_allow_html=True)
+        st.header("🔮 Demand Forecasting & Inventory Planning")
+        st.markdown('<div class="graph-description">This module uses historical demand to calculate future requirements and critical inventory replenishment triggers (Safety Stock & ROP).</div>', unsafe_allow_html=True)
 
-        # 1. Forecasting Configuration (The Selection Boxes)
-        st.subheader("⚙️ Forecast Configuration")
-        col1, col2, col3 = st.columns(3)
+        # 1. Scientific Configuration
+        st.subheader("⚙️ Planning Parameters")
+        col1, col2, col3, col4 = st.columns(4)
         
         with col1:
             tech = st.selectbox(
-                "1. Select Forecasting Technique",
-                ["Simple Average", "Moving Average", "Weightage Average", "Seasonal Average"],
-                help="Choose the mathematical model for prediction."
+                "Forecasting Technique",
+                ["Moving Average", "Simple Average", "Weighted Average"],
+                help="Mathematical model for the 'Expected Demand'."
             )
-            
-            # Brief Descriptions (from your Excel)
-            descriptions = {
-                "Simple Average": "Uses the mean of all past data points.",
-                "Moving Average": "Uses the average of the most recent specific period.",
-                "Weightage Average": "Applies specific weights to recent months (e.g., 50% for last month).",
-                "Seasonal Average": "Repeat previous year patterns with a growth factor."
-            }
-            st.caption(f"**Brief Description:** {descriptions[tech]}")
-
         with col2:
-            horizon_map = {
-                "One Month": 1, "Three Month ( Quarter )": 3, "Six Month": 6,
-                "Twelve Month ( Year )": 12, "3 Year": 36, "5 Year": 60
-            }
-            selected_horizon = st.selectbox("2. Select Forecast Horizon", list(horizon_map.keys()), index=1)
-            horizon_months = horizon_map[selected_horizon]
-            
+            lead_time = st.number_input("Lead Time (Months)", min_value=0.5, value=1.0, step=0.5, 
+                                        help="Time between placing an order and receiving it.")
         with col3:
-            period_type = st.selectbox("3. Available Data Type", ["Month", "Day", "Year"], index=0)
+            service_level = st.selectbox("Desired Service Level", [0.90, 0.95, 0.98, 0.99], index=1,
+                                         help="Probability of not having a stock-out (95% is standard).")
+            # Z-Score Mapping
+            z_map = {0.90: 1.28, 0.95: 1.65, 0.98: 2.05, 0.99: 2.33}
+            z_score = z_map[service_level]
+        with col4:
+            horizon = st.slider("Forecast Horizon (Months)", 1, 12, 6)
 
         st.markdown("---")
 
-        # 2. Historical Data Entry (Default values from your Jan-Dec 2025 Excel)
-        st.subheader(f"📅 Step 1: Input Historical Demand (Past 12 {period_type}s)")
+        # 2. Historical Data Input
+        st.subheader("📅 Step 1: Historical Demand (Last 12 Months)")
+        hist_months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        default_vals = [250, 265, 320, 220, 260, 280, 255, 270, 290, 240, 260, 275]
         
-        hist_months = ["Jan-25", "Feb-25", "Mar-25", "Apr-25", "May-25", "Jun-25", 
-                       "Jul-25", "Aug-25", "Sep-25", "Oct-25", "Nov-25", "Dec-25"]
-        # Default demand values from your screenshot
-        default_vals = [25, 26, 32, 22, 26, 26, 26, 26, 26, 26, 26, 26]
-        
-        # Using data_editor so user can change historical data easily
-        hist_df = pd.DataFrame({"Period": hist_months, "Historical Demand": default_vals})
+        hist_df = pd.DataFrame({"Month": hist_months, "Demand": default_vals})
         edited_hist = st.data_editor(hist_df, use_container_width=True, hide_index=True)
-        history = edited_hist["Historical Demand"].tolist()
+        history = np.array(edited_hist["Demand"].tolist())
 
-        # 3. Method-Specific Settings
-        st.subheader(f"🧮 Step 2: Configure {tech} & Predict")
+        # 3. Formula-Based Calculations
+        # A. Calculate Base Demand (d)
+        if tech == "Moving Average":
+            expected_demand = history[-4:].mean()
+        elif tech == "Weighted Average":
+            expected_demand = (history[-1]*0.5 + history[-2]*0.3 + history[-3]*0.2)
+        else:
+            expected_demand = history.mean()
+
+        # B. Calculate Demand Variability (Standard Deviation - σ)
+        std_dev = np.std(history)
         
-        forecast_results = []
-        future_labels = []
-        start_date = datetime(2026, 1, 1)
+        # C. Safety Stock Formula: SS = Z * σ * √L
+        safety_stock = z_score * std_dev * np.sqrt(lead_time)
+        
+        # D. Reorder Point (ROP) Formula: ROP = (d * L) + SS
+        reorder_point = (expected_demand * lead_time) + safety_stock
 
-        # Logic for each Technique
-        if tech == "Simple Average":
-            prediction = sum(history) / len(history)
-            forecast_results = [prediction] * horizon_months
+        # E. Coefficient of Variation (CV) for Predictability
+        cv = (std_dev / history.mean()) if history.mean() > 0 else 0
 
-        elif tech == "Moving Average":
-            window = st.slider("Select Window Size (Months)", 2, 6, 4)
-            prediction = sum(history[-window:]) / window
-            forecast_results = [prediction] * horizon_months
+        # 4. Display Results
+        st.subheader("📊 Planning Results")
+        res_col1, res_col2, res_col3, res_col4 = st.columns(4)
+        
+        with res_col1:
+            st.metric("Forecasted Monthly Demand", f"{expected_demand:.2f} units")
+        with res_col2:
+            st.metric("Safety Stock (Buffer)", f"{safety_stock:.2f} units", 
+                      help="Extra stock to handle demand spikes and lead time delays.")
+        with res_col3:
+            st.metric("Reorder Point (ROP)", f"{reorder_point:.2f} units",
+                      help="When inventory hits this level, place a new order.")
+        with res_col4:
+            cv_status = "Stable" if cv < 0.2 else "Volatile"
+            st.metric("Demand Stability (CV)", f"{cv:.2f}", delta=cv_status, delta_color="inverse")
 
-        elif tech == "Weightage Average":
-            w_cols = st.columns(4)
-            # Default weights from your Excel screenshot
-            w1 = w_cols[0].number_input("Weight 1 (Last Month %)", value=50) / 100
-            w2 = w_cols[1].number_input("Weight 2 (2nd Last %)", value=40) / 100
-            w3 = w_cols[2].number_input("Weight 3 (3rd Last %)", value=5) / 100
-            w4 = w_cols[3].number_input("Weight 4 (4th Last %)", value=5) / 100
-            
-            if (w1 + w2 + w3 + w4) != 1.0:
-                st.warning("⚠️ Total weightage should equal 100% (currently {:.0f}%)".format((w1+w2+w3+w4)*100))
-            
-            prediction = (history[-1]*w1 + history[-2]*w2 + history[-3]*w3 + history[-4]*w4)
-            forecast_results = [prediction] * horizon_months
-
-        elif tech == "Seasonal Average":
-            growth_factor = st.number_input("Increase Demand Factor (%)", value=0) / 100
-            for i in range(horizon_months):
-                source_idx = i % 12
-                val = history[source_idx] * (1 + growth_factor)
-                forecast_results.append(val)
-
-        # 4. Generate Results and Charts
-        for i in range(horizon_months):
-            curr_date = start_date + pd.DateOffset(months=i)
-            future_labels.append(curr_date.strftime("%b-%y"))
-
-        # Prepare Plot Data
+        # Visualizing the Inventory Planning
+        future_labels = [f"Month +{i+1}" for i in range(horizon)]
+        forecast_values = [expected_demand] * horizon
+        
         plot_df = pd.DataFrame({
-            "Period": hist_months + future_labels,
-            "Demand": history + forecast_results,
-            "Category": ["Historical"] * 12 + ["Forecasted"] * horizon_months
+            "Period": list(hist_months) + future_labels,
+            "Values": list(history) + forecast_values,
+            "Type": ["Historical"] * 12 + ["Forecasted"] * horizon
         })
 
-        # Chart
-        fig = px.line(plot_df, x="Period", y="Demand", color="Category", markers=True,
-                      title=f"Demand Forecast Result using {tech}",
-                      color_discrete_map={"Historical": "#1f77b4", "Forecasted": "#d62728"})
-        fig.add_vline(x="Dec-25", line_dash="dash", line_color="black")
+        fig = px.line(plot_df, x="Period", y="Values", color="Type", markers=True,
+                      title="Inventory Demand Projection & Safety Thresholds")
+        
+        # Add Safety Lines
+        fig.add_hline(y=reorder_point, line_dash="dash", line_color="red", 
+                      annotation_text=f"ROP: {reorder_point:.0f}")
+        fig.add_hline(y=safety_stock, line_dash="dot", line_color="orange", 
+                      annotation_text=f"Safety Stock: {safety_stock:.0f}")
+        
         st.plotly_chart(fig, use_container_width=True)
 
-        # Result Table
-        with st.expander("📋 View Forecast Table"):
-            res_df = pd.DataFrame({"Forecast Period": future_labels, "Predicted Demand": forecast_results})
-            st.dataframe(res_df.style.format({"Predicted Demand": "{:.2f}"}), use_container_width=True)
+        # Formula Transparency
+        with st.expander("📝 View Applied Formulas"):
+            st.latex(r"Safety \ Stock (SS) = Z \times \sigma_{demand} \times \sqrt{Lead \ Time}")
+            st.latex(r"Reorder \ Point (ROP) = (Average \ Demand \times Lead \ Time) + SS")
+            st.info(f"Using Z-Score of {z_score} for {service_level*100}% service level.")
 
-        # Download button
-        csv = res_df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download Forecast Data", data=csv, file_name="inventory_forecast.csv", mime="text/csv")
+        # Download Table
+        final_table = pd.DataFrame({
+            "Metric": ["Avg Demand", "Standard Deviation", "Safety Stock", "Reorder Point", "Lead Time Used"],
+            "Value": [expected_demand, std_dev, safety_stock, reorder_point, lead_time]
+        })
+        st.download_button("📥 Download Planning Data", data=final_table.to_csv(index=False), 
+                           file_name="inventory_planning.csv")
                     
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
