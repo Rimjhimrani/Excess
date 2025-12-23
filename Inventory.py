@@ -2080,132 +2080,129 @@ class InventoryManagementSystem:
 
     def display_forecasting_module(self):
         """
-        UPDATED MODULE: Demand Forecasting (Excel Logic)
-        Implements: Simple Average, Moving Average, Weightage Average, and Seasonal
+        UPDATED MODULE: Demand Forecasting from Uploaded File
+        Format: [Part No, Description, Month, Consumption]
         """
-        st.header("🔮 Demand Forecasting Dashboard")
-        st.markdown('<div class="graph-description">Upload your historical demand and select a forecasting method to project future requirements.</div>', unsafe_allow_html=True)
+        st.header("🔮 Item-Wise Demand Forecasting")
+        st.markdown('<div class="graph-description">Upload your consumption history file to generate part-specific projections.</div>', unsafe_allow_html=True)
 
-        # 1. DATA UPLOAD SECTION
-        st.subheader("📁 Step 1: Upload Historical Demand")
-        uploaded_file = st.file_uploader("Upload CSV or Excel with 'Month' and 'Demand' columns", type=['csv', 'xlsx'])
+        # 1. FILE UPLOAD
+        st.subheader("📁 Step 1: Upload Consumption Data")
+        uploaded_file = st.file_uploader("Upload File (Part No, Description, Month, Consumption)", type=['csv', 'xlsx'])
         
-        # Fallback to manual entry if no file is uploaded
-        if uploaded_file:
-            try:
-                if uploaded_file.name.endswith('.csv'):
-                    df_input = pd.read_csv(uploaded_file)
-                else:
-                    df_input = pd.read_excel(uploaded_file)
-                st.success("✅ File uploaded successfully!")
-            except Exception as e:
-                st.error(f"Error reading file: {e}")
-                return
-        else:
-            st.info("💡 No file uploaded. Using editable sample data below.")
-            # Default values from your Excel image
-            sample_data = {
-                "Month": ["Jan-25", "Feb-25", "Mar-25", "Apr-25", "May-25", "Jun-25", "Jul-25", "Aug-25", "Sep-25", "Oct-25", "Nov-25", "Dec-25"],
-                "Demand": [25, 26, 32, 22, 0, 0, 0, 0, 0, 0, 0, 0] # User fills remaining
+        if uploaded_file is None:
+            st.info("👋 Please upload a file to begin. The file should contain columns: 'Part No', 'Month', and 'Consumption'.")
+            return
+
+        try:
+            if uploaded_file.name.endswith('.csv'):
+                df = pd.read_csv(uploaded_file)
+            else:
+                df = pd.read_excel(uploaded_file)
+            
+            # Standardize Column Names (Handling case sensitivity/spaces)
+            df.columns = [str(c).strip().title() for c in df.columns]
+            rename_map = {
+                'Part No': 'Part_No', 'Partno': 'Part_No', 'Material': 'Part_No',
+                'Consumption': 'Consumption', 'Qty': 'Consumption', 'Demand': 'Consumption',
+                'Month': 'Month', 'Date': 'Month'
             }
-            df_input = pd.DataFrame(sample_data)
+            df = df.rename(columns=rename_map)
 
-        # Allow user to edit data directly in the app
-        edited_df = st.data_editor(df_input, use_container_width=True, hide_index=True)
-        
-        # Ensure we have clean numeric data
-        history = [self.safe_float_convert(x) for x in edited_df["Demand"].tolist()]
-        # We assume first 4 months are 'History' and the rest are to be 'Forecasted'
-        # Or if the user wants to project 12 months ahead:
-        
-        # 2. CONFIGURATION SECTION
+            # Convert Consumption to float
+            df['Consumption'] = df['Consumption'].apply(self.safe_float_convert)
+            
+            st.success(f"✅ Loaded {len(df)} rows of consumption data.")
+        except Exception as e:
+            st.error(f"❌ Error reading file: {e}")
+            return
+
+        # 2. PART SELECTION
         st.markdown("---")
-        st.subheader("⚙️ Step 2: Select Forecasting Technique")
+        part_list = df['Part_No'].unique().tolist()
+        selected_part = st.selectbox("🎯 Select Part No to Forecast", part_list)
+
+        # Filter data for selected part
+        part_data = df[df['Part_No'] == selected_part].copy()
+        
+        # Display small preview of history
+        with st.expander("📋 View Historical Data for this Part"):
+            st.dataframe(part_data, use_container_width=True, hide_index=True)
+
+        # 3. FORECAST CONFIGURATION
+        st.subheader("⚙️ Step 2: Configure Forecast")
         col1, col2 = st.columns(2)
         
         with col1:
             method = st.selectbox(
-                "Choose Method", 
-                ["Simple Average", "Moving Average", "Weightage Average", "Seasonal"],
-                help="Matches the logic from the Excel reference image."
+                "Choose Forecasting Technique", 
+                ["Simple Average", "Moving Average", "Weightage Average", "Seasonal"]
             )
-
+        
+        history = part_data['Consumption'].tolist()
         forecast_results = []
         
-        # 3. APPLY FORMULAS
+        # 4. APPLY FORMULAS
         if method == "Simple Average":
-            # Formula: Average of all non-zero historical months
-            hist_only = [x for x in history if x > 0]
-            avg_val = sum(hist_only) / len(hist_only) if hist_only else 0
-            forecast_results = [round(avg_val, 0)] * 12
+            avg_val = sum(history) / len(history) if history else 0
+            forecast_results = [round(avg_val, 2)] * 12
 
         elif method == "Moving Average":
-            # Formula: Average of the last 4 months
-            window = 4
-            hist_only = [x for x in history if x > 0]
-            if len(hist_only) >= window:
-                mov_avg = sum(hist_only[-window:]) / window
+            # Average of last 4 records
+            if len(history) >= 4:
+                mov_avg = sum(history[-4:]) / 4
             else:
-                mov_avg = sum(hist_only) / len(hist_only) if hist_only else 0
-            forecast_results = [round(mov_avg, 0)] * 12
+                mov_avg = sum(history) / len(history) if history else 0
+            forecast_results = [round(mov_avg, 2)] * 12
 
         elif method == "Weightage Average":
-            # Formula: (M1*W1) + (M2*W2) + (M3*W3) + (M4*W4)
-            st.markdown("**Set Weights (Must total 100%)**")
+            st.write("**Weights (Excel Style: 5%, 5%, 40%, 50%)**")
             w_cols = st.columns(4)
-            # Default weights from your image: 5%, 5%, 40%, 50%
-            w1 = w_cols[0].number_input("W1 (Oldest %)", value=5) / 100
-            w2 = w_cols[1].number_input("W2 (%)", value=5) / 100
-            w3 = w_cols[2].number_input("W3 (%)", value=40) / 100
-            w4 = w_cols[3].number_input("W4 (Latest %)", value=50) / 100
+            w1 = w_cols[0].number_input("W1 (Oldest)", value=5) / 100
+            w2 = w_cols[1].number_input("W2", value=5) / 100
+            w3 = w_cols[2].number_input("W3", value=40) / 100
+            w4 = w_cols[3].number_input("W4 (Latest)", value=50) / 100
             
-            hist_only = [x for x in history if x > 0]
-            if len(hist_only) >= 4:
-                weight_val = (hist_only[-4]*w1) + (hist_only[-3]*w2) + (hist_only[-2]*w3) + (hist_only[-1]*w4)
+            if len(history) >= 4:
+                weight_val = (history[-4]*w1) + (history[-3]*w2) + (history[-2]*w3) + (history[-1]*w4)
             else:
-                weight_val = sum(hist_only) / len(hist_only) if hist_only else 0
-            forecast_results = [round(weight_val, 0)] * 12
+                weight_val = sum(history) / len(history) if history else 0
+            forecast_results = [round(weight_val, 2)] * 12
 
         elif method == "Seasonal":
-            # Formula: Last Year Data * (1 + Demand Factor)
             factor = st.number_input("Increase Demand Factor (%)", value=0) / 100
-            # Projects the full next year based on current year values
-            forecast_results = [round(x * (1 + factor), 0) for x in history]
+            # If we have 12 months, repeat them. If less, repeat what we have.
+            if len(history) >= 12:
+                forecast_results = [round(x * (1 + factor), 2) for x in history[-12:]]
+            else:
+                # Pad with zeros if less than 12 months for seasonality
+                temp_hist = history + ([0] * (12 - len(history)))
+                forecast_results = [round(x * (1 + factor), 2) for x in temp_hist]
 
-        # 4. DISPLAY RESULTS
+        # 5. VISUALIZATION & EXPORT
         st.markdown("---")
-        st.subheader(f"📊 {method} Projection Results")
+        st.subheader(f"📊 {method} Projection for {selected_part}")
         
-        # Create output dataframe
-        future_months = [
-            "Jan-26", "Feb-26", "Mar-26", "Apr-26", "May-26", "Jun-26", 
-            "Jul-26", "Aug-26", "Sep-26", "Oct-26", "Nov-26", "Dec-26"
-        ]
+        # Labels for next 12 months
+        future_months = [f"Next Month {i+1}" for i in range(12)]
         
-        res_df = pd.DataFrame({
-            "Month": future_months,
-            "Forecasted Demand": forecast_results
+        # Chart Data
+        plot_df = pd.DataFrame({
+            "Period": [f"Month {i+1}" for i in range(len(history))] + future_months,
+            "Consumption": history + forecast_results,
+            "Type": ["Historical"] * len(history) + ["Forecasted"] * 12
         })
 
-        # Chart Visualization
-        full_plot_df = pd.DataFrame({
-            "Month": edited_df["Month"].tolist() + future_months,
-            "Demand": history + forecast_results,
-            "Status": ["Historical"] * 12 + ["Forecasted"] * 12
-        })
-
-        fig = px.bar(full_plot_df, x="Month", y="Demand", color="Status", 
-                     title=f"Inventory Demand: {method} Calculation",
-                     color_discrete_map={"Historical": "#1f77b4", "Forecasted": "#ff7f0e"})
+        fig = px.line(plot_df, x="Period", y="Consumption", color="Type", markers=True,
+                      title=f"Forecast Trend: {selected_part}",
+                      color_discrete_map={"Historical": "#1f77b4", "Forecasted": "#ef553b"})
         st.plotly_chart(fig, use_container_width=True)
 
-        # Show Table and Download
-        col_table, col_dl = st.columns([2, 1])
-        with col_table:
-            st.dataframe(res_df, use_container_width=True, hide_index=True)
-        with col_dl:
-            csv = res_df.to_csv(index=False).encode('utf-8')
-            st.download_button("📥 Download Forecast", data=csv, file_name=f"forecast_{method.lower()}.csv")
+        # Download Result
+        res_df = pd.DataFrame({"Part No": selected_part, "Month": future_months, "Forecasted_Qty": forecast_results})
+        csv = res_df.to_csv(index=False).encode('utf-8')
+        st.download_button(f"📥 Download Forecast for {selected_part}", data=csv, 
+                           file_name=f"Forecast_{selected_part}_{method.replace(' ','_')}.csv")
                     
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
