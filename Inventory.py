@@ -1300,7 +1300,7 @@ class InventoryManagementSystem:
         cust_logo = st.session_state.get('customer_logo')
     
         # Path to Agilomatrix Logo (Local file)
-        agilo_logo_path = 'agilomatrix_logo.png' 
+        agilo_logo_path = 'https://github.com/Rimjhimrani/Excess/blob/main/Image.png' 
 
         prs = Presentation()
 
