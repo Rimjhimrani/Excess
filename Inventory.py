@@ -2174,7 +2174,7 @@ class InventoryManagementSystem:
         with col4:
             if st.button("🚀 Generate PPT Report"):
                 with st.spinner("Creating PowerPoint presentation..."):
-                    ppt_data = self.generate_automated_ppt(analysis_results)
+                    ppt_data = self.generate_powerpoint(analysis_results)
                     st.download_button(
                         label="📥 Download PowerPoint",
                         data=ppt_data,
