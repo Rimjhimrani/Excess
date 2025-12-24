@@ -1826,6 +1826,7 @@ class InventoryManagementSystem:
             if col not in available_columns and len(available_columns) < 10:
                 available_columns.append(col)
         return available_columns # Limit to 10 c
+        
     def generate_powerpoint(self, analysis_results, business_unit, inventory_date):
         """
         Generates a PPT matching the provided UI layout (8 Pages)
@@ -2159,7 +2160,7 @@ class InventoryManagementSystem:
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
         st.header("📥 Export & Reporting Options")
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4) # Added a 4th column
         with col1:
             if st.button("📊 Export Full Analysis", type="primary"):
                 self.export_comprehensive_report(analysis_results)
@@ -2169,7 +2170,17 @@ class InventoryManagementSystem:
         with col3:
             if st.button("📈 Export Executive Summary"):
                 self.export_executive_summary(analysis_results)
-        # Export format options
+        # --- NEW: PPT AUTOMATION BUTTON ---
+        with col4:
+            if st.button("🚀 Generate PPT Report"):
+                with st.spinner("Creating PowerPoint presentation..."):
+                    ppt_data = self.generate_automated_ppt(analysis_results)
+                    st.download_button(
+                        label="📥 Download PowerPoint",
+                        data=ppt_data,
+                        file_name=f"Inventory_Analysis_{datetime.now().strftime('%Y%m%d')}.pptx",
+                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    )
         st.subheader("Export Format Options")
         export_format = st.selectbox(
             "Select Export Format",
@@ -2178,6 +2189,7 @@ class InventoryManagementSystem:
         if st.button("🎯 Custom Export"):
             self.export_custom_format(analysis_results, export_format)
             
+    
     def export_comprehensive_report(self, analysis_results):
         """Export comprehensive analysis report"""
         try:
