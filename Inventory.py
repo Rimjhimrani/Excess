@@ -1559,28 +1559,30 @@ class InventoryManagementSystem:
             st.code(str(e))
 
     def display_enhanced_export_options(self, analysis_results):
-        """Allow users to export the analysis results"""
         st.subheader("📤 Export Analysis Results")
         df = pd.DataFrame(analysis_results)
-        # Export to CSV
-        csv_buffer = io.StringIO()
-        df.to_csv(csv_buffer, index=False)
-        st.download_button(
-            label="📄 Download CSV",
-            data=csv_buffer.getvalue(),
-            file_name="inventory_analysis.csv",
-            mime="text/csv"
-        )
-        # Export to Excel
+        
+        col1, col2, col3 = st.columns(3)
+        
+        # 1. Existing Excel Export
         excel_buffer = io.BytesIO()
         with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
             df.to_excel(writer, index=False, sheet_name='Analysis')
-        st.download_button(
-            label="📊 Download Excel",
-            data=excel_buffer.getvalue(),
-            file_name="inventory_analysis.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        col1.download_button("📊 Download Excel", data=excel_buffer.getvalue(), file_name="inventory_analysis.xlsx")
+        
+        # 2. Existing CSV Export
+        csv_data = df.to_csv(index=False).encode('utf-8')
+        col2.download_button("📄 Download CSV", data=csv_data, file_name="inventory_analysis.csv")
+        
+        # 3. NEW PPT EXPORT
+        if col3.button("📑 Generate PPT Report (MINR)"):
+            ppt_file = self.generate_ppt_report(analysis_results)
+            st.download_button(
+                label="📥 Click to Download PPT",
+                data=ppt_file,
+                file_name=f"Inventory_Analyzer_Report_{datetime.now().strftime('%Y%m%d')}.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            )
         
     def display_enhanced_summary_metrics(self, analysis_results):
         """Enhanced summary metrics dashboard - Fixed Width Issues"""
