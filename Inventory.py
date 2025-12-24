@@ -1430,13 +1430,6 @@ class InventoryManagementSystem:
         st.title("📊 Inventory Analyzer")
         st.markdown("<p style='font-size:18px; font-style:italic;'>Designed and Developed by Agilomatrix</p>", unsafe_allow_html=True)
         
-        # --- NEW REPORT METADATA INPUTS ---
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("📋 Report Metadata")
-        st.session_state.biz_unit = st.sidebar.text_input("Business Unit", value="P4 Bus Plant")
-        st.session_state.pfep_ref = st.sidebar.text_input("PFEP Reference", value="REF-2025-001")
-        st.session_state.inv_date_input = st.sidebar.date_input("Inventory Date", value=datetime.now())
-        
         # Original run logic...
         self.authenticate_user()
         if st.session_state.user_role == "Admin":
@@ -1445,7 +1438,14 @@ class InventoryManagementSystem:
             self.user_inventory_upload()
         else:
             st.info("👋 Please select your role and authenticate to access the system.")
-    
+            
+        # --- NEW REPORT METADATA INPUTS ---
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("📋 Report Metadata")
+        st.session_state.biz_unit = st.sidebar.text_input("Business Unit", value="P4 Bus Plant")
+        st.session_state.pfep_ref = st.sidebar.text_input("PFEP Reference", value="REF-2025-001")
+        st.session_state.inv_date_input = st.sidebar.date_input("Inventory Date", value=datetime.now())
+
     def display_validation_results(self, validation_result):
         """Display inventory validation results"""
         st.markdown("**📋 Validation Results**")
