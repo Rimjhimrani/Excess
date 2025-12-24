@@ -1291,35 +1291,62 @@ class InventoryManagementSystem:
                     st.rerun()
 
     def generate_ppt_report(self, analysis_results):
-        """Generates the full 8-page PPT report exactly matching the image layout."""
         df = pd.DataFrame(analysis_results)
-        
-        # Metadata from session state
-        biz_unit = st.session_state.get('biz_unit', 'P4 Bus Plant')
-        pfep_ref = st.session_state.get('pfep_ref', 'N/A')
+    
+        # Metadata from tool inputs
+        biz_unit = st.session_state.get('biz_unit', '').upper()
+        pfep_ref = st.session_state.get('pfep_ref', '').upper()
         inv_date = st.session_state.get('inv_date_input', datetime.now()).strftime('%d-%m-%Y')
-        tolerance = st.session_state.get('admin_tolerance', 30)
-        ideal_days = st.session_state.get('user_preferences', {}).get('ideal_inventory_days', 30)
+        cust_logo = st.session_state.get('customer_logo')
+    
+        # Path to Agilomatrix Logo (Local file)
+        agilo_logo_path = 'agilomatrix_logo.png' 
 
         prs = Presentation()
 
-        def add_logos_and_headers(slide, pg_num):
-            # Page Label (Top Left)
-            slide.shapes.add_textbox(Inches(0.2), Inches(0.1), Inches(1), Inches(0.3)).text = f"Page {pg_num}"
-            # Customer Logo (Top Right)
-            tx_cust = slide.shapes.add_textbox(Inches(7.5), Inches(0.2), Inches(2), Inches(0.5))
-            tx_cust.text = "Customer Logo"
-            # Agilomatrix Logo (Bottom Right)
-            tx_agilo = slide.shapes.add_textbox(Inches(7.5), Inches(7), Inches(2), Inches(0.5))
-            tx_agilo.text = "Agilomatrix Logo"
+        def add_logos(slide):
+            # 1. Top Right Logo (Customer)
+            if cust_logo:
+                slide.shapes.add_picture(cust_logo, Inches(8.0), Inches(0.2), height=Inches(0.6))
+        
+            # 2. Bottom Right Logo (Agilomatrix)
+            try:
+                slide.shapes.add_picture(agilo_logo_path, Inches(7.5), Inches(6.8), height=Inches(0.7))
+            except:
+                # Fallback if image path is not found
+                tx = slide.shapes.add_textbox(Inches(7.5), Inches(7.0), Inches(2), Inches(0.5))
+                tx.text = "AGILOMATRIX"
 
-        # --- PAGE 1: COVER PAGE ---
-        slide1 = prs.slides.add_slide(prs.slide_layouts[6]); add_logos_and_headers(slide1, 1)
-        rows = [("Heading", "Inventory Analyzer"), ("Business Unit", biz_unit), ("PFEP Reference", pfep_ref), ("Inventory Date", inv_date)]
-        y = 1.5
-        for lbl, val in rows:
-            tb = slide1.shapes.add_textbox(Inches(1), Inches(y), Inches(6), Inches(0.5))
-            tb.text = f"{lbl.ljust(20)} {val}"; y += 0.8
+        # --- PAGE 1: COVER PAGE (MATCHING SCREENSHOT) ---
+        slide1 = prs.slides.add_slide(prs.slide_layouts[6])
+        add_logos(slide1)
+
+        # Main Title
+        title_box = slide1.shapes.add_textbox(Inches(0), Inches(1.8), Inches(10), Inches(1))
+        tf = title_box.text_frame
+        tf.text = "INVENTORY ANALYSER"
+        p = tf.paragraphs[0]
+        p.alignment = PP_ALIGN.CENTER
+        p.font.size = Pt(44)
+        p.font.bold = True
+        p.font.name = 'Arial'
+
+        # Metadata Labels and Values
+        labels = [
+            f"BUSINESS UNIT:   {biz_unit}",
+            f"PFEP REFERENCE:  {pfep_ref}",
+            f"INVENTORY DATE:  {inv_date}"
+        ]
+    
+        y_pos = 3.8
+        for text in labels:
+            tb = slide1.shapes.add_textbox(Inches(3.5), Inches(y_pos), Inches(6), Inches(0.5))
+            tf = tb.text_frame
+            p = tf.add_paragraph()
+            p.text = text
+            p.font.size = Pt(24)
+            p.font.name = 'Arial'
+            y_pos += 0.8
 
         # --- PAGE 2: KPI METRICS (DAYS & MINR) ---
         slide2 = prs.slides.add_slide(prs.slide_layouts[6]); add_logos_and_headers(slide2, 2)
