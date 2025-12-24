@@ -1291,10 +1291,10 @@ class InventoryManagementSystem:
                     st.rerun()
 
     def generate_ppt_report(self, analysis_results):
-        """Generates a PPT report following the specific 8-page format requested."""
+        """Generates the full 8-page PPT report exactly matching the image layout."""
         df = pd.DataFrame(analysis_results)
         
-        # Metadata from Session State
+        # Metadata from session state
         biz_unit = st.session_state.get('biz_unit', 'P4 Bus Plant')
         pfep_ref = st.session_state.get('pfep_ref', 'N/A')
         inv_date = st.session_state.get('inv_date_input', datetime.now()).strftime('%d-%m-%Y')
@@ -1303,128 +1303,117 @@ class InventoryManagementSystem:
 
         prs = Presentation()
 
-        # Helper to add Logo placeholders
-        def add_logos(slide):
-            # Customer Logo Placeholder (Top Right)
-            slide.shapes.add_textbox(Inches(8), Inches(0.2), Inches(1.5), Inches(0.5)).text = "Customer Logo"
-            # Agilomatrix Logo Placeholder (Bottom Right)
-            slide.shapes.add_textbox(Inches(8), Inches(7), Inches(1.5), Inches(0.5)).text = "Agilomatrix Logo"
+        def add_logos_and_headers(slide, pg_num):
+            # Page Label (Top Left)
+            slide.shapes.add_textbox(Inches(0.2), Inches(0.1), Inches(1), Inches(0.3)).text = f"Page {pg_num}"
+            # Customer Logo (Top Right)
+            tx_cust = slide.shapes.add_textbox(Inches(7.5), Inches(0.2), Inches(2), Inches(0.5))
+            tx_cust.text = "Customer Logo"
+            # Agilomatrix Logo (Bottom Right)
+            tx_agilo = slide.shapes.add_textbox(Inches(7.5), Inches(7), Inches(2), Inches(0.5))
+            tx_agilo.text = "Agilomatrix Logo"
 
         # --- PAGE 1: COVER PAGE ---
-        slide = prs.slides.add_slide(prs.slide_layouts[6])
-        add_logos(slide)
-        
-        content = [
-            ("Heading", "Inventory Analyzer"),
-            ("Business Unit", biz_unit),
-            ("PFEP Reference", pfep_ref),
-            ("Inventory Date", inv_date)
-        ]
-        
-        y_pos = 1.5
-        for label, val in content:
-            txBox = slide.shapes.add_textbox(Inches(1), Inches(y_pos), Inches(6), Inches(0.5))
-            tf = txBox.text_frame
-            p = tf.add_paragraph()
-            p.text = f"{label}:      {val}"
-            p.font.bold = True
-            p.font.size = Pt(18)
-            y_pos += 0.8
+        slide1 = prs.slides.add_slide(prs.slide_layouts[6]); add_logos_and_headers(slide1, 1)
+        rows = [("Heading", "Inventory Analyzer"), ("Business Unit", biz_unit), ("PFEP Reference", pfep_ref), ("Inventory Date", inv_date)]
+        y = 1.5
+        for lbl, val in rows:
+            tb = slide1.shapes.add_textbox(Inches(1), Inches(y), Inches(6), Inches(0.5))
+            tb.text = f"{lbl.ljust(20)} {val}"; y += 0.8
 
-        # --- PAGE 2: METRICS (MINR) ---
-        slide = prs.slides.add_slide(prs.slide_layouts[6])
-        add_logos(slide)
+        # --- PAGE 2: KPI METRICS (DAYS & MINR) ---
+        slide2 = prs.slides.add_slide(prs.slide_layouts[6]); add_logos_and_headers(slide2, 2)
+        slide2.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(4), Inches(0.8)).text = f"Business Unit: {biz_unit}\nInventory Date: {inv_date}"
         
-        # Calculate Values for Page 2
-        total_val = df['Current Inventory - VALUE'].sum() / 1_000_000 # MINR
-        total_cons = df['AVG CONSUMPTION/DAY'].apply(self.safe_float_convert).sum()
-        total_price = df['UNIT PRICE'].mean() # Approximation
-        
-        ideal_minr = (total_cons * ideal_days * total_price) / 1_000_000
+        # Calculations
+        total_cons = df['AVG CONSUMPTION/DAY'].apply(pd.to_numeric, errors='coerce').sum()
+        total_val_minr = df['Current Inventory - VALUE'].sum() / 1_000_000
         actual_days = (df['Current Inventory - Qty'].sum() / total_cons) if total_cons > 0 else 0
+        ideal_minr = (total_cons * ideal_days * df['UNIT PRICE'].mean()) / 1_000_000
+        
+        exc_df = df[df['INVENTORY REMARK STATUS'] == 'Excess Inventory']
+        shr_df = df[df['INVENTORY REMARK STATUS'] == 'Short Inventory']
+        exc_days = (exc_df['SHORT/EXCESS INVENTORY'].sum() / total_cons) if total_cons > 0 else 0
+        shr_days = (abs(shr_df['SHORT/EXCESS INVENTORY'].sum()) / total_cons) if total_cons > 0 else 0
+        exc_minr = exc_df['Stock Deviation Value'].sum() / 1_000_000
+        shr_minr = abs(shr_df['Stock Deviation Value'].sum()) / 1_000_000
 
-        # Layout for Page 2
-        tx = slide.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(4), Inches(1))
-        tx.text = f"Business Unit: {biz_unit}\nInventory Date: {inv_date}"
+        # Create the 4 boxes matching layout
+        tbl_l = slide2.shapes.add_table(3, 2, Inches(0.5), Inches(2), Inches(4), Inches(1.2)).table
+        tbl_l.cell(0,0).text = "Ideal Inventory in Days"; tbl_l.cell(0,1).text = str(ideal_days)
+        tbl_l.cell(1,0).text = "Tolerance Level (%)"; tbl_l.cell(1,1).text = f"{tolerance}%"
+        tbl_l.cell(2,0).text = "Actual Inventory in Days"; tbl_l.cell(2,1).text = f"{actual_days:.2f}"
+        
+        tbl_r = slide2.shapes.add_table(3, 2, Inches(5.2), Inches(2), Inches(4), Inches(1.2)).table
+        tbl_r.cell(0,0).text = "Ideal Inventory in MINR"; tbl_r.cell(0,1).text = f"{ideal_minr:.2f}"
+        tbl_r.cell(1,0).text = "Tolerance Level (%)"; tbl_r.cell(1,1).text = f"{tolerance}%"
+        tbl_r.cell(2,0).text = "Actual Inventory in MINR"; tbl_r.cell(2,1).text = f"{total_val_minr:.2f}"
+        
+        tbl_bl = slide2.shapes.add_table(2, 2, Inches(0.5), Inches(3.8), Inches(4), Inches(0.8)).table
+        tbl_bl.cell(0,0).text = "Excess in Days"; tbl_bl.cell(0,1).text = f"{exc_days:.2f}"
+        tbl_bl.cell(1,0).text = "Short in Days"; tbl_bl.cell(1,1).text = f"{shr_days:.2f}"
 
-        # Create Metric Boxes (Simplified representation)
-        table = slide.shapes.add_table(6, 2, Inches(0.5), Inches(2), Inches(9), Inches(3)).table
-        table.cell(0, 0).text = "Ideal Inventory in Days"
-        table.cell(0, 1).text = str(ideal_days)
-        table.cell(1, 0).text = "Tolerance Level (%)"
-        table.cell(1, 1).text = f"{tolerance}%"
-        table.cell(2, 0).text = "Actual Inventory in Days"
-        table.cell(2, 1).text = f"{actual_days:.2f}"
-        
-        table.cell(0, 1).text_frame.paragraphs[0].font.bold = True
-        
-        # Second column for MINR
-        table.cell(3, 0).text = "Ideal Inventory in MINR"
-        table.cell(3, 1).text = f"{ideal_minr:.2f}"
-        table.cell(4, 0).text = "Actual Inventory in MINR"
-        table.cell(4, 1).text = f"{total_val:.2f}"
+        tbl_br = slide2.shapes.add_table(2, 2, Inches(5.2), Inches(3.8), Inches(4), Inches(0.8)).table
+        tbl_br.cell(0,0).text = "Excess in MINR"; tbl_br.cell(0,1).text = f"{exc_minr:.2f}"
+        tbl_br.cell(1,0).text = "Short in MINR"; tbl_br.cell(1,1).text = f"{shr_minr:.2f}"
 
-        # --- PAGE 3: STATUS CHART ---
-        slide = prs.slides.add_slide(prs.slide_layouts[6])
-        add_logos(slide)
-        
-        chart_data = CategoryChartData()
-        status_counts = df['INVENTORY REMARK STATUS'].value_counts()
-        chart_data.categories = ['Within Norm', 'Excess', 'Short']
-        chart_data.add_series('Status', (
-            status_counts.get('Within Norms', 0), 
-            status_counts.get('Excess Inventory', 0), 
-            status_counts.get('Short Inventory', 0)
-        ))
-        
-        x, y, cx, cy = Inches(2), Inches(2), Inches(6), Inches(4)
-        chart = slide.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, x, y, cx, cy, chart_data).chart
+        # --- PAGE 3: THE GRAPH ---
+        slide3 = prs.slides.add_slide(prs.slide_layouts[6]); add_logos_and_headers(slide3, 3)
+        slide3.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(4), Inches(0.8)).text = f"Business Unit: {biz_unit}\nInventory Date: {inv_date}"
+        c_data = CategoryChartData(); counts = df['INVENTORY REMARK STATUS'].value_counts()
+        c_data.categories = ['Within Norm', 'Excess', 'Short']
+        c_data.add_series('Status', (counts.get('Within Norms', 0), counts.get('Excess Inventory', 0), counts.get('Short Inventory', 0)))
+        slide3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1.5), Inches(2), Inches(7), Inches(4.5), c_data)
 
         # --- PAGE 4: SUMMARY GRID ---
-        slide = prs.slides.add_slide(prs.slide_layouts[6])
-        add_logos(slide)
-        grid_labels = ["Top 10 Excess Parts", "Top 10 Short Parts", "Top 10 Excess Vendor", "Top 10 Short Vendors"]
+        slide4 = prs.slides.add_slide(prs.slide_layouts[6]); add_logos_and_headers(slide4, 4)
+        slide4.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(4), Inches(0.8)).text = f"Business Unit: {biz_unit}\nInventory Date: {inv_date}"
+        grid = [("Top 10 Excess Parts", 0.5, 2.5), ("Top 10 Short Parts", 5.2, 2.5), ("Top 10 Excess Vendor", 0.5, 4.8), ("Top 10 Short Vendors", 5.2, 4.8)]
+        for t, x, y in grid: slide4.shapes.add_textbox(Inches(x), Inches(y), Inches(4), Inches(0.5)).text = t
+        slide4.shapes.add_textbox(Inches(0.5), Inches(7.2), Inches(4), Inches(0.5)).text = "All Value in MINR"
+
+        # --- PAGES 5, 6, 7, 8: DATA TABLES ---
+        # Data preparation
+        top_exc_parts = df[df['Status'] == 'Excess Inventory'].nlargest(10, 'Stock Deviation Value')
+        top_shr_parts = df[df['Status'] == 'Short Inventory'].nlargest(10, 'Stock Deviation Value', key=abs)
         
-        positions = [(1, 2), (5.5, 2), (1, 4.5), (5.5, 4.5)]
-        for i, label in enumerate(grid_labels):
-            pos = positions[i]
-            tb = slide.shapes.add_textbox(Inches(pos[0]), Inches(pos[1]), Inches(3.5), Inches(0.5))
-            tb.text = label
+        # Vendor preparation
+        v_col = next((c for c in ['Vendor Name', 'Vendor'] if c in df.columns), 'Vendor Name')
+        v_exc = df[df['Status'] == 'Excess Inventory'].groupby(v_col)['Stock Deviation Value'].sum().nlargest(10)
+        v_shr = df[df['Status'] == 'Short Inventory'].groupby(v_col)['Stock Deviation Value'].sum().nsmallest(10)
 
-        # --- PAGE 5-8: DETAILED TABLES ---
-        def add_detail_page(title, data_subset, cols):
-            slide = prs.slides.add_slide(prs.slide_layouts[6])
-            add_logos(slide)
-            title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(5), Inches(0.5))
-            title_box.text = title
+        # Function to generate table pages
+        def add_table_page(pg_num, title, data_list, headers):
+            s = prs.slides.add_slide(prs.slide_layouts[6]); add_logos_and_headers(s, pg_num)
+            s.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(4), Inches(0.8)).text = f"Business Unit: {biz_unit}\nInventory Date: {inv_date}"
+            s.shapes.add_textbox(Inches(0.5), Inches(1.4), Inches(5), Inches(0.5)).text = f"{pg_num} {title}"
             
-            rows = len(data_subset) + 1
-            tbl = slide.shapes.add_table(rows, len(cols), Inches(0.5), Inches(1.5), Inches(9), Inches(4)).table
-            for c, col_name in enumerate(cols):
-                tbl.cell(0, c).text = col_name
+            rows = len(data_list) + 1
+            tbl = s.shapes.add_table(rows, len(headers), Inches(0.5), Inches(2), Inches(9), Inches(4)).table
+            for i, h in enumerate(headers): tbl.cell(0, i).text = h
             
-            for r, row_data in enumerate(data_subset.to_dict('records')):
-                for c, col_name in enumerate(cols):
-                    val = row_data.get(col_name, "")
-                    if 'Value' in col_name or 'VALUE' in col_name:
-                        val = f"{float(val)/1_000_000:.2f}" # Convert to MINR
-                    tbl.cell(r+1, c).text = str(val)
+            for i, row in enumerate(data_list):
+                for j, val in enumerate(row): tbl.cell(i+1, j).text = str(val)
+            s.shapes.add_textbox(Inches(0.5), Inches(7.2), Inches(4), Inches(0.5)).text = "All Value in MINR"
 
-        # Page 5: Top 10 Excess Parts
-        excess_parts = df[df['INVENTORY REMARK STATUS'] == 'Excess Inventory'].nlargest(10, 'Stock Deviation Value')
-        add_detail_page("5 Top 10 Excess Parts", excess_parts, ['PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty', 'Stock Deviation Value'])
+        # Page 5: Excess Parts
+        rows5 = [[i+1, r['PART NO'], r['PART DESCRIPTION'][:30], f"{r['Current Inventory - Qty']:.0f}", f"{r['Stock Deviation Value']/1_000_000:.4f}"] for i, r in enumerate(top_exc_parts.to_dict('records'))]
+        add_table_page(5, "Top 10 Excess Parts", rows5, ["S.N.", "Part No.", "Description", "Excess Qty", "Excess Value (MINR)"])
 
-        # Page 6: Top 10 Short Parts
-        short_parts = df[df['INVENTORY REMARK STATUS'] == 'Short Inventory']
-        short_parts['Abs_Shortage'] = short_parts['Stock Deviation Value'].abs()
-        short_parts = short_parts.nlargest(10, 'Abs_Shortage')
-        add_detail_page("6 Top 10 Short Parts", short_parts, ['PART NO', 'PART DESCRIPTION', 'Current Inventory - Qty', 'Stock Deviation Value'])
+        # Page 6: Short Parts
+        rows6 = [[i+1, r['PART NO'], r['PART DESCRIPTION'][:30], f"{r['Current Inventory - Qty']:.0f}", f"{abs(r['Stock Deviation Value'])/1_000_000:.4f}"] for i, r in enumerate(top_shr_parts.to_dict('records'))]
+        add_table_page(6, "Top 10 Short Parts", rows6, ["S.N.", "Part No.", "Description", "Short Qty", "Short Value (MINR)"])
 
-        # Save to buffer
-        ppt_buffer = io.BytesIO()
-        prs.save(ppt_buffer)
-        ppt_buffer.seek(0)
-        return ppt_buffer
+        # Page 7: Excess Vendors
+        rows7 = [[i+1, name, f"{val/1_000_000:.4f}"] for i, (name, val) in enumerate(v_exc.items())]
+        add_table_page(7, "Top 10 Excess Vendor", rows7, ["S.N.", "Vendor Name", "Excess Value (MINR)"])
+
+        # Page 8: Short Vendors
+        rows8 = [[i+1, name, f"{abs(val)/1_000_000:.4f}"] for i, (name, val) in enumerate(v_shr.items())]
+        add_table_page(8, "Top 10 Short Vendors", rows8, ["S.N.", "Vendor Name", "Short Value (MINR)"])
+
+        # Finalize
+        ppt_out = io.BytesIO(); prs.save(ppt_out); ppt_out.seek(0); return ppt_out
         
     def run(self):
         st.title("📊 Inventory Analyzer")
