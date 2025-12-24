@@ -14,10 +14,6 @@ from typing import Union, Any, Optional, List, Dict
 from decimal import Decimal, InvalidOperation
 from collections import Counter
 from collections import defaultdict
-from pptx import Presentation
-from pptx.util import Inches, Pt
-from pptx.enum.text import PP_ALIGN
-from pptx.dml.color import RGBColor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -1827,113 +1823,26 @@ class InventoryManagementSystem:
                 available_columns.append(col)
         return available_columns # Limit to 10 c
         
-    def generate_powerpoint(self, analysis_results, business_unit, inventory_date):
-        """
-        Generates a PPT matching the provided UI layout (8 Pages)
-        """
-        df = pd.DataFrame(analysis_results)
-        prs = Presentation()
-    
-        # helper to add a slide with a title placeholder
-        def add_blank_slide():
-            return prs.slides.add_slide(prs.slide_layouts[6])
-        # --- PAGE 1: COVER PAGE ---
-        slide = add_blank_slide()
-        self._add_text(slide, "Inventory Analyzer", 1, 0.5, size=32, bold=True)
-        self._add_text(slide, f"Business Unit: {business_unit}", 1, 1.5)
-        self._add_text(slide, f"Inventory Date: {inventory_date}", 1, 2.5)
-        self._add_text(slide, "Agilomatrix Logo", 7, 7, size=12) # Placeholder for footer
-
-        # --- PAGE 2: SUMMARY METRICS ---
-        slide = add_blank_slide()
-        # Calculate Metrics
-        actual_val = df['Current Inventory - VALUE'].sum() / 100000 # In MINR (Lakhs)
-        # Mocking 'Days' logic based on your UI
-        actual_days = 45 # Replace with actual calculation (Value / Avg Daily Consumption Value)
-    
-        # Left Box (Days)
-        self._add_text(slide, f"Actual Inventory in Days: {actual_days}", 0.5, 2, size=18)
-        # Right Box (Value)
-        self._add_text(slide, f"Actual Inventory in MINR: {actual_val:.2f}", 5, 2, size=18)
- 
-        # --- PAGE 3: STATUS CHART ---
-        slide = add_blank_slide()
-        self._add_text(slide, "Inventory Status Overview", 0.5, 0.5, size=24)
-        # Generate the status bar chart image
-        status_counts = df['INVENTORY REMARK STATUS'].value_counts()
-        fig = px.bar(status_counts, color=status_counts.index, 
-                     color_discrete_map={'Within Norms': 'green', 'Excess Inventory': 'blue', 'Short Inventory': 'red'})
-        img_bytes = fig.to_image(format="png")
-        slide.shapes.add_picture(io.BytesIO(img_bytes), Inches(1), Inches(2), width=Inches(8))
-
-        # --- PAGE 4: TOP 10 DASHBOARD GRID ---
-        slide = add_blank_slide()
-        self._add_text(slide, "Top 10 Dashboard Overview", 0.5, 0.5, bold=True)
-        # Add 4 small chart images in a grid (Logic for Top 10 Excess/Short Parts & Vendors)
-        # This page acts as a visual summary of the following 4 pages.
-
-        # --- PAGES 5/6/7/8: DETAILED TABLES ---
-        table_configs = [
-            ("Top 10 Excess Parts", "Excess Inventory", "Stock Deviation Value"),
-            ("Top 10 Short Parts", "Short Inventory", "Stock Deviation Value"),
-            ("Top 10 Excess Vendors", "Excess Inventory", "Stock Deviation Value"), # Grouped by Vendor
-            ("Top 10 Short Vendors", "Short Inventory", "Stock Deviation Value")    # Grouped by Vendor
-        ]
-
-        for title, status, sort_col in table_configs:
-            slide = add_blank_slide()
-            self._add_text(slide, title, 0.5, 0.5, size=20, bold=True)
-        
-            # Filter Top 10
-            subset = df[df['INVENTORY REMARK STATUS'] == status].nlargest(10, sort_col if status=="Excess Inventory" else sort_col)
-            if "Vendor" in title:
-                subset = subset.groupby('Vendor Name').sum().reset_index().nlargest(10, sort_col)
-
-            # Add Table to Slide
-            rows, cols = len(subset) + 1, 4
-            table = slide.shapes.add_table(rows, cols, Inches(0.5), Inches(1.5), Inches(9), Inches(5)).table
-            headers = ["S.N.", "Part/Vendor", "Qty", "Value"]
-            for i, h in enumerate(headers): table.cell(0, i).text = h
-        
-            for i, (idx, row) in enumerate(subset.iterrows()):
-                table.cell(i+1, 0).text = str(i+1)
-                table.cell(i+1, 1).text = str(row.get('PART NO', row.get('Vendor Name')))
-                table.cell(i+1, 2).text = f"{row.get('Current Inventory - Qty', 0):,.0f}"
-                table.cell(i+1, 3).text = f"{row.get('Stock Deviation Value', 0)/100000:.2f}L"
-
-        # Save to buffer
-        ppt_output = io.BytesIO()
-        prs.save(ppt_output)
-        ppt_output.seek(0)
-        return ppt_output
-
-    def _add_text(self, slide, text, left, top, size=14, bold=False):
-        txBox = slide.shapes.add_textbox(Inches(left), Inches(top), Inches(4), Inches(1))
-        tf = txBox.text_frame
-        p = tf.paragraphs[0]
-        p.text = text
-        p.font.size = Pt(size)
-        p.font.bold = bold    
-        def _get_column_formatters(self,df=None):
-            """Get column formatters for styling dataframes"""
-            formatters = {}
-            if df is not None:
-                for col in df.columns:
-                    if 'VALUE' in col.upper() or 'PRICE' in col.upper() or 'COST' in col.upper():
-                        formatters[col] = lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
-                    elif 'QTY' in col.upper() or 'QUANTITY' in col.upper():
-                        formatters[col] = lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
-                    elif 'PERCENTAGE' in col.upper() or 'SCORE' in col.upper():
-                        formatters[col] = lambda x: f"{x:.1f}%" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
-            else:
-                # Default formatters when no dataframe is provided
-                formatters = {
-                    'VALUE(Unit Price* Short/Excess Inventory)': lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
-                    'Current Inventory - VALUE': lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
-                    'Current Inventory - Qty': lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
-                    'UNIT PRICE': lambda x: f"₹{x:,.2f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
-                }
-            return formatters
+    def _get_column_formatters(self,df=None):
+        """Get column formatters for styling dataframes"""
+        formatters = {}
+        if df is not None:
+            for col in df.columns:
+                if 'VALUE' in col.upper() or 'PRICE' in col.upper() or 'COST' in col.upper():
+                    formatters[col] = lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
+                elif 'QTY' in col.upper() or 'QUANTITY' in col.upper():
+                    formatters[col] = lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
+                elif 'PERCENTAGE' in col.upper() or 'SCORE' in col.upper():
+                    formatters[col] = lambda x: f"{x:.1f}%" if pd.notnull(x) and isinstance(x, (int, float)) else str(x)
+        else:
+            # Default formatters when no dataframe is provided
+            formatters = {
+                'VALUE(Unit Price* Short/Excess Inventory)': lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+                'Current Inventory - VALUE': lambda x: f"₹{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+                'Current Inventory - Qty': lambda x: f"{x:,.0f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+                'UNIT PRICE': lambda x: f"₹{x:,.2f}" if pd.notnull(x) and isinstance(x, (int, float)) else str(x),
+            }
+        return formatters
     
     def display_overview_metrics(self, analysis_results):
         """Display key overview metrics"""
@@ -2160,7 +2069,7 @@ class InventoryManagementSystem:
     def display_export_options(self, analysis_results):
         """Enhanced export options"""
         st.header("📥 Export & Reporting Options")
-        col1, col2, col3, col4 = st.columns(4) # Added a 4th column
+        col1, col2, col3 = st.columns(3)
         with col1:
             if st.button("📊 Export Full Analysis", type="primary"):
                 self.export_comprehensive_report(analysis_results)
@@ -2170,17 +2079,7 @@ class InventoryManagementSystem:
         with col3:
             if st.button("📈 Export Executive Summary"):
                 self.export_executive_summary(analysis_results)
-        # --- NEW: PPT AUTOMATION BUTTON ---
-        with col4:
-            if st.button("🚀 Generate PPT Report"):
-                with st.spinner("Creating PowerPoint presentation..."):
-                    ppt_data = self.generate_powerpoint(analysis_results)
-                    st.download_button(
-                        label="📥 Download PowerPoint",
-                        data=ppt_data,
-                        file_name=f"Inventory_Analysis_{datetime.now().strftime('%Y%m%d')}.pptx",
-                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                    )
+        # Export format options
         st.subheader("Export Format Options")
         export_format = st.selectbox(
             "Select Export Format",
@@ -2189,7 +2088,6 @@ class InventoryManagementSystem:
         if st.button("🎯 Custom Export"):
             self.export_custom_format(analysis_results, export_format)
             
-    
     def export_comprehensive_report(self, analysis_results):
         """Export comprehensive analysis report"""
         try:
@@ -2287,7 +2185,7 @@ class InventoryManagementSystem:
             st.error(f"❌ Export failed: {str(e)}")
             
     def export_custom_format(self, analysis_results, format_type):
-        """Export in custom format with Automated PPT Support"""
+        """Export in custom format"""
         try:
             df = pd.DataFrame(analysis_results)
             if format_type == "Excel (.xlsx)":
@@ -2297,23 +2195,16 @@ class InventoryManagementSystem:
                 st.download_button(
                     label="📥 Download CSV",
                     data=csv,
-                    file_name=f"inventory_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                    file_name=f"inventory_analysis_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
                     mime="text/csv"
                 )
             elif format_type == "PDF Report":
                 st.info("📄 PDF export functionality requires additional setup. Using CSV format instead.")
                 self.export_custom_format(analysis_results, "CSV (.csv)")
-                
             elif format_type == "PowerPoint Summary":
-                with st.spinner("🚀 Generating Automated 8-Page PPT Report..."):
-                    ppt_file = self._create_ppt_report(analysis_results)
-                    st.download_button(
-                        label="📥 Click to Download PPT",
-                        data=ppt_file,
-                        file_name=f"Inventory_Analyzer_Report_{datetime.now().strftime('%Y%m%d')}.pptx",
-                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                    )
-                st.success("✅ PowerPoint generated successfully based on your layout!")
+                st.info("📊 PowerPoint export functionality requires additional setup. Using Excel format instead.")
+                self.export_comprehensive_report(analysis_results)
+            st.success(f"✅ Export completed in {format_type} format!")
         except Exception as e:
             st.error(f"❌ Export failed: {str(e)}")
             
