@@ -2287,7 +2287,7 @@ class InventoryManagementSystem:
             st.error(f"❌ Export failed: {str(e)}")
             
     def export_custom_format(self, analysis_results, format_type):
-        """Export in custom format"""
+        """Export in custom format with Automated PPT Support"""
         try:
             df = pd.DataFrame(analysis_results)
             if format_type == "Excel (.xlsx)":
@@ -2297,16 +2297,23 @@ class InventoryManagementSystem:
                 st.download_button(
                     label="📥 Download CSV",
                     data=csv,
-                    file_name=f"inventory_analysis_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                    file_name=f"inventory_analysis_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
                     mime="text/csv"
                 )
             elif format_type == "PDF Report":
                 st.info("📄 PDF export functionality requires additional setup. Using CSV format instead.")
                 self.export_custom_format(analysis_results, "CSV (.csv)")
+                
             elif format_type == "PowerPoint Summary":
-                st.info("📊 PowerPoint export functionality requires additional setup. Using Excel format instead.")
-                self.export_comprehensive_report(analysis_results)
-            st.success(f"✅ Export completed in {format_type} format!")
+                with st.spinner("🚀 Generating Automated 8-Page PPT Report..."):
+                    ppt_file = self._create_ppt_report(analysis_results)
+                    st.download_button(
+                        label="📥 Click to Download PPT",
+                        data=ppt_file,
+                        file_name=f"Inventory_Analyzer_Report_{datetime.now().strftime('%Y%m%d')}.pptx",
+                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    )
+                st.success("✅ PowerPoint generated successfully based on your layout!")
         except Exception as e:
             st.error(f"❌ Export failed: {str(e)}")
             
