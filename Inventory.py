@@ -1374,7 +1374,7 @@ class InventoryManagementSystem:
         st.sidebar.subheader("🖼️ Branding")
         cust_logo = st.sidebar.file_uploader("Upload Customer Logo (Top Right)", type=['png', 'jpg', 'jpeg'])
         if cust_logo:
-            st.session_state.customer_logo = cust_logo # Store in session for the PPT generator
+            st.session_state.customer_logo = cust_logo
 
         if st.session_state.user_role == "Admin":
             self.admin_data_management()
