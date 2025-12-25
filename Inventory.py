@@ -1503,19 +1503,19 @@ class InventoryManagementSystem:
         st.subheader("📤 Export Analysis Results")
         df = pd.DataFrame(analysis_results)
         col1, col2 = st.columns(2)
-        
         with col1:
             excel_buffer = io.BytesIO()
             df.to_excel(excel_buffer, index=False)
-            st.download_button("📊 Download Excel", data=excel_buffer.getvalue(), file_name="inventory_analysis.xlsx")
+            st.download_button("📊 Download Excel", data=excel_buffer.getvalue(), file_name="inventory.xlsx")
         with col2:
             if st.button("📑 Generate Professional PPT Report"):
-                with st.spinner("Creating Professional Report..."):
+                with st.spinner("Generating professional report..."):
+                    # This calls the detailed function below
                     ppt_file = self.generate_ppt_report(analysis_results)
                     st.download_button(
-                        label="📥 Click to Download Professional PPT",
+                        label="📥 Download PPT Report",
                         data=ppt_file,
-                        file_name=f"Inventory_Report_{datetime.now().strftime('%Y%m%d')}.pptx",
+                        file_name=f"Inventory_Analysis_{datetime.now().strftime('%Y%m%d')}.pptx",
                         mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
                     )
         
