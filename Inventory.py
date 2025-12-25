@@ -1314,7 +1314,7 @@ class InventoryManagementSystem:
         # 2. BOTTOM RIGHT: AGILOMATRIX LOGO (Fixed in Code)
         # Note: Ensure 'agilomatrix_logo.png' exists in your root folder
         try:
-            slide1.shapes.add_picture('agilomatrix_logo.png', Inches(7.5), Inches(6.8), height=Inches(0.7))
+            slide1.shapes.add_picture('Image.png', Inches(7.5), Inches(6.8), height=Inches(0.7))
         except:
             # Fallback text if the file is missing during development
             tx = slide1.shapes.add_textbox(Inches(7.5), Inches(7.0), Inches(2), Inches(0.5))
