@@ -1291,62 +1291,76 @@ class InventoryManagementSystem:
                     st.rerun()
 
     def generate_ppt_report(self, analysis_results):
+        """Generates a professional PPT report matching the provided layout."""
         df = pd.DataFrame(analysis_results)
-    
-        # Metadata from tool inputs
+        
+        # --- Metadata from session state ---
         biz_unit = st.session_state.get('biz_unit', '').upper()
         pfep_ref = st.session_state.get('pfep_ref', '').upper()
         inv_date = st.session_state.get('inv_date_input', datetime.now()).strftime('%d-%m-%Y')
-        cust_logo = st.session_state.get('customer_logo')
-    
-        # Path to Agilomatrix Logo (Local file)
-        agilo_logo_path = 'https://github.com/Rimjhimrani/Excess/blob/main/Image.png' 
+        tolerance = st.session_state.get('admin_tolerance', 30)
+        ideal_days = st.session_state.get('user_preferences', {}).get('ideal_inventory_days', 30)
 
         prs = Presentation()
 
         def add_logos(slide):
-            # 1. Top Right Logo (Customer)
-            if cust_logo:
-                slide.shapes.add_picture(cust_logo, Inches(8.0), Inches(0.2), height=Inches(0.6))
+            # 1. Top Right Logo (eka)
+            # Replace 'eka_logo.png' with your actual local file path or logo object
+            try:
+                slide.shapes.add_picture('eka_logo.png', Inches(8.2), Inches(0.3), height=Inches(0.5))
+            except:
+                pass # Skip if logo file not found
         
             # 2. Bottom Right Logo (Agilomatrix)
+            # Use local path if possible. If using URL, download it to a BytesIO object first.
             try:
-                slide.shapes.add_picture(agilo_logo_path, Inches(7.5), Inches(6.8), height=Inches(0.7))
+                # Assuming 'Image.png' is in your local directory
+                slide.shapes.add_picture('Image.png', Inches(7.5), Inches(6.8), height=Inches(0.6))
             except:
-                # Fallback if image path is not found
+                # Fallback text if logo missing
                 tx = slide.shapes.add_textbox(Inches(7.5), Inches(7.0), Inches(2), Inches(0.5))
-                tx.text = "AGILOMATRIX"
+                tx.text = "Agilomatrix"
 
-        # --- PAGE 1: COVER PAGE (MATCHING SCREENSHOT) ---
-        slide1 = prs.slides.add_slide(prs.slide_layouts[6])
+        # --- PAGE 1: COVER PAGE (EXACT MATCH TO SCREENSHOT) ---
+        slide1 = prs.slides.add_slide(prs.slide_layouts[6]) # Blank layout
         add_logos(slide1)
 
-        # Main Title
-        title_box = slide1.shapes.add_textbox(Inches(0), Inches(1.8), Inches(10), Inches(1))
+        # 1. Main Title: INVENTORY ANALYSER
+        title_box = slide1.shapes.add_textbox(Inches(0), Inches(2.2), Inches(10), Inches(1))
         tf = title_box.text_frame
         tf.text = "INVENTORY ANALYSER"
         p = tf.paragraphs[0]
         p.alignment = PP_ALIGN.CENTER
         p.font.size = Pt(44)
-        p.font.bold = True
-        p.font.name = 'Arial'
+        p.font.bold = False # Matching the thin look in screenshot
+        p.font.name = 'Calibri' # Or 'Arial'
 
-        # Metadata Labels and Values
+        # 2. Metadata Block
+        # We create one textbox for labels and another for values to keep alignment perfect
+        # or use tab stops. Here's a simple vertical list approach:
         labels = [
-            f"BUSINESS UNIT:   {biz_unit}",
-            f"PFEP REFERENCE:  {pfep_ref}",
-            f"INVENTORY DATE:  {inv_date}"
+            ("BUSINESS UNIT:", biz_unit),
+            ("PFEP REFERENCE:", pfep_ref),
+            ("INVENTORY DATE:", inv_date)
         ]
-    
+        
         y_pos = 3.8
-        for text in labels:
-            tb = slide1.shapes.add_textbox(Inches(3.5), Inches(y_pos), Inches(6), Inches(0.5))
-            tf = tb.text_frame
-            p = tf.add_paragraph()
-            p.text = text
-            p.font.size = Pt(24)
-            p.font.name = 'Arial'
-            y_pos += 0.8
+        for label, value in labels:
+            # Add Label
+            label_box = slide1.shapes.add_textbox(Inches(3.2), Inches(y_pos), Inches(2.5), Inches(0.5))
+            label_p = label_box.text_frame.paragraphs[0]
+            label_p.text = label
+            label_p.font.size = Pt(20)
+            label_p.font.name = 'Calibri'
+            
+            # Add Value
+            val_box = slide1.shapes.add_textbox(Inches(5.6), Inches(y_pos), Inches(4), Inches(0.5))
+            val_p = val_box.text_frame.paragraphs[0]
+            val_p.text = value
+            val_p.font.size = Pt(20)
+            val_p.font.name = 'Calibri'
+            
+            y_pos += 0.6
 
         # --- PAGE 2: KPI METRICS (DAYS & MINR) ---
         slide2 = prs.slides.add_slide(prs.slide_layouts[6]); add_logos_and_headers(slide2, 2)
@@ -1440,7 +1454,10 @@ class InventoryManagementSystem:
         add_table_page(8, "Top 10 Short Vendors", rows8, ["S.N.", "Vendor Name", "Short Value (MINR)"])
 
         # Finalize
-        ppt_out = io.BytesIO(); prs.save(ppt_out); ppt_out.seek(0); return ppt_out
+        ppt_out = io.BytesIO()
+        prs.save(ppt_out)
+        ppt_out.seek(0)
+        return ppt_out
         
     def run(self):
         st.title("📊 Inventory Analyzer")
