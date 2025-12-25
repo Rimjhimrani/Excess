@@ -1502,48 +1502,22 @@ class InventoryManagementSystem:
     def display_enhanced_export_options(self, analysis_results):
         st.subheader("📤 Export Analysis Results")
         df = pd.DataFrame(analysis_results)
-        col1, col2, col3 = st.columns(3)
+        col1, col2 = st.columns(2)
         
-        # Excel Download (Existing)
-        excel_buffer = io.BytesIO()
-        df.to_excel(excel_buffer, index=False)
-        col1.download_button("📊 Download Excel", data=excel_buffer.getvalue(), file_name="inventory.xlsx")
-
-        # --- ADD THIS PPT LOGIC HERE ---
-        if col2.button("📑 Generate PPT Report (MINR)"):
-            # Create PPT Object
-            prs = Presentation()
-            biz_unit = st.session_state.get('biz_unit', 'P4 Bus Plant')
-            inv_date = st.session_state.get('inv_date_input', datetime.now()).strftime('%d-%m-%Y')
-
-            # Page 1: Metadata
-            slide1 = prs.slides.add_slide(prs.slide_layouts[6])
-            slide1.shapes.add_textbox(Inches(1), Inches(1), Inches(6), Inches(1)).text = f"Business Unit: {biz_unit}"
-            slide1.shapes.add_textbox(Inches(1), Inches(2), Inches(6), Inches(1)).text = f"Inventory Date: {inv_date}"
-
-            # Page 2: KPI Box (Values in MINR)
-            slide2 = prs.slides.add_slide(prs.slide_layouts[6])
-            total_val_minr = df['Current Inventory - VALUE'].sum() / 1_000_000
-            tbl = slide2.shapes.add_table(2, 2, Inches(1), Inches(2), Inches(6), Inches(2)).table
-            tbl.cell(0,0).text = "Actual Inventory (MINR)"
-            tbl.cell(0,1).text = f"{total_val_minr:.2f}"
-
-            # Page 3: Chart
-            slide3 = prs.slides.add_slide(prs.slide_layouts[6])
-            chart_data = CategoryChartData()
-            chart_data.categories = ['Within Norm', 'Excess', 'Short']
-            counts = df['INVENTORY REMARK STATUS'].value_counts()
-            chart_data.add_series('Status', (counts.get('Within Norms', 0), counts.get('Excess Inventory', 0), counts.get('Short Inventory', 0)))
-            slide3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(2), Inches(8), Inches(4.5), chart_data)
-
-            # Save and provide download button
-            ppt_file = self.generate_ppt_report(analysis_results)
-            st.download_button(
-                label="📥 Click to Download Professional PPT",
-                data=ppt_file,
-                file_name=f"Inventory_Analysis_Report_{datetime.now().strftime('%Y%m%d')}.pptx",
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-            )
+        with col1:
+            excel_buffer = io.BytesIO()
+            df.to_excel(excel_buffer, index=False)
+            st.download_button("📊 Download Excel", data=excel_buffer.getvalue(), file_name="inventory_analysis.xlsx")
+        with col2:
+            if st.button("📑 Generate Professional PPT Report"):
+                with st.spinner("Creating Professional Report..."):
+                    ppt_file = self.generate_ppt_report(analysis_results)
+                    st.download_button(
+                        label="📥 Click to Download Professional PPT",
+                        data=ppt_file,
+                        file_name=f"Inventory_Report_{datetime.now().strftime('%Y%m%d')}.pptx",
+                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    )
         
     def display_enhanced_summary_metrics(self, analysis_results):
         """Enhanced summary metrics dashboard - Fixed Width Issues"""
