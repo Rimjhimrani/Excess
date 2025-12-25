@@ -1635,9 +1635,13 @@ class InventoryManagementSystem:
             slide3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(2), Inches(8), Inches(4.5), chart_data)
 
             # Save and provide download button
-            ppt_buffer = io.BytesIO()
-            prs.save(ppt_buffer)
-            st.download_button("📥 Click to Download PPT", data=ppt_buffer.getvalue(), file_name="Inventory_Report.pptx")
+            ppt_file = self.generate_ppt_report(analysis_results)
+            st.download_button(
+                label="📥 Click to Download Professional PPT",
+                data=ppt_file,
+                file_name=f"Inventory_Analysis_Report_{datetime.now().strftime('%Y%m%d')}.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            )
         
     def display_enhanced_summary_metrics(self, analysis_results):
         """Enhanced summary metrics dashboard - Fixed Width Issues"""
