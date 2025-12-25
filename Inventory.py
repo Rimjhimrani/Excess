@@ -1291,73 +1291,84 @@ class InventoryManagementSystem:
                     st.rerun()
 
     def generate_ppt_report(self, analysis_results):
-        """Generates the professional PPT report with the exact requested cover page layout."""
+        """Generates the PPT with the exact layout: Centered title, corner logos, and tables."""
         df = pd.DataFrame(analysis_results)
-        
-        # Pulling metadata from session state
-        biz_unit = st.session_state.get('biz_unit', '').upper()
-        # Per your request: PFEP Reference is set based on admin status or logic
-        pfep_ref = st.session_state.get('pfep_ref', 'ADMIN_MASTER').upper()
+        # Metadata Setup
+        biz_unit = st.session_state.get('biz_unit', 'BUS PLANT').upper()
+        # PFEP Ref is set to "ADMIN_MASTER" if data is uploaded/locked
+        pfep_ref = "ADMIN_MASTER" if st.session_state.get('persistent_pfep_locked') else st.session_state.get('pfep_ref', 'N/A').upper()
         inv_date = st.session_state.get('inv_date_input', datetime.now()).strftime('%d-%m-%Y')
-        
+
         prs = Presentation()
 
-        # --- SLIDE 1: COVER PAGE (EXACT REPLICA) ---
-        slide1 = prs.slides.add_slide(prs.slide_layouts[6]) # Layout 6 is a blank slide
-
-        # 1. TOP RIGHT: CUSTOMER LOGO (Uploaded by User)
-        if 'customer_logo' in st.session_state and st.session_state.customer_logo:
-            # We convert the uploaded file to a BytesIO object for pptx
-            logo_stream = io.BytesIO(st.session_state.customer_logo.getvalue())
-            slide1.shapes.add_picture(logo_stream, Inches(8.0), Inches(0.2), height=Inches(0.6))
+        def add_logos_and_branding(slide):
+            # 1. Top Right: Customer Logo (Uploaded by User)
+            if 'customer_logo' in st.session_state and st.session_state.customer_logo:
+                logo_stream = io.BytesIO(st.session_state.customer_logo.getvalue())
+                slide.shapes.add_picture(logo_stream, Inches(8.2), Inches(0.3), height=Inches(0.6))
         
-        # 2. BOTTOM RIGHT: AGILOMATRIX LOGO (Fixed in Code)
-        # Note: Ensure 'agilomatrix_logo.png' exists in your root folder
-        try:
-            slide1.shapes.add_picture('Image.png', Inches(7.5), Inches(6.8), height=Inches(0.7))
-        except:
-            # Fallback text if the file is missing during development
-            tx = slide1.shapes.add_textbox(Inches(7.5), Inches(7.0), Inches(2), Inches(0.5))
-            tx.text = "Agilomatrix"
+            # 2. Bottom Right: Agilomatrix Logo (Fixed in code)
+            try:
+                # Change 'agilo_logo.png' to your actual logo filename
+                slide.shapes.add_picture('agilo_logo.png', Inches(7.5), Inches(6.8), height=Inches(0.7))
+            except:
+                # Fallback text if logo file is missing
+                tx = slide.shapes.add_textbox(Inches(7.5), Inches(7.0), Inches(2), Inches(0.5))
+                tx.text = "Agilomatrix"
 
-        # 3. CENTER TITLE: INVENTORY ANALYSER
+        # --- SLIDE 1: COVER PAGE (The Screen You Want) ---
+        slide1 = prs.slides.add_slide(prs.slide_layouts[6]) # Blank Layout
+        add_logos_and_branding(slide1)
+
+        # 1. Centered Title
         title_box = slide1.shapes.add_textbox(Inches(0), Inches(2.2), Inches(10), Inches(1))
         tf = title_box.text_frame
         tf.text = "INVENTORY ANALYSER"
         p = tf.paragraphs[0]
         p.alignment = PP_ALIGN.CENTER
         p.font.size = Pt(44)
-        p.font.name = 'Arial' # Or 'Calibri'
-        p.font.bold = False # Matching the thin look in the screenshot
+        p.font.name = 'Arial'
 
-        # 4. METADATA LABELS & VALUES (Centered vertically below title)
+        # 2. Metadata Block (Centered column)
         labels = [
             f"BUSINESS UNIT:   {biz_unit}",
             f"PFEP REFERENCE:  {pfep_ref}",
             f"INVENTORY DATE:  {inv_date}"
         ]
-        
-        y_pos = 4.2
+    
+        y_pos = 4.0
         for text in labels:
-            tb = slide1.shapes.add_textbox(Inches(3.5), Inches(y_pos), Inches(6), Inches(0.5))
-            tf = tb.text_frame
-            p = tf.add_paragraph()
+            tb = slide1.shapes.add_textbox(Inches(3.2), Inches(y_pos), Inches(6), Inches(0.5))
+            p = tb.text_frame.add_paragraph()
             p.text = text
-            p.font.size = Pt(24)
+            p.font.size = Pt(22)
             p.font.name = 'Arial'
             y_pos += 0.8
 
-        # --- SLIDE 2 & 3: SUMMARY AND CHARTS ---
-        # (Same logic as before, ensure they call standard formatting)
+        # --- SLIDE 2: KPI SUMMARY (Values in MINR) ---
         slide2 = prs.slides.add_slide(prs.slide_layouts[6])
+        add_logos_and_branding(slide2)
+    
         total_val_minr = df['Current Inventory - VALUE'].sum() / 1_000_000
-        tbl = slide2.shapes.add_table(2, 2, Inches(1), Inches(2), Inches(8), Inches(1.5)).table
-        tbl.cell(0, 0).text = "Inventory Metric"
-        tbl.cell(0, 1).text = "Value"
-        tbl.cell(1, 0).text = "Total Stock Value (MINR)"
-        tbl.cell(1, 1).text = f"{total_val_minr:.2f}"
+    
+        # Simple summary table
+        rows, cols = 2, 2
+        table = slide2.shapes.add_table(rows, cols, Inches(1.5), Inches(2.5), Inches(7), Inches(1.5)).table
+        table.cell(0, 0).text = "Metric Description"
+        table.cell(0, 1).text = "Value (MINR)"
+        table.cell(1, 0).text = "Total Inventory Value"
+        table.cell(1, 1).text = f"{total_val_minr:.2f}"
 
-        # Finalize
+        # --- SLIDE 3: STATUS CHART ---
+        slide3 = prs.slides.add_slide(prs.slide_layouts[6])
+        add_logos_and_branding(slide3)
+        c_data = CategoryChartData()
+        counts = df['INVENTORY REMARK STATUS'].value_counts()
+        c_data.categories = ['Within Norm', 'Excess', 'Short']
+        c_data.add_series('Status', (counts.get('Within Norms', 0), counts.get('Excess Inventory', 0), counts.get('Short Inventory', 0)))
+        slide3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(2), Inches(8), Inches(4.5), c_data)
+
+        # Save and return
         ppt_out = io.BytesIO()
         prs.save(ppt_out)
         ppt_out.seek(0)
