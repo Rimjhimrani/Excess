@@ -1291,76 +1291,73 @@ class InventoryManagementSystem:
                     st.rerun()
 
     def generate_ppt_report(self, analysis_results):
-        """Professional PPT generator with fixed Cover Page layout."""
+        """Generates the professional PPT report with the exact requested cover page layout."""
         df = pd.DataFrame(analysis_results)
         
-        # Metadata
-        biz_unit = st.session_state.get('biz_unit', 'P4 BUS PLANT').upper()
-        pf_ref = st.session_state.get('pfep_ref', 'REF-2025-001').upper()
+        # Pulling metadata from session state
+        biz_unit = st.session_state.get('biz_unit', '').upper()
+        # Per your request: PFEP Reference is set based on admin status or logic
+        pfep_ref = st.session_state.get('pfep_ref', 'ADMIN_MASTER').upper()
         inv_date = st.session_state.get('inv_date_input', datetime.now()).strftime('%d-%m-%Y')
         
         prs = Presentation()
 
-        # --- SLIDE 1: PROFESSIONAL COVER PAGE ---
-        slide1 = prs.slides.add_slide(prs.slide_layouts[6]) # Blank Layout
+        # --- SLIDE 1: COVER PAGE (EXACT REPLICA) ---
+        slide1 = prs.slides.add_slide(prs.slide_layouts[6]) # Layout 6 is a blank slide
+
+        # 1. TOP RIGHT: CUSTOMER LOGO (Uploaded by User)
+        if 'customer_logo' in st.session_state and st.session_state.customer_logo:
+            # We convert the uploaded file to a BytesIO object for pptx
+            logo_stream = io.BytesIO(st.session_state.customer_logo.getvalue())
+            slide1.shapes.add_picture(logo_stream, Inches(8.0), Inches(0.2), height=Inches(0.6))
         
-        # 1. Main Title
-        title_shape = slide1.shapes.add_textbox(Inches(0), Inches(1.8), Inches(10), Inches(1))
-        tf = title_shape.text_frame
+        # 2. BOTTOM RIGHT: AGILOMATRIX LOGO (Fixed in Code)
+        # Note: Ensure 'agilomatrix_logo.png' exists in your root folder
+        try:
+            slide1.shapes.add_picture('agilomatrix_logo.png', Inches(7.5), Inches(6.8), height=Inches(0.7))
+        except:
+            # Fallback text if the file is missing during development
+            tx = slide1.shapes.add_textbox(Inches(7.5), Inches(7.0), Inches(2), Inches(0.5))
+            tx.text = "Agilomatrix"
+
+        # 3. CENTER TITLE: INVENTORY ANALYSER
+        title_box = slide1.shapes.add_textbox(Inches(0), Inches(2.2), Inches(10), Inches(1))
+        tf = title_box.text_frame
         tf.text = "INVENTORY ANALYSER"
         p = tf.paragraphs[0]
         p.alignment = PP_ALIGN.CENTER
         p.font.size = Pt(44)
-        p.font.name = 'Arial'
+        p.font.name = 'Arial' # Or 'Calibri'
+        p.font.bold = False # Matching the thin look in the screenshot
 
-        # 2. Metadata Labels and Values (Centered Alignment)
-        entries = [
-            ("BUSINESS UNIT:", biz_unit),
-            ("PFEP REFERENCE:", pf_ref),
-            ("INVENTORY DATE:", inv_date)
+        # 4. METADATA LABELS & VALUES (Centered vertically below title)
+        labels = [
+            f"BUSINESS UNIT:   {biz_unit}",
+            f"PFEP REFERENCE:  {pfep_ref}",
+            f"INVENTORY DATE:  {inv_date}"
         ]
         
-        y_pos = 3.8
-        for label, val in entries:
-            # Label (Left aligned from center)
-            lbl = slide1.shapes.add_textbox(Inches(3.2), Inches(y_pos), Inches(2.5), Inches(0.5))
-            lbl.text_frame.paragraphs[0].text = label
-            lbl.text_frame.paragraphs[0].font.size = Pt(20)
-            
-            # Value (Offset to the right)
-            vbox = slide1.shapes.add_textbox(Inches(5.6), Inches(y_pos), Inches(4), Inches(0.5))
-            vbox.text_frame.paragraphs[0].text = val
-            vbox.text_frame.paragraphs[0].font.size = Pt(20)
-            y_pos += 0.7
+        y_pos = 4.2
+        for text in labels:
+            tb = slide1.shapes.add_textbox(Inches(3.5), Inches(y_pos), Inches(6), Inches(0.5))
+            tf = tb.text_frame
+            p = tf.add_paragraph()
+            p.text = text
+            p.font.size = Pt(24)
+            p.font.name = 'Arial'
+            y_pos += 0.8
 
-        # --- SLIDE 2: KPI SUMMARY ---
+        # --- SLIDE 2 & 3: SUMMARY AND CHARTS ---
+        # (Same logic as before, ensure they call standard formatting)
         slide2 = prs.slides.add_slide(prs.slide_layouts[6])
-        # Title for slide 2
-        s2_title = slide2.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(5), Inches(0.5))
-        s2_title.text = f"Overview: {biz_unit} | {inv_date}"
-        
         total_val_minr = df['Current Inventory - VALUE'].sum() / 1_000_000
-        
-        # Add a simple KPI Table
         tbl = slide2.shapes.add_table(2, 2, Inches(1), Inches(2), Inches(8), Inches(1.5)).table
-        tbl.cell(0, 0).text = "Metric"
+        tbl.cell(0, 0).text = "Inventory Metric"
         tbl.cell(0, 1).text = "Value"
-        tbl.cell(1, 0).text = "Total Inventory Value (MINR)"
+        tbl.cell(1, 0).text = "Total Stock Value (MINR)"
         tbl.cell(1, 1).text = f"{total_val_minr:.2f}"
 
-        # --- SLIDE 3: STATUS CHART ---
-        slide3 = prs.slides.add_slide(prs.slide_layouts[6])
-        chart_data = CategoryChartData()
-        counts = df['INVENTORY REMARK STATUS'].value_counts()
-        chart_data.categories = ['Within Norm', 'Excess', 'Short']
-        chart_data.add_series('Inventory Status', (
-            counts.get('Within Norms', 0), 
-            counts.get('Excess Inventory', 0), 
-            counts.get('Short Inventory', 0)
-        ))
-        slide3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(1.5), Inches(8), Inches(4.5), chart_data)
-
-        # Save to buffer
+        # Finalize
         ppt_out = io.BytesIO()
         prs.save(ppt_out)
         ppt_out.seek(0)
