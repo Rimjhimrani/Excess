@@ -1291,7 +1291,7 @@ class InventoryManagementSystem:
                     st.rerun()
 
     def generate_ppt_report(self, analysis_results):
-        """Generates the PPT matching the requested alignment precisely."""
+        """Generates the PPT with the metadata moved to the left side as requested."""
         df = pd.DataFrame(analysis_results)
     
         # Metadata Setup
@@ -1301,20 +1301,20 @@ class InventoryManagementSystem:
 
         prs = Presentation()
     
-        # 1. Force 16:9 Widescreen layout (matches your PowerPoint screenshot)
+        # 1. Force 16:9 Widescreen layout
         prs.slide_width = Inches(13.33)
         prs.slide_height = Inches(7.5)
 
         def add_branding(slide):
-            # Top Right: Logo
+            # Top Right Logo
             if 'customer_logo' in st.session_state and st.session_state.customer_logo:
                 try:
                     logo_stream = io.BytesIO(st.session_state.customer_logo.getvalue())
-                    slide.shapes.add_picture(logo_stream, Inches(11.0), Inches(0.4), height=Inches(0.6))
+                    slide.shapes.add_picture(logo_stream, Inches(11.5), Inches(0.4), height=Inches(0.6))
                 except:
-                    pass # Skip if image is invalid
+                    pass
     
-            #  Bottom Right: Agilomatrix Text
+            # Bottom Right: Agilomatrix Text
             tx_box = slide.shapes.add_textbox(Inches(10.0), Inches(6.8), Inches(3.0), Inches(0.5))
             tf = tx_box.text_frame
             p = tf.paragraphs[0]
@@ -1324,11 +1324,11 @@ class InventoryManagementSystem:
             p.alignment = PP_ALIGN.RIGHT
 
         # --- SLIDE 1: COVER PAGE ---
-        slide1 = prs.slides.add_slide(prs.slide_layouts[6]) # Use Blank Layout
+        slide1 = prs.slides.add_slide(prs.slide_layouts[6]) 
         add_branding(slide1)
 
         # 1. Main Title: "INVENTORY ANALYSER"
-        # Moved Top to 1.5 inches to pull it out of the middle
+        # Centered horizontally
         title_box = slide1.shapes.add_textbox(Inches(0), Inches(1.5), Inches(13.33), Inches(1.5))
         tf = title_box.text_frame
         p = tf.paragraphs[0]
@@ -1338,11 +1338,10 @@ class InventoryManagementSystem:
         p.font.name = 'Arial'
         p.alignment = PP_ALIGN.CENTER
 
-        # 2. Metadata Block 
-        # To center a left-aligned block:
-        # We create a 7-inch wide box and place it at Inches(3.16) 
-        # Formula: (SlideWidth 13.33 - BoxWidth 7.0) / 2 = 3.165
-        meta_box = slide1.shapes.add_textbox(Inches(3.16), Inches(3.5), Inches(7.0), Inches(3.0))
+        # 2. Metadata Block - MOVED TO THE LEFT
+        # Left = Inches(1.0) pushes it to the left side of the slide
+        # Top = Inches(3.2) puts it just below the title
+        meta_box = slide1.shapes.add_textbox(Inches(1.0), Inches(3.2), Inches(10.0), Inches(3.0))
         tf = meta_box.text_frame
         tf.word_wrap = True
 
@@ -1361,15 +1360,14 @@ class InventoryManagementSystem:
             p.font.size = Pt(28)
             p.font.name = 'Arial'
             p.font.bold = False
-            p.space_before = Pt(15) # Adds clean spacing between rows
-            p.alignment = PP_ALIGN.LEFT # Text is left aligned inside the centered box
+            p.space_before = Pt(12) 
+            p.alignment = PP_ALIGN.LEFT # Left aligned as requested
 
         # --- SLIDE 2: KPI SUMMARY ---
         slide2 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(slide2)
         total_val_minr = df['Current Inventory - VALUE'].sum() / 1_000_000
         rows, cols = 2, 2
-        # Center the table on widescreen: (13.33 - 7) / 2 = 3.16
         table_shape = slide2.shapes.add_table(rows, cols, Inches(3.16), Inches(3.0), Inches(7), Inches(1.5))
         table = table_shape.table
         table.cell(0, 0).text = "Metric Description"
@@ -1385,7 +1383,6 @@ class InventoryManagementSystem:
         counts = df[status_col].value_counts()
         c_data.categories = ['Within Norm', 'Excess', 'Short']
         c_data.add_series('Status', (counts.get('Within Norms', 0), counts.get('Excess Inventory', 0), counts.get('Short Inventory', 0)))
-        # Center chart: (13.33 - 9) / 2 = 2.16
         slide3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(2.16), Inches(1.8), Inches(9.0), Inches(4.5), c_data)
 
         # Save and return
