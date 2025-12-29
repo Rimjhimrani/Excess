@@ -1291,8 +1291,9 @@ class InventoryManagementSystem:
                     st.rerun()
 
     def generate_ppt_report(self, analysis_results):
-        """Generates the PPT with updated Cover Page layout."""
+        """Generates the PPT with exact alignment as per the shared image."""
         df = pd.DataFrame(analysis_results)
+        
         # Metadata Setup
         biz_unit = st.session_state.get('biz_unit', 'BUS PLANT').upper()
         pfep_ref = "ADMIN_MASTER" if st.session_state.get('persistent_pfep_locked') else st.session_state.get('pfep_ref', 'N/A').upper()
@@ -1301,59 +1302,63 @@ class InventoryManagementSystem:
         prs = Presentation()
 
         def add_logos_and_branding(slide):
-            # Top Right: Customer Logo
+            # 1. Top Right: Customer Logo
             if 'customer_logo' in st.session_state and st.session_state.customer_logo:
                 logo_stream = io.BytesIO(st.session_state.customer_logo.getvalue())
-                slide.shapes.add_picture(logo_stream, Inches(8.2), Inches(0.3), height=Inches(0.6))
+                # Positioned at top right
+                slide.shapes.add_picture(logo_stream, Inches(7.5), Inches(0.4), height=Inches(0.6))
         
-            # Bottom Right: Agilomatrix Logo
-            try:
-                slide.shapes.add_picture('agilo_logo.png', Inches(7.5), Inches(6.8), height=Inches(0.7))
-            except:
-                tx = slide.shapes.add_textbox(Inches(7.5), Inches(7.0), Inches(2), Inches(0.5))
-                tx.text = "Agilomatrix"
+            # 2. Bottom Right: Agilomatrix Text
+            tx_box = slide.shapes.add_textbox(Inches(7.0), Inches(6.8), Inches(2.5), Inches(0.5))
+            tf = tx_box.text_frame
+            p = tf.paragraphs[0]
+            p.text = "Agilomatrix"
+            p.font.size = Pt(14)
+            p.alignment = PP_ALIGN.RIGHT
 
-        # --- SLIDE 1: COVER PAGE (Updated Layout) ---
+        # --- SLIDE 1: COVER PAGE ---
         slide1 = prs.slides.add_slide(prs.slide_layouts[6]) # Blank Layout
         add_logos_and_branding(slide1)
 
-        # 1. Centered Title - Moved higher (Inches 1.2 instead of 2.2) and Bolded
-        title_box = slide1.shapes.add_textbox(Inches(0), Inches(1.2), Inches(10), Inches(1.5))
+        # 1. Main Title: "INVENTORY ANALYSER"
+        # Positioned higher and centered
+        title_box = slide1.shapes.add_textbox(Inches(0), Inches(2.5), Inches(10), Inches(1))
         tf = title_box.text_frame
-        tf.word_wrap = True
         p = tf.paragraphs[0]
         p.text = "INVENTORY ANALYSER"
-        p.alignment = PP_ALIGN.CENTER
-        p.font.size = Pt(48)
+        p.font.bold = True
+        p.font.size = Pt(44)
         p.font.name = 'Arial'
-        p.font.bold = True  # Making the title Bold
+        p.alignment = PP_ALIGN.CENTER # Centered on slide
 
-        # 2. Metadata Block (Centered precisely)
-        labels = [
-            f"BUSINESS UNIT:   {biz_unit}",
-            f"PFEP REFERENCE:  {pfep_ref}",
-            f"INVENTORY DATE:  {inv_date}"
-        ]
-    
-        # Start metadata block around the middle of the slide
-        y_pos = 3.5 
-        for text in labels:
-            # Width set to 10 inches and alignment set to CENTER for perfect centering
-            tb = slide1.shapes.add_textbox(Inches(0), Inches(y_pos), Inches(10), Inches(0.6))
-            p = tb.text_frame.paragraphs[0]
-            p.text = text
-            p.alignment = PP_ALIGN.CENTER # Centering the text horizontally
-            p.font.size = Pt(24)
-            p.font.name = 'Arial'
-            y_pos += 0.8
+        # 2. Metadata Block
+        # We use a single textbox with a left margin (Inches 2.8) to keep lines aligned 
+        # on the left side, as seen in your image.
+        meta_box = slide1.shapes.add_textbox(Inches(2.8), Inches(3.8), Inches(6), Inches(2))
+        tf = meta_box.text_frame
+        tf.word_wrap = True
 
-        # --- SLIDE 2: KPI SUMMARY (Values in MINR) ---
+        # Business Unit Line
+        p1 = tf.paragraphs[0]
+        p1.text = f"BUSINESS UNIT:  {biz_unit}"
+        p1.font.size = Pt(22)
+        p1.space_after = Pt(10)
+
+        # PFEP Reference Line
+        p2 = tf.add_paragraph()
+        p2.text = f"PFEP REFERENCE:  {pfep_ref}"
+        p2.font.size = Pt(22)
+        p2.space_after = Pt(10)
+
+        # Inventory Date Line
+        p3 = tf.add_paragraph()
+        p3.text = f"INVENTORY DATE:  {inv_date}"
+        p3.font.size = Pt(22)
+
+        # --- SLIDE 2: KPI SUMMARY ---
         slide2 = prs.slides.add_slide(prs.slide_layouts[6])
         add_logos_and_branding(slide2)
-    
         total_val_minr = df['Current Inventory - VALUE'].sum() / 1_000_000
-    
-        # Simple summary table
         rows, cols = 2, 2
         table = slide2.shapes.add_table(rows, cols, Inches(1.5), Inches(2.5), Inches(7), Inches(1.5)).table
         table.cell(0, 0).text = "Metric Description"
@@ -1365,7 +1370,8 @@ class InventoryManagementSystem:
         slide3 = prs.slides.add_slide(prs.slide_layouts[6])
         add_logos_and_branding(slide3)
         c_data = CategoryChartData()
-        counts = df['INVENTORY REMARK STATUS'].value_counts()
+        status_col = 'INVENTORY REMARK STATUS' if 'INVENTORY REMARK STATUS' in df.columns else 'Status'
+        counts = df[status_col].value_counts()
         c_data.categories = ['Within Norm', 'Excess', 'Short']
         c_data.add_series('Status', (counts.get('Within Norms', 0), counts.get('Excess Inventory', 0), counts.get('Short Inventory', 0)))
         slide3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(2), Inches(8), Inches(4.5), c_data)
