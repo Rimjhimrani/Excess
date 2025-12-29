@@ -1291,57 +1291,59 @@ class InventoryManagementSystem:
                     st.rerun()
 
     def generate_ppt_report(self, analysis_results):
-        """Generates the PPT with the exact layout: Centered title, corner logos, and tables."""
+        """Generates the PPT with updated Cover Page layout."""
         df = pd.DataFrame(analysis_results)
         # Metadata Setup
         biz_unit = st.session_state.get('biz_unit', 'BUS PLANT').upper()
-        # PFEP Ref is set to "ADMIN_MASTER" if data is uploaded/locked
         pfep_ref = "ADMIN_MASTER" if st.session_state.get('persistent_pfep_locked') else st.session_state.get('pfep_ref', 'N/A').upper()
         inv_date = st.session_state.get('inv_date_input', datetime.now()).strftime('%d-%m-%Y')
 
         prs = Presentation()
 
         def add_logos_and_branding(slide):
-            # 1. Top Right: Customer Logo (Uploaded by User)
+            # Top Right: Customer Logo
             if 'customer_logo' in st.session_state and st.session_state.customer_logo:
                 logo_stream = io.BytesIO(st.session_state.customer_logo.getvalue())
                 slide.shapes.add_picture(logo_stream, Inches(8.2), Inches(0.3), height=Inches(0.6))
         
-            # 2. Bottom Right: Agilomatrix Logo (Fixed in code)
+            # Bottom Right: Agilomatrix Logo
             try:
-                # Change 'agilo_logo.png' to your actual logo filename
                 slide.shapes.add_picture('agilo_logo.png', Inches(7.5), Inches(6.8), height=Inches(0.7))
             except:
-                # Fallback text if logo file is missing
                 tx = slide.shapes.add_textbox(Inches(7.5), Inches(7.0), Inches(2), Inches(0.5))
                 tx.text = "Agilomatrix"
 
-        # --- SLIDE 1: COVER PAGE (The Screen You Want) ---
+        # --- SLIDE 1: COVER PAGE (Updated Layout) ---
         slide1 = prs.slides.add_slide(prs.slide_layouts[6]) # Blank Layout
         add_logos_and_branding(slide1)
 
-        # 1. Centered Title
-        title_box = slide1.shapes.add_textbox(Inches(0), Inches(2.2), Inches(10), Inches(1))
+        # 1. Centered Title - Moved higher (Inches 1.2 instead of 2.2) and Bolded
+        title_box = slide1.shapes.add_textbox(Inches(0), Inches(1.2), Inches(10), Inches(1.5))
         tf = title_box.text_frame
-        tf.text = "INVENTORY ANALYSER"
+        tf.word_wrap = True
         p = tf.paragraphs[0]
+        p.text = "INVENTORY ANALYSER"
         p.alignment = PP_ALIGN.CENTER
-        p.font.size = Pt(44)
+        p.font.size = Pt(48)
         p.font.name = 'Arial'
+        p.font.bold = True  # Making the title Bold
 
-        # 2. Metadata Block (Centered column)
+        # 2. Metadata Block (Centered precisely)
         labels = [
             f"BUSINESS UNIT:   {biz_unit}",
             f"PFEP REFERENCE:  {pfep_ref}",
             f"INVENTORY DATE:  {inv_date}"
         ]
     
-        y_pos = 4.0
+        # Start metadata block around the middle of the slide
+        y_pos = 3.5 
         for text in labels:
-            tb = slide1.shapes.add_textbox(Inches(3.2), Inches(y_pos), Inches(6), Inches(0.5))
-            p = tb.text_frame.add_paragraph()
+            # Width set to 10 inches and alignment set to CENTER for perfect centering
+            tb = slide1.shapes.add_textbox(Inches(0), Inches(y_pos), Inches(10), Inches(0.6))
+            p = tb.text_frame.paragraphs[0]
             p.text = text
-            p.font.size = Pt(22)
+            p.alignment = PP_ALIGN.CENTER # Centering the text horizontally
+            p.font.size = Pt(24)
             p.font.name = 'Arial'
             y_pos += 0.8
 
