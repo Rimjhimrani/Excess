@@ -1344,7 +1344,7 @@ class InventoryManagementSystem:
                 except: pass
             # Agilomatrix Logo Image (Bottom Right)
             try:
-                slide.shapes.add_picture("agilomatrix_logo.png", prs.slide_width - AGILO_LOGO_WIDTH - Inches(0.5), prs.slide_height - AGILO_LOGO_HEIGHT - Inches(0.4), width=AGILO_LOGO_WIDTH, height=AGILO_LOGO_HEIGHT)
+                slide.shapes.add_picture("Image.png", prs.slide_width - AGILO_LOGO_WIDTH - Inches(0.5), prs.slide_height - AGILO_LOGO_HEIGHT - Inches(0.4), width=AGILO_LOGO_WIDTH, height=AGILO_LOGO_HEIGHT)
             except:
                 p = slide.shapes.add_textbox(Inches(10.5), Inches(6.5), Inches(2.5), Inches(0.5)).text_frame.paragraphs[0]
                 p.text = "Agilomatrix"; p.alignment = PP_ALIGN.RIGHT
