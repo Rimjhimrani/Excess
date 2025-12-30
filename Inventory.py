@@ -1327,7 +1327,7 @@ class InventoryManagementSystem:
             # 2. Agilomatrix Logo Image (Bottom Right)
             # Replace 'agilomatrix_logo.png' with your actual file path
             try:
-                agilo_logo_path = "agilomatrix_logo.png" 
+                agilo_logo_path = "Image.png" 
                 slide.shapes.add_picture(
                     agilo_logo_path,
                     left=prs.slide_width - AGILO_LOGO_WIDTH - Inches(0.5),
