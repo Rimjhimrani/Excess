@@ -9,6 +9,7 @@ import pickle
 import base64
 import uuid
 import io
+import os
 import re
 from typing import Union, Any, Optional, List, Dict
 from decimal import Decimal, InvalidOperation
