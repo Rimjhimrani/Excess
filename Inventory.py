@@ -1291,7 +1291,7 @@ class InventoryManagementSystem:
                     st.rerun()
 
     def generate_ppt_report(self, analysis_results):
-        """Generates the PPT with the metadata moved to the left side as requested."""
+        """Generates the PPT with metadata shifted to the far left on Slide 1."""
         df = pd.DataFrame(analysis_results)
     
         # Metadata Setup
@@ -1328,7 +1328,6 @@ class InventoryManagementSystem:
         add_branding(slide1)
 
         # 1. Main Title: "INVENTORY ANALYSER"
-        # Centered horizontally
         title_box = slide1.shapes.add_textbox(Inches(0), Inches(1.5), Inches(13.33), Inches(1.5))
         tf = title_box.text_frame
         p = tf.paragraphs[0]
@@ -1338,10 +1337,9 @@ class InventoryManagementSystem:
         p.font.name = 'Arial'
         p.alignment = PP_ALIGN.CENTER
 
-        # 2. Metadata Block - MOVED TO THE LEFT
-        # Left = Inches(1.0) pushes it to the left side of the slide
-        # Top = Inches(3.2) puts it just below the title
-        meta_box = slide1.shapes.add_textbox(Inches(1.0), Inches(3.2), Inches(10.0), Inches(3.0))
+        # 2. Metadata Block - SHIFTED TO THE FAR LEFT
+        # Left position changed from Inches(1.0) to Inches(0.5)
+        meta_box = slide1.shapes.add_textbox(Inches(0.5), Inches(3.2), Inches(10.0), Inches(3.0))
         tf = meta_box.text_frame
         tf.word_wrap = True
 
@@ -1361,14 +1359,21 @@ class InventoryManagementSystem:
             p.font.name = 'Arial'
             p.font.bold = False
             p.space_before = Pt(12) 
-            p.alignment = PP_ALIGN.LEFT # Left aligned as requested
+            p.alignment = PP_ALIGN.LEFT  # Explicitly left-aligned
 
         # --- SLIDE 2: KPI SUMMARY ---
         slide2 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(slide2)
+        # Convert total value to Million INR
         total_val_minr = df['Current Inventory - VALUE'].sum() / 1_000_000
+        
+        # Add a title to slide 2
+        title2 = slide2.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(10), Inches(1))
+        title2.text_frame.text = "Executive KPI Summary"
+        title2.text_frame.paragraphs[0].font.size = Pt(36)
+
         rows, cols = 2, 2
-        table_shape = slide2.shapes.add_table(rows, cols, Inches(3.16), Inches(3.0), Inches(7), Inches(1.5))
+        table_shape = slide2.shapes.add_table(rows, cols, Inches(3.16), Inches(2.5), Inches(7), Inches(1.5))
         table = table_shape.table
         table.cell(0, 0).text = "Metric Description"
         table.cell(0, 1).text = "Value (MINR)"
@@ -1378,11 +1383,20 @@ class InventoryManagementSystem:
         # --- SLIDE 3: STATUS CHART ---
         slide3 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(slide3)
+        
+        title3 = slide3.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(10), Inches(1))
+        title3.text_frame.text = "Inventory Status Distribution"
+        title3.text_frame.paragraphs[0].font.size = Pt(36)
+
         c_data = CategoryChartData()
         status_col = 'INVENTORY REMARK STATUS' if 'INVENTORY REMARK STATUS' in df.columns else 'Status'
         counts = df[status_col].value_counts()
         c_data.categories = ['Within Norm', 'Excess', 'Short']
-        c_data.add_series('Status', (counts.get('Within Norms', 0), counts.get('Excess Inventory', 0), counts.get('Short Inventory', 0)))
+        c_data.add_series('Status', (
+            counts.get('Within Norms', 0), 
+            counts.get('Excess Inventory', 0), 
+            counts.get('Short Inventory', 0)
+        ))
         slide3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(2.16), Inches(1.8), Inches(9.0), Inches(4.5), c_data)
 
         # Save and return
