@@ -1291,7 +1291,7 @@ class InventoryManagementSystem:
                     st.rerun()
 
     def generate_ppt_report(self, analysis_results):
-        """Generates the PPT with metadata shifted to the far left on Slide 1."""
+        """Generates PPT with Centered Metadata and Image Logos."""
         df = pd.DataFrame(analysis_results)
     
         # Metadata Setup
@@ -1300,35 +1300,55 @@ class InventoryManagementSystem:
         inv_date = st.session_state.get('inv_date_input', datetime.now()).strftime('%d-%m-%Y')
 
         prs = Presentation()
-    
-        # 1. Force 16:9 Widescreen layout
         prs.slide_width = Inches(13.33)
         prs.slide_height = Inches(7.5)
 
+        # Define Logo Dimensions
+        CUST_LOGO_WIDTH = Inches(1.8)
+        CUST_LOGO_HEIGHT = Inches(0.8)
+        AGILO_LOGO_WIDTH = Inches(2.0)
+        AGILO_LOGO_HEIGHT = Inches(0.6)
+
         def add_branding(slide):
-            # Top Right Logo
+            # 1. Customer Logo (Top Right)
             if 'customer_logo' in st.session_state and st.session_state.customer_logo:
                 try:
                     logo_stream = io.BytesIO(st.session_state.customer_logo.getvalue())
-                    slide.shapes.add_picture(logo_stream, Inches(11.5), Inches(0.4), height=Inches(0.6))
+                    slide.shapes.add_picture(
+                        logo_stream, 
+                        left=prs.slide_width - CUST_LOGO_WIDTH - Inches(0.5), 
+                        top=Inches(0.4), 
+                        width=CUST_LOGO_WIDTH, 
+                        height=CUST_LOGO_HEIGHT
+                    )
                 except:
                     pass
     
-            # Bottom Right: Agilomatrix Text
-            tx_box = slide.shapes.add_textbox(Inches(10.0), Inches(6.8), Inches(3.0), Inches(0.5))
-            tf = tx_box.text_frame
-            p = tf.paragraphs[0]
-            p.text = "Agilomatrix"
-            p.font.size = Pt(18)
-            p.font.name = 'Arial'
-            p.alignment = PP_ALIGN.RIGHT
+            # 2. Agilomatrix Logo Image (Bottom Right)
+            # Replace 'agilomatrix_logo.png' with your actual file path
+            try:
+                agilo_logo_path = "agilomatrix_logo.png" 
+                slide.shapes.add_picture(
+                    agilo_logo_path,
+                    left=prs.slide_width - AGILO_LOGO_WIDTH - Inches(0.5),
+                    top=prs.slide_height - AGILO_LOGO_HEIGHT - Inches(0.4),
+                    width=AGILO_LOGO_WIDTH,
+                    height=AGILO_LOGO_HEIGHT
+                )
+            except Exception as e:
+                # Fallback to text if image not found
+                tx_box = slide.shapes.add_textbox(Inches(10.0), Inches(6.8), Inches(3.0), Inches(0.5))
+                p = tx_box.text_frame.paragraphs[0]
+                p.text = "Agilomatrix"
+                p.font.size = Pt(18)
+                p.alignment = PP_ALIGN.RIGHT
 
         # --- SLIDE 1: COVER PAGE ---
         slide1 = prs.slides.add_slide(prs.slide_layouts[6]) 
         add_branding(slide1)
 
-        # 1. Main Title: "INVENTORY ANALYSER"
-        title_box = slide1.shapes.add_textbox(Inches(0), Inches(1.5), Inches(13.33), Inches(1.5))
+        # 1. Title: "INVENTORY ANALYSER" (Centered)
+        title_box = slide1.shapes.add_textbox(Inches(0), Inches(2.0), prs.slide_width, Inches(1.5))
         tf = title_box.text_frame
         p = tf.paragraphs[0]
         p.text = "INVENTORY ANALYSER"
@@ -1337,43 +1357,36 @@ class InventoryManagementSystem:
         p.font.name = 'Arial'
         p.alignment = PP_ALIGN.CENTER
 
-        # 2. Metadata Block - SHIFTED TO THE FAR LEFT
-        # Left position changed from Inches(1.0) to Inches(0.5)
-        meta_box = slide1.shapes.add_textbox(Inches(0.5), Inches(3.2), Inches(10.0), Inches(3.0))
+        # 2. Metadata Block (Centered Horizontally and Vertically)
+        # Positioned starting below the title
+        meta_box = slide1.shapes.add_textbox(Inches(0), Inches(3.5), prs.slide_width, Inches(3.0))
         tf = meta_box.text_frame
-        tf.word_wrap = True
-
-        metadata = [
+        
+        metadata_lines = [
             f"BUSINESS UNIT:  {biz_unit}",
             f"PFEP REFERENCE:  {pfep_ref}",
             f"INVENTORY DATE:  {inv_date}"
         ]
 
-        for i, text in enumerate(metadata):
-            if i == 0:
-                p = tf.paragraphs[0]
-            else:
-                p = tf.add_paragraph()
+        for i, text in enumerate(metadata_lines):
+            p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
             p.text = text
-            p.font.size = Pt(28)
+            p.font.size = Pt(32)
             p.font.name = 'Arial'
-            p.font.bold = False
-            p.space_before = Pt(12) 
-            p.alignment = PP_ALIGN.LEFT  # Explicitly left-aligned
+            p.alignment = PP_ALIGN.CENTER # This centers the text lines
+            p.space_before = Pt(15)
 
         # --- SLIDE 2: KPI SUMMARY ---
         slide2 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(slide2)
-        # Convert total value to Million INR
         total_val_minr = df['Current Inventory - VALUE'].sum() / 1_000_000
         
-        # Add a title to slide 2
+        # Add Title to Slide 2
         title2 = slide2.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(10), Inches(1))
         title2.text_frame.text = "Executive KPI Summary"
         title2.text_frame.paragraphs[0].font.size = Pt(36)
 
-        rows, cols = 2, 2
-        table_shape = slide2.shapes.add_table(rows, cols, Inches(3.16), Inches(2.5), Inches(7), Inches(1.5))
+        table_shape = slide2.shapes.add_table(2, 2, Inches(3.16), Inches(3.0), Inches(7), Inches(1.5))
         table = table_shape.table
         table.cell(0, 0).text = "Metric Description"
         table.cell(0, 1).text = "Value (MINR)"
@@ -1392,14 +1405,9 @@ class InventoryManagementSystem:
         status_col = 'INVENTORY REMARK STATUS' if 'INVENTORY REMARK STATUS' in df.columns else 'Status'
         counts = df[status_col].value_counts()
         c_data.categories = ['Within Norm', 'Excess', 'Short']
-        c_data.add_series('Status', (
-            counts.get('Within Norms', 0), 
-            counts.get('Excess Inventory', 0), 
-            counts.get('Short Inventory', 0)
-        ))
+        c_data.add_series('Status', (counts.get('Within Norms', 0), counts.get('Excess Inventory', 0), counts.get('Short Inventory', 0)))
         slide3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(2.16), Inches(1.8), Inches(9.0), Inches(4.5), c_data)
 
-        # Save and return
         ppt_out = io.BytesIO()
         prs.save(ppt_out)
         ppt_out.seek(0)
