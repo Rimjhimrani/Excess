@@ -1291,12 +1291,20 @@ class InventoryManagementSystem:
                     st.rerun()
 
     def generate_ppt_report(self, analysis_results):
-        """Generates PPT with Centered Metadata and Image Logos."""
+        """Generates PPT with Centered Metadata and dynamic PFEP Upload Date."""
         df = pd.DataFrame(analysis_results)
     
-        # Metadata Setup
+        # --- UPDATED PFEP REFERENCE LOGIC ---
+        # Fetch the timestamp from when the Admin saved the PFEP data
+        pfep_meta = st.session_state.get('persistent_pfep_data')
+        if pfep_meta and isinstance(pfep_meta, dict) and 'timestamp' in pfep_meta:
+            # Format the date/time of upload
+            pfep_ref = pfep_meta['timestamp'].strftime('%d-%m-%Y %H:%M')
+        else:
+            pfep_ref = "N/A"
+
+        # General Metadata
         biz_unit = st.session_state.get('biz_unit', 'BUS PLANT').upper()
-        pfep_ref = "ADMIN_MASTER" if st.session_state.get('persistent_pfep_locked') else st.session_state.get('pfep_ref', 'N/A').upper()
         inv_date = st.session_state.get('inv_date_input', datetime.now()).strftime('%d-%m-%Y')
 
         prs = Presentation()
@@ -1325,9 +1333,8 @@ class InventoryManagementSystem:
                     pass
     
             # 2. Agilomatrix Logo Image (Bottom Right)
-            # Replace 'agilomatrix_logo.png' with your actual file path
             try:
-                agilo_logo_path = "Image.png" 
+                agilo_logo_path = "agilomatrix_logo.png" 
                 slide.shapes.add_picture(
                     agilo_logo_path,
                     left=prs.slide_width - AGILO_LOGO_WIDTH - Inches(0.5),
@@ -1335,7 +1342,7 @@ class InventoryManagementSystem:
                     width=AGILO_LOGO_WIDTH,
                     height=AGILO_LOGO_HEIGHT
                 )
-            except Exception as e:
+            except Exception:
                 # Fallback to text if image not found
                 tx_box = slide.shapes.add_textbox(Inches(10.0), Inches(6.8), Inches(3.0), Inches(0.5))
                 p = tx_box.text_frame.paragraphs[0]
@@ -1347,7 +1354,7 @@ class InventoryManagementSystem:
         slide1 = prs.slides.add_slide(prs.slide_layouts[6]) 
         add_branding(slide1)
 
-        # 1. Title: "INVENTORY ANALYSER" (Centered)
+        # 1. Title: Centered
         title_box = slide1.shapes.add_textbox(Inches(0), Inches(2.0), prs.slide_width, Inches(1.5))
         tf = title_box.text_frame
         p = tf.paragraphs[0]
@@ -1357,14 +1364,13 @@ class InventoryManagementSystem:
         p.font.name = 'Arial'
         p.alignment = PP_ALIGN.CENTER
 
-        # 2. Metadata Block (Centered Horizontally and Vertically)
-        # Positioned starting below the title
+        # 2. Metadata Block: Centered
         meta_box = slide1.shapes.add_textbox(Inches(0), Inches(3.5), prs.slide_width, Inches(3.0))
         tf = meta_box.text_frame
         
         metadata_lines = [
             f"BUSINESS UNIT:  {biz_unit}",
-            f"PFEP REFERENCE:  {pfep_ref}",
+            f"PFEP REFERENCE:  {pfep_ref}",  # Now displays the Admin's upload date
             f"INVENTORY DATE:  {inv_date}"
         ]
 
@@ -1373,7 +1379,7 @@ class InventoryManagementSystem:
             p.text = text
             p.font.size = Pt(32)
             p.font.name = 'Arial'
-            p.alignment = PP_ALIGN.CENTER # This centers the text lines
+            p.alignment = PP_ALIGN.CENTER 
             p.space_before = Pt(15)
 
         # --- SLIDE 2: KPI SUMMARY ---
@@ -1381,7 +1387,6 @@ class InventoryManagementSystem:
         add_branding(slide2)
         total_val_minr = df['Current Inventory - VALUE'].sum() / 1_000_000
         
-        # Add Title to Slide 2
         title2 = slide2.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(10), Inches(1))
         title2.text_frame.text = "Executive KPI Summary"
         title2.text_frame.paragraphs[0].font.size = Pt(36)
