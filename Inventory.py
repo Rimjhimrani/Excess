@@ -1291,36 +1291,39 @@ class InventoryManagementSystem:
                     st.rerun()
 
     def generate_ppt_report(self, analysis_results):
-        """Generates PPT with Centered Slide 1 and Structured KPI Slide 2."""
+        """Generates PPT with Centered Slide 1 and the new textual design for Slide 2."""
         df = pd.DataFrame(analysis_results)
         
         # --- Metadata & Settings ---
-        biz_unit = st.session_state.get('biz_unit', 'P4 BUS PLANT').upper()
+        biz_unit = st.session_state.get('biz_unit', 'BUS PLANT').upper()
         ideal_days = st.session_state.get('user_preferences', {}).get('ideal_inventory_days', 30)
         tolerance = st.session_state.get('admin_tolerance', 30)
         inv_date = st.session_state.get('inv_date_input', datetime.now()).strftime('%d-%m-%Y')
         
-        # Fetch PFEP timestamp
+        # Fetch PFEP timestamp (Date admin entered the file)
         pfep_meta = st.session_state.get('persistent_pfep_data')
         pfep_ref = pfep_meta['timestamp'].strftime('%d-%m-%Y %H:%M') if (pfep_meta and isinstance(pfep_meta, dict) and 'timestamp' in pfep_meta) else "N/A"
 
         # --- Calculations for Slide 2 ---
         total_qty = df['Current Inventory - Qty'].sum()
         total_avg_cons = df['AVG CONSUMPTION/DAY'].apply(self.safe_float_convert).sum()
-        total_val_minr = df['Current Inventory - VALUE'].sum() / 1_000_000
+        total_val_actual = df['Current Inventory - VALUE'].sum()
         
-        # Calculate Actual Days (Total Qty / Total Avg Consumption)
+        # 1. Actual Days and Actual MINR
         actual_inv_days = total_qty / total_avg_cons if total_avg_cons > 0 else 0
+        actual_minr = total_val_actual / 1_000_000
         
-        # Ideal MINR: Sum of (Avg Cons * Ideal Days * Unit Price)
-        df['Ideal_Val'] = df['AVG CONSUMPTION/DAY'].apply(self.safe_float_convert) * ideal_days * df['UNIT PRICE']
-        ideal_inv_minr = df['Ideal_Val'].sum() / 1_000_000
+        # 2. Ideal MINR
+        ideal_val_total = (df['AVG CONSUMPTION/DAY'].apply(self.safe_float_convert) * ideal_days * df['UNIT PRICE']).sum()
+        ideal_minr = ideal_val_total / 1_000_000
         
-        # Excess/Short in MINR
-        excess_minr = df[df['INVENTORY REMARK STATUS'] == 'Excess Inventory']['Stock Deviation Value'].sum() / 1_000_000
-        short_minr = abs(df[df['INVENTORY REMARK STATUS'] == 'Short Inventory']['Stock Deviation Value'].sum()) / 1_000_000
+        # 3. Excess/Short MINR
+        excess_val = df[df['INVENTORY REMARK STATUS'] == 'Excess Inventory']['Stock Deviation Value'].sum()
+        short_val = abs(df[df['INVENTORY REMARK STATUS'] == 'Short Inventory']['Stock Deviation Value'].sum())
+        excess_minr = excess_val / 1_000_000
+        short_minr = short_val / 1_000_000
         
-        # Excess/Short in Days (Simplified: Difference relative to Ideal)
+        # 4. Excess/Short Days
         excess_days = max(0, actual_inv_days - (ideal_days * (1 + tolerance/100)))
         short_days = max(0, (ideal_days * (1 - tolerance/100)) - actual_inv_days)
 
@@ -1330,7 +1333,7 @@ class InventoryManagementSystem:
         prs.slide_height = Inches(7.5)
         
         CUST_LOGO_WIDTH, CUST_LOGO_HEIGHT = Inches(1.8), Inches(0.8)
-        AGILO_LOGO_WIDTH, AGILO_LOGO_HEIGHT = Inches(2.0), Inches(0.6)
+        AGILO_LOGO_WIDTH, AGILO_LOGO_HEIGHT = Inches(2.0), Inches(0.8)
 
         def add_branding(slide):
             # Customer Logo (Top Right)
@@ -1339,11 +1342,11 @@ class InventoryManagementSystem:
                     logo_stream = io.BytesIO(st.session_state.customer_logo.getvalue())
                     slide.shapes.add_picture(logo_stream, prs.slide_width - CUST_LOGO_WIDTH - Inches(0.5), Inches(0.4), width=CUST_LOGO_WIDTH, height=CUST_LOGO_HEIGHT)
                 except: pass
-            # Agilomatrix Logo (Bottom Right)
+            # Agilomatrix Logo Image (Bottom Right)
             try:
                 slide.shapes.add_picture("agilomatrix_logo.png", prs.slide_width - AGILO_LOGO_WIDTH - Inches(0.5), prs.slide_height - AGILO_LOGO_HEIGHT - Inches(0.4), width=AGILO_LOGO_WIDTH, height=AGILO_LOGO_HEIGHT)
             except:
-                p = slide.shapes.add_textbox(Inches(10.5), Inches(6.8), Inches(2), Inches(0.5)).text_frame.paragraphs[0]
+                p = slide.shapes.add_textbox(Inches(10.5), Inches(6.5), Inches(2.5), Inches(0.5)).text_frame.paragraphs[0]
                 p.text = "Agilomatrix"; p.alignment = PP_ALIGN.RIGHT
 
         # --- SLIDE 1: COVER PAGE (Centered) ---
@@ -1354,60 +1357,57 @@ class InventoryManagementSystem:
         p1 = t1.paragraphs[0]; p1.text = "INVENTORY ANALYSER"; p1.font.bold = True; p1.font.size = Pt(54); p1.alignment = PP_ALIGN.CENTER
         
         m1 = slide1.shapes.add_textbox(Inches(0), Inches(3.5), prs.slide_width, Inches(3.0)).text_frame
-        for i, text in enumerate([f"BUSINESS UNIT:  {biz_unit}", f"PFEP REFERENCE:  {pfep_ref}", f"INVENTORY DATE:  {inv_date}"]):
+        for i, text in enumerate([f"BUSSINESS UNIT:  {biz_unit}", f"PFEP REFERENCE:  {pfep_ref}", f"INVENTORY DATE:  {inv_date}"]):
             p = m1.paragraphs[0] if i == 0 else m1.add_paragraph()
             p.text = text; p.font.size = Pt(32); p.alignment = PP_ALIGN.CENTER; p.space_before = Pt(15)
 
-        # --- SLIDE 2: KPI BOX DESIGN ---
+        # --- SLIDE 2: NEW TEXTUAL DESIGN ---
         slide2 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(slide2)
         
-        # "Page 2" text
-        p2_text = slide2.shapes.add_textbox(Inches(0.5), Inches(0.4), Inches(2), Inches(0.5))
-        p2_text.text_frame.text = "Page 2"
-
-        # Header Info: Business Unit & Date
-        header_box = slide2.shapes.add_textbox(Inches(1.0), Inches(0.8), Inches(6), Inches(1.2))
-        htf = header_box.text_frame
-        h1 = htf.paragraphs[0]; h1.text = f"Business Unit        {biz_unit}"; h1.font.size = Pt(20)
-        h2 = htf.add_paragraph(); h2.text = f"Inventory Date      {inv_date}"; h2.font.size = Pt(20); h2.space_before = Pt(10)
-
-        def add_kpi_box(left, top, width, height, labels, values):
-            # Draw Rectangle
-            from pptx.enum.shapes import MSO_SHAPE
-            rect = slide2.shapes.add_shape(MSO_SHAPE.RECTANGLE, left, top, width, height)
-            rect.fill.background() # Transparent
-            rect.line.color.rgb = RGBColor(0, 0, 0)
-            rect.line.width = Pt(1.5)
-            # Add Text
-            tx = slide2.shapes.add_textbox(left + Inches(0.1), top + Inches(0.1), width - Inches(0.2), height - Inches(0.2))
-            tf = tx.text_frame
-            for i, (l, v) in enumerate(zip(labels, values)):
-                p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-                p.text = f"{l:<30} {v}"
-                p.font.size = Pt(18); p.font.name = 'Arial'
-
-        # Box 1: Left - Days
-        add_kpi_box(Inches(1.0), Inches(2.8), Inches(4.5), Inches(1.8), 
-                    ["Ideal Inventory in Days", "Tolerance Level (%)", "Actual Inventory in Days"], 
-                    [f"{ideal_days}", f"{tolerance}%", f"{actual_inv_days:.1f}"])
+        # Layout Settings
+        LEFT_COL = Inches(3.5)
+        RIGHT_COL = Inches(7.5)
+        FONT_SIZE = Pt(22)
         
-        # Box 2: Right - MINR
-        add_kpi_box(Inches(7.5), Inches(2.8), Inches(4.5), Inches(1.8), 
-                    ["Ideal Inventory in MINR", "Tolerance Level (%)", "Actual Inventory in MINR"], 
-                    [f"{ideal_inv_minr:.2f}", f"{tolerance}%", f"{total_val_minr:.2f}"])
-        
-        # Box 3: Left - Excess/Short Days
-        add_kpi_box(Inches(1.0), Inches(5.2), Inches(4.5), Inches(1.2), 
-                    ["Excess in Days", "Short in Days"], 
-                    [f"{excess_days:.1f}", f"{short_days:.1f}"])
-        
-        # Box 4: Right - Excess/Short MINR
-        add_kpi_box(Inches(7.5), Inches(5.2), Inches(4.5), Inches(1.2), 
-                    ["Excess in MINR", "Short in MINR"], 
-                    [f"{excess_minr:.2f}", f"{short_minr:.2f}"])
+        # 1. Top Section (Header Info)
+        top_box = slide2.shapes.add_textbox(LEFT_COL, Inches(1.0), Inches(6), Inches(2))
+        tf_top = top_box.text_frame
+        for i, text in enumerate([f"BUSSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]):
+            p = tf_top.paragraphs[0] if i == 0 else tf_top.add_paragraph()
+            p.text = text; p.font.size = FONT_SIZE; p.space_after = Pt(10)
 
-        # --- SLIDE 3: CHART ---
+        # 2. Middle Section (Inventory Stats)
+        # Left Side (Days)
+        mid_left = slide2.shapes.add_textbox(LEFT_COL, Inches(3.2), Inches(4), Inches(2))
+        tf_ml = mid_left.text_frame
+        for i, text in enumerate([f"Ideal Inventory in Days: {ideal_days}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in Day: {actual_inv_days:.1f}"]):
+            p = tf_ml.paragraphs[0] if i == 0 else tf_ml.add_paragraph()
+            p.text = text; p.font.size = FONT_SIZE; p.space_after = Pt(10)
+
+        # Right Side (MINR)
+        mid_right = slide2.shapes.add_textbox(RIGHT_COL, Inches(3.2), Inches(4), Inches(2))
+        tf_mr = mid_right.text_frame
+        for i, text in enumerate([f"Ideal Inventory in MINR: {ideal_minr:.2f}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in MINR: {actual_minr:.2f}"]):
+            p = tf_mr.paragraphs[0] if i == 0 else tf_mr.add_paragraph()
+            p.text = text; p.font.size = FONT_SIZE; p.space_after = Pt(10)
+
+        # 3. Bottom Section (Excess/Short)
+        # Left Side (Days)
+        bot_left = slide2.shapes.add_textbox(LEFT_COL, Inches(5.5), Inches(4), Inches(1.5))
+        tf_bl = bot_left.text_frame
+        for i, text in enumerate([f"Excess in Days: {excess_days:.1f}", f"Short in Days: {short_days:.1f}"]):
+            p = tf_bl.paragraphs[0] if i == 0 else tf_bl.add_paragraph()
+            p.text = text; p.font.size = FONT_SIZE; p.space_after = Pt(10)
+
+        # Right Side (MINR)
+        bot_right = slide2.shapes.add_textbox(RIGHT_COL, Inches(5.5), Inches(4), Inches(1.5))
+        tf_br = bot_right.text_frame
+        for i, text in enumerate([f"Excess in MINR: {excess_minr:.2f}", f"Short in MINR: {short_minr:.2f}"]):
+            p = tf_br.paragraphs[0] if i == 0 else tf_br.add_paragraph()
+            p.text = text; p.font.size = FONT_SIZE; p.space_after = Pt(10)
+
+        # --- SLIDE 3: STATUS CHART ---
         slide3 = prs.slides.add_slide(prs.slide_layouts[6]); add_branding(slide3)
         c_data = CategoryChartData()
         status_col = 'INVENTORY REMARK STATUS' if 'INVENTORY REMARK STATUS' in df.columns else 'Status'
