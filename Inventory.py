@@ -1290,8 +1290,7 @@ class InventoryManagementSystem:
                     st.session_state.persistent_inventory_locked = True
                     st.success(f"✅ Sample inventory data loaded and locked: {len(sample_data)} parts")
                     st.rerun()
-
-   def generate_ppt_report(self, analysis_results):
+    def generate_ppt_report(self, analysis_results):
         """
         Generates a professional 3-slide PPT report matching the user's layout.
         Slide 1: Centered Cover Page
