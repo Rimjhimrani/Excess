@@ -1298,13 +1298,6 @@ class InventoryManagementSystem:
         Slide 2: Centered Header with Left-Aligned Metric Columns
         Slide 3: Inventory Status Graph + Data Table
         """
-        import os
-        from pptx.util import Inches, Pt
-        from pptx.enum.text import PP_ALIGN
-        from pptx.dml.color import RGBColor
-        from pptx.chart.data import CategoryChartData
-        from pptx.enum.chart import XL_CHART_TYPE
-
         df = pd.DataFrame(analysis_results)
         
         # --- 1. Metadata & Global Settings ---
@@ -1328,7 +1321,6 @@ class InventoryManagementSystem:
         excess_minr = df[df['Status'] == 'Excess Inventory']['Stock Deviation Value'].sum() / 1_000_000
         short_minr = abs(df[df['Status'] == 'Short Inventory']['Stock Deviation Value'].sum()) / 1_000_000
         
-        # Note: Calculation of 'Excess/Short in Days' relative to tolerance limits
         excess_days = max(0, actual_inv_days - (ideal_days * (1 + tolerance/100)))
         short_days = max(0, (ideal_days * (1 - tolerance/100)) - actual_inv_days)
 
@@ -1341,14 +1333,12 @@ class InventoryManagementSystem:
         A_LOGO_W, A_LOGO_H = Inches(2.2), Inches(0.8)
 
         def add_branding(slide):
-            """Adds Logos to every slide"""
-            # Customer Logo (Top Right)
+            """Internal helper to add Logos to every slide"""
             if 'customer_logo' in st.session_state and st.session_state.customer_logo:
                 try:
                     stream = io.BytesIO(st.session_state.customer_logo.getvalue())
                     slide.shapes.add_picture(stream, prs.slide_width - C_LOGO_W - Inches(0.5), Inches(0.4), C_LOGO_W, C_LOGO_H)
                 except: pass
-            # Agilomatrix Logo (Bottom Right)
             logo_path = os.path.join(os.getcwd(), "Image.png")
             if os.path.exists(logo_path):
                 try:
@@ -1378,10 +1368,8 @@ class InventoryManagementSystem:
         s2 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(s2)
         
-        # L_COL shifted left from 3.5 to 1.5 to provide more space
         L_COL, R_COL, FS = Inches(1.5), Inches(8.0), Pt(24)
         
-        # Header Section - Centered across slide
         top = s2.shapes.add_textbox(Inches(0), Inches(0.8), prs.slide_width, Inches(2)).text_frame
         for i, txt in enumerate([f"BUSSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]):
             p = top.paragraphs[0] if i == 0 else top.add_paragraph()
@@ -1390,7 +1378,6 @@ class InventoryManagementSystem:
             p.alignment = PP_ALIGN.CENTER
             p.space_after = Pt(12)
 
-        # Middle Section (Inventory Stats)
         ml = s2.shapes.add_textbox(L_COL, Inches(3.5), Inches(6), Inches(2)).text_frame
         for i, txt in enumerate([f"Ideal Inventory in Days: {ideal_days}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in Day: {actual_inv_days:.1f}"]):
             p = ml.paragraphs[0] if i == 0 else ml.add_paragraph()
@@ -1401,7 +1388,6 @@ class InventoryManagementSystem:
             p = mr.paragraphs[0] if i == 0 else mr.add_paragraph()
             p.text = txt; p.font.size = FS; p.space_after = Pt(15)
 
-        # Bottom Section (Excess/Short)
         bl = s2.shapes.add_textbox(L_COL, Inches(6.0), Inches(6), Inches(1.5)).text_frame
         for i, txt in enumerate([f"Excess in Days: {excess_days:.1f}", f"Short in Days: {short_days:.1f}"]):
             p = bl.paragraphs[0] if i == 0 else bl.add_paragraph()
@@ -1416,7 +1402,6 @@ class InventoryManagementSystem:
         s3 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(s3)
         
-        # Summary Data
         status_map = {'Within Norms': 'Within Norm', 'Excess Inventory': 'Excess than Norm', 'Short Inventory': 'Short Than Norm'}
         metrics = []
         for sk, disp in status_map.items():
@@ -1425,7 +1410,6 @@ class InventoryManagementSystem:
             dev = sub['Stock Deviation Value'].sum() / 1_000_000 if sk == 'Excess Inventory' else (abs(sub['Stock Deviation Value'].sum()) / 1_000_000 if sk == 'Short Inventory' else 0)
             metrics.append({'Cat': disp, 'Count': len(sub), 'Val': val, 'Dev': dev})
 
-        # Chart
         cd = CategoryChartData()
         cd.categories = [m['Cat'] for m in metrics]
         cd.add_series('Part Count', [m['Count'] for m in metrics])
@@ -1434,7 +1418,6 @@ class InventoryManagementSystem:
         for i, pt in enumerate(chart.plots[0].series[0].points):
             pt.format.fill.solid(); pt.format.fill.fore_color.rgb = colors[i]
 
-        # Table
         tbl = s3.shapes.add_table(4, 4, Inches(1.0), Inches(5.2), Inches(11.0), Inches(1.5)).table
         hdrs = ["Status", "Part Count", "Total Value (MINR)", "Excess/Short (MINR)"]
         for c, h in enumerate(hdrs):
