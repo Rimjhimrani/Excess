@@ -1293,13 +1293,13 @@ class InventoryManagementSystem:
 
     def generate_ppt_report(self, analysis_results):
         """
-        Generates a 3-slide PPT report. 
-        Slide 2 is adjusted to shift text left and avoid logo overlap.
+        Slide 1: Custom Cinematic Cover (Matches Image).
+        Slide 2 & 3: Your original logic (Shows Business Unit/PFEP/Date).
         """
         df = pd.DataFrame(analysis_results)
         
         # --- Metadata ---
-        biz_unit = st.session_state.get('biz_unit', 'BUS PLANT').upper()
+        biz_unit = st.session_state.get('ppt_biz_unit', 'BUS PLANT').upper()
         ideal_days = st.session_state.user_preferences.get('ideal_inventory_days', 30)
         tolerance = st.session_state.admin_tolerance
         inv_date = datetime.now().strftime('%d-%m-%Y')
@@ -1322,11 +1322,12 @@ class InventoryManagementSystem:
         prs = Presentation()
         prs.slide_width = Inches(13.33)
         prs.slide_height = Inches(7.5)
+        
         C_LOGO_W, C_LOGO_H = Inches(1.8), Inches(0.8)
         A_LOGO_W, A_LOGO_H = Inches(2.2), Inches(0.8)
 
         def add_branding(slide):
-            """Adds Logos without overlapping text zones"""
+            """Original branding for Slide 2 and 3"""
             if 'customer_logo' in st.session_state and st.session_state.customer_logo:
                 try:
                     stream = io.BytesIO(st.session_state.customer_logo.getvalue())
@@ -1338,54 +1339,74 @@ class InventoryManagementSystem:
                     slide.shapes.add_picture(logo_path, prs.slide_width - A_LOGO_W - Inches(0.5), prs.slide_height - A_LOGO_H - Inches(0.3), A_LOGO_W, A_LOGO_H)
                 except: pass
 
-        # --- SLIDE 1: COVER PAGE ---
+        # ==========================================
+        # SLIDE 1: UPDATED CINEMATIC COVER
+        # ==========================================
         s1 = prs.slides.add_slide(prs.slide_layouts[6]) 
-        add_branding(s1)
-        tf1 = s1.shapes.add_textbox(Inches(1), Inches(2.5), Inches(11.33), Inches(1.5)).text_frame
-        p1 = tf1.paragraphs[0]; p1.text = "INVENTORY ANALYSER"; p1.font.bold = True; p1.font.size = Pt(48); p1.alignment = PP_ALIGN.CENTER
-        mf1 = s1.shapes.add_textbox(Inches(1), Inches(4.0), Inches(11.33), Inches(3.0)).text_frame
-        for txt in [f"BUSSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]:
-            p = mf1.add_paragraph(); p.text = txt; p.font.size = Pt(26); p.alignment = PP_ALIGN.CENTER; p.space_before = Pt(12)
+        
+        # 1. Background Warehouse Image
+        bg_path = os.path.join(os.getcwd(), "background.png")
+        if os.path.exists(bg_path):
+            s1.shapes.add_picture(bg_path, 0, 0, width=prs.slide_width, height=prs.slide_height)
 
-        # --- SLIDE 2: KPI METRICS (No Overlap Layout) ---
+        # 2. Main Title: INVENTORY ANALYSER
+        title_box = s1.shapes.add_textbox(0, Inches(3.0), prs.slide_width, Inches(1.0))
+        tf = title_box.text_frame
+        p = tf.paragraphs[0]
+        p.text = "INVENTORY ANALYSER"
+        p.font.bold = True; p.font.size = Pt(54); p.font.color.rgb = RGBColor(255, 255, 255); p.alignment = PP_ALIGN.CENTER
+
+        # 3. Tagline
+        tagline_box = s1.shapes.add_textbox(0, Inches(4.0), prs.slide_width, Inches(0.5))
+        p2 = tagline_box.text_frame.paragraphs[0]
+        p2.text = "Optimize Stock, Reduce Costs, and Forecast Smarter with AI"
+        p2.font.size = Pt(22); p2.font.color.rgb = RGBColor(255, 255, 255); p2.alignment = PP_ALIGN.CENTER
+
+        # 4. Credit Line
+        credit_box = s1.shapes.add_textbox(0, Inches(5.8), prs.slide_width, Inches(0.5))
+        p3 = credit_box.text_frame.paragraphs[0]
+        run1 = p3.add_run(); run1.text = "Developed by "
+        run2 = p3.add_run(); run2.text = "Rimjhim Rani"; run2.font.bold = True
+        run3 = p3.add_run(); run3.text = " | "
+        run4 = p3.add_run(); run4.text = "Agilomatrix"; run4.font.bold = True
+        p3.font.size = Pt(20); p3.font.color.rgb = RGBColor(255, 255, 255); p3.alignment = PP_ALIGN.CENTER
+
+        # 5. Agilomatrix Logo (Bottom Right)
+        logo_path = os.path.join(os.getcwd(), "Image.png")
+        if os.path.exists(logo_path):
+            s1.shapes.add_picture(logo_path, prs.slide_width - Inches(2.3), prs.slide_height - Inches(1.1), width=Inches(2.0))
+
+        # ==========================================
+        # SLIDE 2: KPI METRICS (NO CHANGES)
+        # ==========================================
         s2 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(s2)
-        
-        # Position definitions to keep clear of logos (Right logo is at ~10.6")
-        L_COL = Inches(1.2)
-        R_COL = Inches(7.2)
-        BOX_W = Inches(3.5)
-        FS = Pt(22)
-        
-        # Centered Header (narrower to avoid top-right logo)
+        L_COL, R_COL, BOX_W, FS = Inches(1.2), Inches(7.2), Inches(3.5), Pt(22)
         top = s2.shapes.add_textbox(Inches(2), Inches(0.6), Inches(9.33), Inches(2.5)).text_frame
         for txt in [f"BUSSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]:
             p = top.add_paragraph(); p.text = txt; p.font.size = Pt(28); p.alignment = PP_ALIGN.CENTER; p.space_after = Pt(10)
 
-        # Metrics: Left Column
         ml = s2.shapes.add_textbox(L_COL, Inches(3.2), BOX_W, Inches(2.5)).text_frame
         for txt in [f"Ideal Inventory in Days: {ideal_days}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in Day: {actual_inv_days:.1f}"]:
             p = ml.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
 
-        # Metrics: Right Column (Narrower width to avoid right-side logo)
         mr = s2.shapes.add_textbox(R_COL, Inches(3.2), BOX_W, Inches(2.5)).text_frame
         for txt in [f"Ideal Inventory in MINR: {ideal_minr:.2f}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in MINR: {actual_minr:.2f}"]:
             p = mr.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
 
-        # Excess/Short: Left
         bl = s2.shapes.add_textbox(L_COL, Inches(5.6), BOX_W, Inches(1.5)).text_frame
         for txt in [f"Excess in Days: {excess_days:.1f}", f"Short in Days: {short_days:.1f}"]:
             p = bl.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
 
-        # Excess/Short: Right
         br = s2.shapes.add_textbox(R_COL, Inches(5.6), BOX_W, Inches(1.5)).text_frame
         for txt in [f"Excess in MINR: {excess_minr:.2f}", f"Short in MINR: {short_minr:.2f}"]:
             p = br.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
 
-        # --- SLIDE 3: GRAPH & DATA TABLE ---
+        # ==========================================
+        # SLIDE 3: GRAPH & DATA TABLE (NO CHANGES)
+        # ==========================================
         s3 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(s3)
-        
         status_map = {'Within Norms': 'Within Norm', 'Excess Inventory': 'Excess than Norm', 'Short Inventory': 'Short Than Norm'}
         metrics = []
         for sk, disp in status_map.items():
@@ -1394,48 +1415,21 @@ class InventoryManagementSystem:
             dev = sub['Stock Deviation Value'].sum() / 1_000_000 if sk == 'Excess Inventory' else (abs(sub['Stock Deviation Value'].sum()) / 1_000_000 if sk == 'Short Inventory' else 0)
             metrics.append({'Cat': disp, 'Count': len(sub), 'Val': val, 'Dev': dev})
 
-        # 1. Position the Chart in the Center
-        # Slide width is 13.33". Chart width 6.5". (13.33 - 6.5) / 2 = ~3.41"
-        chart_width = Inches(6.5)
-        chart_left = Inches(3.41)
-        
         cd = CategoryChartData()
         cd.categories = [m['Cat'] for m in metrics]
         cd.add_series('Part Count', [m['Count'] for m in metrics])
-        
-        chart_shape = s3.shapes.add_chart(
-            XL_CHART_TYPE.COLUMN_CLUSTERED, chart_left, Inches(1.2), 
-            chart_width, Inches(3.5), cd
-        )
-        chart = chart_shape.chart
-        
+        chart = s3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(3.41), Inches(1.2), Inches(6.5), Inches(3.5), cd).chart
         colors = [RGBColor(76, 175, 80), RGBColor(33, 150, 243), RGBColor(244, 67, 54)]
         for i, pt in enumerate(chart.plots[0].series[0].points):
-            pt.format.fill.solid()
-            pt.format.fill.fore_color.rgb = colors[i]
+            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = colors[i]
 
-        # 2. Position the Table in the Center
-        # Table width 8.5". (13.33 - 8.5) / 2 = ~2.41"
-        # This width leaves enough space to avoid the Agilomatrix logo in the bottom right.
-        table_width = Inches(8.5)
-        table_left = Inches(2.41)
-        
-        tbl_obj = s3.shapes.add_table(4, 4, table_left, Inches(5.0), table_width, Inches(1.5))
-        tbl = tbl_obj.table
-        
+        tbl = s3.shapes.add_table(4, 4, Inches(2.41), Inches(5.0), Inches(8.5), Inches(1.5)).table
         hdrs = ["Status", "Part Count", "Value (MINR)", "Deviation (MINR)"]
         for c, h in enumerate(hdrs):
-            cell = tbl.cell(0, c)
-            cell.text = h
-            cell.text_frame.paragraphs[0].font.bold = True
-            cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER # Center text in header
-
+            cell = tbl.cell(0, c); cell.text = h; cell.text_frame.paragraphs[0].font.bold = True; cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
         for r, m in enumerate(metrics, 1):
-            row_data = [m['Cat'], str(m['Count']), f"{m['Val']:.2f}", f"{m['Dev']:.2f}"]
-            for c, text in enumerate(row_data):
-                cell = tbl.cell(r, c)
-                cell.text = text
-                cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER # Center text in cells
+            for c, text in enumerate([m['Cat'], str(m['Count']), f"{m['Val']:.2f}", f"{m['Dev']:.2f}"]):
+                cell = tbl.cell(r, c); cell.text = text; cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
                 
         ppt_out = io.BytesIO()
         prs.save(ppt_out)
