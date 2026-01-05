@@ -1294,7 +1294,7 @@ class InventoryManagementSystem:
     def generate_ppt_report(self, analysis_results):
         """
         Generates a 3-slide PPT report. 
-        Updated Slide 3 to center the Chart and Table perfectly.
+        Slide 2 is adjusted to shift text left and avoid logo overlap.
         """
         df = pd.DataFrame(analysis_results)
         
@@ -1344,26 +1344,45 @@ class InventoryManagementSystem:
         tf1 = s1.shapes.add_textbox(Inches(1), Inches(2.5), Inches(11.33), Inches(1.5)).text_frame
         p1 = tf1.paragraphs[0]; p1.text = "INVENTORY ANALYSER"; p1.font.bold = True; p1.font.size = Pt(48); p1.alignment = PP_ALIGN.CENTER
         mf1 = s1.shapes.add_textbox(Inches(1), Inches(4.0), Inches(11.33), Inches(3.0)).text_frame
-        for txt in [f"BUSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]:
+        for txt in [f"BUSSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]:
             p = mf1.add_paragraph(); p.text = txt; p.font.size = Pt(26); p.alignment = PP_ALIGN.CENTER; p.space_before = Pt(12)
 
-        # --- SLIDE 2: KPI METRICS ---
+        # --- SLIDE 2: KPI METRICS (No Overlap Layout) ---
         s2 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(s2)
-        L_COL, R_COL, BOX_W, FS = Inches(1.2), Inches(7.2), Inches(3.5), Pt(22)
+        
+        # Position definitions to keep clear of logos (Right logo is at ~10.6")
+        L_COL = Inches(1.2)
+        R_COL = Inches(7.2)
+        BOX_W = Inches(3.5)
+        FS = Pt(22)
+        
+        # Centered Header (narrower to avoid top-right logo)
         top = s2.shapes.add_textbox(Inches(2), Inches(0.6), Inches(9.33), Inches(2.5)).text_frame
-        for txt in [f"BUSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]:
+        for txt in [f"BUSSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]:
             p = top.add_paragraph(); p.text = txt; p.font.size = Pt(28); p.alignment = PP_ALIGN.CENTER; p.space_after = Pt(10)
 
+        # Metrics: Left Column
         ml = s2.shapes.add_textbox(L_COL, Inches(3.2), BOX_W, Inches(2.5)).text_frame
         for txt in [f"Ideal Inventory in Days: {ideal_days}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in Day: {actual_inv_days:.1f}"]:
             p = ml.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
 
+        # Metrics: Right Column (Narrower width to avoid right-side logo)
         mr = s2.shapes.add_textbox(R_COL, Inches(3.2), BOX_W, Inches(2.5)).text_frame
         for txt in [f"Ideal Inventory in MINR: {ideal_minr:.2f}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in MINR: {actual_minr:.2f}"]:
             p = mr.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
 
-        # --- SLIDE 3: GRAPH & DATA TABLE (Centered Layout) ---
+        # Excess/Short: Left
+        bl = s2.shapes.add_textbox(L_COL, Inches(5.6), BOX_W, Inches(1.5)).text_frame
+        for txt in [f"Excess in Days: {excess_days:.1f}", f"Short in Days: {short_days:.1f}"]:
+            p = bl.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
+
+        # Excess/Short: Right
+        br = s2.shapes.add_textbox(R_COL, Inches(5.6), BOX_W, Inches(1.5)).text_frame
+        for txt in [f"Excess in MINR: {excess_minr:.2f}", f"Short in MINR: {short_minr:.2f}"]:
+            p = br.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
+
+        # --- SLIDE 3: GRAPH & DATA TABLE ---
         s3 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(s3)
         status_map = {'Within Norms': 'Within Norm', 'Excess Inventory': 'Excess than Norm', 'Short Inventory': 'Short Than Norm'}
@@ -1374,41 +1393,20 @@ class InventoryManagementSystem:
             dev = sub['Stock Deviation Value'].sum() / 1_000_000 if sk == 'Excess Inventory' else (abs(sub['Stock Deviation Value'].sum()) / 1_000_000 if sk == 'Short Inventory' else 0)
             metrics.append({'Cat': disp, 'Count': len(sub), 'Val': val, 'Dev': dev})
 
-        # Chart Centering Logic
-        chart_width = Inches(7.5)
-        chart_left = (prs.slide_width - chart_width) / 2
-        
         cd = CategoryChartData()
         cd.categories = [m['Cat'] for m in metrics]
         cd.add_series('Part Count', [m['Count'] for m in metrics])
-        
-        chart_shape = s3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, chart_left, Inches(1.2), chart_width, Inches(3.5), cd)
-        chart = chart_shape.chart
+        chart = s3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(0.8), Inches(1.2), Inches(5.5), Inches(3.5), cd).chart
         colors = [RGBColor(76, 175, 80), RGBColor(33, 150, 243), RGBColor(244, 67, 54)]
         for i, pt in enumerate(chart.plots[0].series[0].points):
             pt.format.fill.solid(); pt.format.fill.fore_color.rgb = colors[i]
 
-        # Table Centering Logic
-        table_width = Inches(10.0)
-        table_left = (prs.slide_width - table_width) / 2
-        
-        tbl_shape = s3.shapes.add_table(4, 4, table_left, Inches(5.0), table_width, Inches(1.5))
-        tbl = tbl_shape.table
-        
+        tbl = s3.shapes.add_table(4, 4, Inches(0.8), Inches(5.0), Inches(10.5), Inches(1.5)).table
         hdrs = ["Status", "Part Count", "Value (MINR)", "Deviation (MINR)"]
         for c, h in enumerate(hdrs):
-            cell = tbl.cell(0, c)
-            cell.text = h
-            cell.text_frame.paragraphs[0].font.bold = True
-            cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
-            
+            tbl.cell(0, c).text = h; tbl.cell(0, c).text_frame.paragraphs[0].font.bold = True
         for r, m in enumerate(metrics, 1):
-            tbl.cell(r, 0).text = m['Cat']
-            tbl.cell(r, 1).text = str(m['Count'])
-            tbl.cell(r, 2).text = f"{m['Val']:.2f}"
-            tbl.cell(r, 3).text = f"{m['Dev']:.2f}"
-            for c in range(4):
-                tbl.cell(r, c).text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+            tbl.cell(r, 0).text = m['Cat']; tbl.cell(r, 1).text = str(m['Count']); tbl.cell(r, 2).text = f"{m['Val']:.2f}"; tbl.cell(r, 3).text = f"{m['Dev']:.2f}"
 
         ppt_out = io.BytesIO()
         prs.save(ppt_out)
