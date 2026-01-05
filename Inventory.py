@@ -1394,18 +1394,19 @@ class InventoryManagementSystem:
             dev = sub['Stock Deviation Value'].sum() / 1_000_000 if sk == 'Excess Inventory' else (abs(sub['Stock Deviation Value'].sum()) / 1_000_000 if sk == 'Short Inventory' else 0)
             metrics.append({'Cat': disp, 'Count': len(sub), 'Val': val, 'Dev': dev})
 
-        # 1. Position the Chart in the Center
-        # Slide width is 13.33". Chart width 6.5". (13.33 - 6.5) / 2 = ~3.41"
-        chart_width = Inches(6.5)
-        chart_left = Inches(3.41)
+        # 1. Position the Chart in the Center, but higher up
+        # Top moved from 1.2 to 0.9
+        chart_width = Inches(7.0)
+        chart_left = (prs.slide_width - chart_width) / 2
+        chart_top = Inches(0.9) 
         
         cd = CategoryChartData()
         cd.categories = [m['Cat'] for m in metrics]
         cd.add_series('Part Count', [m['Count'] for m in metrics])
         
         chart_shape = s3.shapes.add_chart(
-            XL_CHART_TYPE.COLUMN_CLUSTERED, chart_left, Inches(1.2), 
-            chart_width, Inches(3.5), cd
+            XL_CHART_TYPE.COLUMN_CLUSTERED, chart_left, chart_top, 
+            chart_width, Inches(3.3), cd
         )
         chart = chart_shape.chart
         
@@ -1414,13 +1415,13 @@ class InventoryManagementSystem:
             pt.format.fill.solid()
             pt.format.fill.fore_color.rgb = colors[i]
 
-        # 2. Position the Table in the Center
-        # Table width 8.5". (13.33 - 8.5) / 2 = ~2.41"
-        # This width leaves enough space to avoid the Agilomatrix logo in the bottom right.
-        table_width = Inches(8.5)
-        table_left = Inches(2.41)
+        # 2. Position the Table in the Center, but higher up
+        # Top moved from 5.0 to 4.4 to avoid bottom logo overlap
+        table_width = Inches(9.0)
+        table_left = (prs.slide_width - table_width) / 2
+        table_top = Inches(4.4)
         
-        tbl_obj = s3.shapes.add_table(4, 4, table_left, Inches(5.0), table_width, Inches(1.5))
+        tbl_obj = s3.shapes.add_table(4, 4, table_left, table_top, table_width, Inches(1.5))
         tbl = tbl_obj.table
         
         hdrs = ["Status", "Part Count", "Value (MINR)", "Deviation (MINR)"]
@@ -1428,14 +1429,14 @@ class InventoryManagementSystem:
             cell = tbl.cell(0, c)
             cell.text = h
             cell.text_frame.paragraphs[0].font.bold = True
-            cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER # Center text in header
+            cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER 
 
         for r, m in enumerate(metrics, 1):
             row_data = [m['Cat'], str(m['Count']), f"{m['Val']:.2f}", f"{m['Dev']:.2f}"]
             for c, text in enumerate(row_data):
                 cell = tbl.cell(r, c)
                 cell.text = text
-                cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER # Center text in cells
+                cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
                 
         ppt_out = io.BytesIO()
         prs.save(ppt_out)
