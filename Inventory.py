@@ -1294,7 +1294,7 @@ class InventoryManagementSystem:
     def generate_ppt_report(self, analysis_results):
         """
         Generates a 3-slide PPT report. 
-        Slide 3 is centered and optimized to avoid logo overlap.
+        Updated Slide 3 to center the Chart and Table perfectly.
         """
         df = pd.DataFrame(analysis_results)
         
@@ -1315,7 +1315,9 @@ class InventoryManagementSystem:
         ideal_minr = ideal_val_total / 1_000_000
         excess_minr = df[df['Status'] == 'Excess Inventory']['Stock Deviation Value'].sum() / 1_000_000
         short_minr = abs(df[df['Status'] == 'Short Inventory']['Stock Deviation Value'].sum()) / 1_000_000
-        
+        excess_days = max(0, actual_inv_days - (ideal_days * (1 + tolerance/100)))
+        short_days = max(0, (ideal_days * (1 - tolerance/100)) - actual_inv_days)
+
         # --- PPT Setup ---
         prs = Presentation()
         prs.slide_width = Inches(13.33)
@@ -1324,7 +1326,7 @@ class InventoryManagementSystem:
         A_LOGO_W, A_LOGO_H = Inches(2.2), Inches(0.8)
 
         def add_branding(slide):
-            """Adds Logos without overlapping content"""
+            """Adds Logos without overlapping text zones"""
             if 'customer_logo' in st.session_state and st.session_state.customer_logo:
                 try:
                     stream = io.BytesIO(st.session_state.customer_logo.getvalue())
@@ -1336,30 +1338,34 @@ class InventoryManagementSystem:
                     slide.shapes.add_picture(logo_path, prs.slide_width - A_LOGO_W - Inches(0.5), prs.slide_height - A_LOGO_H - Inches(0.3), A_LOGO_W, A_LOGO_H)
                 except: pass
 
-        # --- SLIDE 1 & 2 remain as per previous logic ---
-        # (Slide 1 & 2 code abbreviated for focus on Slide 3)
-        s1 = prs.slides.add_slide(prs.slide_layouts[6]); add_branding(s1)
-        tf1 = s1.shapes.add_textbox(Inches(0), Inches(3), prs.slide_width, Inches(1.5)).text_frame
+        # --- SLIDE 1: COVER PAGE ---
+        s1 = prs.slides.add_slide(prs.slide_layouts[6]) 
+        add_branding(s1)
+        tf1 = s1.shapes.add_textbox(Inches(1), Inches(2.5), Inches(11.33), Inches(1.5)).text_frame
         p1 = tf1.paragraphs[0]; p1.text = "INVENTORY ANALYSER"; p1.font.bold = True; p1.font.size = Pt(48); p1.alignment = PP_ALIGN.CENTER
-        
-        s2 = prs.slides.add_slide(prs.slide_layouts[6]); add_branding(s2)
-        top_box = s2.shapes.add_textbox(Inches(0), Inches(0.8), prs.slide_width, Inches(2)).text_frame
-        p2 = top_box.paragraphs[0]; p2.text = f"BUSINESS UNIT: {biz_unit}\nINVENTORY DATE: {inv_date}"; p2.alignment = PP_ALIGN.CENTER; p2.font.size = Pt(24)
+        mf1 = s1.shapes.add_textbox(Inches(1), Inches(4.0), Inches(11.33), Inches(3.0)).text_frame
+        for txt in [f"BUSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]:
+            p = mf1.add_paragraph(); p.text = txt; p.font.size = Pt(26); p.alignment = PP_ALIGN.CENTER; p.space_before = Pt(12)
 
-        # --- SLIDE 3: GRAPH & DATA TABLE (Centered & No Overlap) ---
+        # --- SLIDE 2: KPI METRICS ---
+        s2 = prs.slides.add_slide(prs.slide_layouts[6])
+        add_branding(s2)
+        L_COL, R_COL, BOX_W, FS = Inches(1.2), Inches(7.2), Inches(3.5), Pt(22)
+        top = s2.shapes.add_textbox(Inches(2), Inches(0.6), Inches(9.33), Inches(2.5)).text_frame
+        for txt in [f"BUSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]:
+            p = top.add_paragraph(); p.text = txt; p.font.size = Pt(28); p.alignment = PP_ALIGN.CENTER; p.space_after = Pt(10)
+
+        ml = s2.shapes.add_textbox(L_COL, Inches(3.2), BOX_W, Inches(2.5)).text_frame
+        for txt in [f"Ideal Inventory in Days: {ideal_days}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in Day: {actual_inv_days:.1f}"]:
+            p = ml.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
+
+        mr = s2.shapes.add_textbox(R_COL, Inches(3.2), BOX_W, Inches(2.5)).text_frame
+        for txt in [f"Ideal Inventory in MINR: {ideal_minr:.2f}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in MINR: {actual_minr:.2f}"]:
+            p = mr.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
+
+        # --- SLIDE 3: GRAPH & DATA TABLE (Centered Layout) ---
         s3 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(s3)
-        
-        # 1. Slide Title (Centered)
-        title_box = s3.shapes.add_textbox(Inches(0), Inches(0.5), prs.slide_width, Inches(0.6))
-        title_tf = title_box.text_frame
-        p = title_tf.paragraphs[0]
-        p.text = "INVENTORY STATUS SUMMARY"
-        p.font.bold = True
-        p.font.size = Pt(28)
-        p.alignment = PP_ALIGN.CENTER
-
-        # Prepare Metrics Data
         status_map = {'Within Norms': 'Within Norm', 'Excess Inventory': 'Excess than Norm', 'Short Inventory': 'Short Than Norm'}
         metrics = []
         for sk, disp in status_map.items():
@@ -1368,31 +1374,25 @@ class InventoryManagementSystem:
             dev = sub['Stock Deviation Value'].sum() / 1_000_000 if sk == 'Excess Inventory' else (abs(sub['Stock Deviation Value'].sum()) / 1_000_000 if sk == 'Short Inventory' else 0)
             metrics.append({'Cat': disp, 'Count': len(sub), 'Val': val, 'Dev': dev})
 
-        # 2. Centered Chart
+        # Chart Centering Logic
+        chart_width = Inches(7.5)
+        chart_left = (prs.slide_width - chart_width) / 2
+        
         cd = CategoryChartData()
         cd.categories = [m['Cat'] for m in metrics]
         cd.add_series('Part Count', [m['Count'] for m in metrics])
         
-        c_width = Inches(8.0)   # Width optimized to avoid right-side logo
-        c_height = Inches(3.5)
-        c_left = (prs.slide_width - c_width) / 2
-        c_top = Inches(1.4)
-        
-        chart_frame = s3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, c_left, c_top, c_width, c_height, cd)
-        chart = chart_frame.chart
+        chart_shape = s3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, chart_left, Inches(1.2), chart_width, Inches(3.5), cd)
+        chart = chart_shape.chart
         colors = [RGBColor(76, 175, 80), RGBColor(33, 150, 243), RGBColor(244, 67, 54)]
         for i, pt in enumerate(chart.plots[0].series[0].points):
             pt.format.fill.solid(); pt.format.fill.fore_color.rgb = colors[i]
-        chart.has_title = True
-        chart.chart_title.text_frame.text = "Part Count Breakdown"
 
-        # 3. Centered Table
-        t_width = Inches(9.5)   # Narrower than chart for clean hierarchy
-        t_height = Inches(1.5)
-        t_left = (prs.slide_width - t_width) / 2
-        t_top = Inches(5.0)     # Positioned below chart with gap
+        # Table Centering Logic
+        table_width = Inches(10.0)
+        table_left = (prs.slide_width - table_width) / 2
         
-        tbl_shape = s3.shapes.add_table(4, 4, t_left, t_top, t_width, t_height)
+        tbl_shape = s3.shapes.add_table(4, 4, table_left, Inches(5.0), table_width, Inches(1.5))
         tbl = tbl_shape.table
         
         hdrs = ["Status", "Part Count", "Value (MINR)", "Deviation (MINR)"]
@@ -1403,11 +1403,12 @@ class InventoryManagementSystem:
             cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
             
         for r, m in enumerate(metrics, 1):
-            values = [m['Cat'], str(m['Count']), f"{m['Val']:.2f}", f"{m['Dev']:.2f}"]
-            for c, val in enumerate(values):
-                cell = tbl.cell(r, c)
-                cell.text = val
-                cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+            tbl.cell(r, 0).text = m['Cat']
+            tbl.cell(r, 1).text = str(m['Count'])
+            tbl.cell(r, 2).text = f"{m['Val']:.2f}"
+            tbl.cell(r, 3).text = f"{m['Dev']:.2f}"
+            for c in range(4):
+                tbl.cell(r, c).text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
 
         ppt_out = io.BytesIO()
         prs.save(ppt_out)
