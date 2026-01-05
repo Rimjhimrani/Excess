@@ -1293,34 +1293,28 @@ class InventoryManagementSystem:
 
     def generate_ppt_report(self, analysis_results):
         """
-        Generates a professional 3-slide PPT report.
-        Fixes the 'Repair' error by sanitizing data and ensuring valid XML structures.
+        Generates a 3-slide PPT report. 
+        Slide 2 is adjusted to shift text left and avoid logo overlap.
         """
-
-        # 1. Sanitize Data (Crucial: prevents XML corruption from NaN/Inf)
         df = pd.DataFrame(analysis_results)
-        df = df.replace([np.inf, -np.inf], np.nan).fillna(0)
         
         # --- Metadata ---
-        biz_unit = str(st.session_state.get('biz_unit', 'BUS PLANT')).upper()
+        biz_unit = st.session_state.get('biz_unit', 'BUS PLANT').upper()
         ideal_days = st.session_state.user_preferences.get('ideal_inventory_days', 30)
         tolerance = st.session_state.admin_tolerance
         inv_date = datetime.now().strftime('%d-%m-%Y')
         pfep_ts = self.persistence.get_data_timestamp('persistent_pfep_data')
         pfep_ref = pfep_ts.strftime('%d-%m-%Y %H:%M') if pfep_ts else "N/A"
 
-        # --- Global Calculations (MINR = Value / 1,000,000) ---
-        total_qty = float(df['Current Inventory - Qty'].sum())
-        total_avg_cons = float(df['AVG CONSUMPTION/DAY'].apply(self.safe_float_convert).sum())
+        # --- Calculations ---
+        total_qty = df['Current Inventory - Qty'].sum()
+        total_avg_cons = df['AVG CONSUMPTION/DAY'].apply(self.safe_float_convert).sum()
         actual_inv_days = total_qty / total_avg_cons if total_avg_cons > 0 else 0
-        actual_minr = float(df['Current Inventory - VALUE'].sum()) / 1_000_000
-        
+        actual_minr = df['Current Inventory - VALUE'].sum() / 1_000_000
         ideal_val_total = (df['AVG CONSUMPTION/DAY'].apply(self.safe_float_convert) * ideal_days * df['UNIT PRICE']).sum()
-        ideal_minr = float(ideal_val_total) / 1_000_000
-        
-        excess_minr = float(df[df['Status'] == 'Excess Inventory']['Stock Deviation Value'].sum()) / 1_000_000
-        short_minr = abs(float(df[df['Status'] == 'Short Inventory']['Stock Deviation Value'].sum())) / 1_000_000
-        
+        ideal_minr = ideal_val_total / 1_000_000
+        excess_minr = df[df['Status'] == 'Excess Inventory']['Stock Deviation Value'].sum() / 1_000_000
+        short_minr = abs(df[df['Status'] == 'Short Inventory']['Stock Deviation Value'].sum()) / 1_000_000
         excess_days = max(0, actual_inv_days - (ideal_days * (1 + tolerance/100)))
         short_days = max(0, (ideal_days * (1 - tolerance/100)) - actual_inv_days)
 
@@ -1332,7 +1326,7 @@ class InventoryManagementSystem:
         A_LOGO_W, A_LOGO_H = Inches(2.2), Inches(0.8)
 
         def add_branding(slide):
-            """Adds Logos in corners without overlap"""
+            """Adds Logos without overlapping text zones"""
             if 'customer_logo' in st.session_state and st.session_state.customer_logo:
                 try:
                     stream = io.BytesIO(st.session_state.customer_logo.getvalue())
@@ -1345,91 +1339,74 @@ class InventoryManagementSystem:
                 except: pass
 
         # --- SLIDE 1: COVER PAGE ---
-        s1 = prs.slides.add_slide(prs.slide_layouts[6]); add_branding(s1)
-        tf1 = s1.shapes.add_textbox(Inches(1), Inches(2.2), Inches(11.33), Inches(1.5)).text_frame
-        tf1.text = "INVENTORY ANALYSER"
-        p1 = tf1.paragraphs[0]; p1.font.bold = True; p1.font.size = Pt(48); p1.alignment = PP_ALIGN.CENTER
+        s1 = prs.slides.add_slide(prs.slide_layouts[6]) 
+        add_branding(s1)
+        tf1 = s1.shapes.add_textbox(Inches(1), Inches(2.5), Inches(11.33), Inches(1.5)).text_frame
+        p1 = tf1.paragraphs[0]; p1.text = "INVENTORY ANALYSER"; p1.font.bold = True; p1.font.size = Pt(48); p1.alignment = PP_ALIGN.CENTER
+        mf1 = s1.shapes.add_textbox(Inches(1), Inches(4.0), Inches(11.33), Inches(3.0)).text_frame
+        for txt in [f"BUSSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]:
+            p = mf1.add_paragraph(); p.text = txt; p.font.size = Pt(26); p.alignment = PP_ALIGN.CENTER; p.space_before = Pt(12)
+
+        # --- SLIDE 2: KPI METRICS (No Overlap Layout) ---
+        s2 = prs.slides.add_slide(prs.slide_layouts[6])
+        add_branding(s2)
         
-        mf1 = s1.shapes.add_textbox(Inches(1), Inches(3.8), Inches(11.33), Inches(3.0)).text_frame
-        m_lines = [f"BUSSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]
-        for i, txt in enumerate(m_lines):
-            p = mf1.paragraphs[0] if i == 0 else mf1.add_paragraph()
-            p.text = txt; p.font.size = Pt(26); p.alignment = PP_ALIGN.CENTER; p.space_before = Pt(12)
-
-        # --- SLIDE 2: KPI METRICS (Avoiding Overlap) ---
-        s2 = prs.slides.add_slide(prs.slide_layouts[6]); add_branding(s2)
-        L_COL, R_COL, BOX_W, FS = Inches(1.2), Inches(7.2), Inches(4.5), Pt(22)
+        # Position definitions to keep clear of logos (Right logo is at ~10.6")
+        L_COL = Inches(1.2)
+        R_COL = Inches(7.2)
+        BOX_W = Inches(3.5)
+        FS = Pt(22)
         
-        hdr_tf = s2.shapes.add_textbox(Inches(2), Inches(0.6), Inches(9.33), Inches(2.0)).text_frame
-        hdr_lines = [f"BUSSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]
-        for i, txt in enumerate(hdr_lines):
-            p = hdr_tf.paragraphs[0] if i == 0 else hdr_tf.add_paragraph()
-            p.text = txt; p.font.size = Pt(28); p.alignment = PP_ALIGN.CENTER; p.space_after = Pt(10)
+        # Centered Header (narrower to avoid top-right logo)
+        top = s2.shapes.add_textbox(Inches(2), Inches(0.6), Inches(9.33), Inches(2.5)).text_frame
+        for txt in [f"BUSSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]:
+            p = top.add_paragraph(); p.text = txt; p.font.size = Pt(28); p.alignment = PP_ALIGN.CENTER; p.space_after = Pt(10)
 
-        # Content Logic for Slide 2
-        blocks = [
-            (L_COL, 3.2, [f"Ideal Inventory in Days: {ideal_days}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in Day: {actual_inv_days:.1f}"]),
-            (R_COL, 3.2, [f"Ideal Inventory in MINR: {ideal_minr:.2f}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in MINR: {actual_minr:.2f}"]),
-            (L_COL, 5.6, [f"Excess in Days: {excess_days:.1f}", f"Short in Days: {short_days:.1f}"]),
-            (R_COL, 5.6, [f"Excess in MINR: {excess_minr:.2f}", f"Short in MINR: {short_minr:.2f}"])
-        ]
-        for x, y, lines in blocks:
-            tf = s2.shapes.add_textbox(x, Inches(y), BOX_W, Inches(2.0)).text_frame
-            for i, line in enumerate(lines):
-                p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
-                p.text = line; p.font.size = FS; p.space_after = Pt(15)
+        # Metrics: Left Column
+        ml = s2.shapes.add_textbox(L_COL, Inches(3.2), BOX_W, Inches(2.5)).text_frame
+        for txt in [f"Ideal Inventory in Days: {ideal_days}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in Day: {actual_inv_days:.1f}"]:
+            p = ml.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
 
-        # --- SLIDE 3: GRAPH & DATA TABLE (Centered & Safe) ---
-        s3 = prs.slides.add_slide(prs.slide_layouts[6]); add_branding(s3)
+        # Metrics: Right Column (Narrower width to avoid right-side logo)
+        mr = s2.shapes.add_textbox(R_COL, Inches(3.2), BOX_W, Inches(2.5)).text_frame
+        for txt in [f"Ideal Inventory in MINR: {ideal_minr:.2f}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in MINR: {actual_minr:.2f}"]:
+            p = mr.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
 
-        title_tf = s3.shapes.add_textbox(Inches(0), Inches(0.8), prs.slide_width, Inches(0.6)).text_frame
-        title_tf.text = "Part Count"
-        p_t = title_tf.paragraphs[0]; p_t.font.bold = True; p_t.font.size = Pt(32); p_t.alignment = PP_ALIGN.CENTER
+        # Excess/Short: Left
+        bl = s2.shapes.add_textbox(L_COL, Inches(5.6), BOX_W, Inches(1.5)).text_frame
+        for txt in [f"Excess in Days: {excess_days:.1f}", f"Short in Days: {short_days:.1f}"]:
+            p = bl.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
 
-        # Data for Summary
-        status_cfg = [
-            ('Within Norms', 'Within Norm', RGBColor(76, 175, 80)),
-            ('Excess Inventory', 'Excess than Norm', RGBColor(33, 150, 243)),
-            ('Short Inventory', 'Short Than Norm', RGBColor(244, 67, 54))
-        ]
-        
-        m_list = []
-        for real, disp, color in status_cfg:
-            sub = df[df['Status'] == real]
-            v_val = float(sub['Current Inventory - VALUE'].sum()) / 1_000_000
-            d_val = 0.0 if real == 'Within Norms' else (float(sub['Stock Deviation Value'].sum()) / 1_000_000 if real == 'Excess Inventory' else abs(float(sub['Stock Deviation Value'].sum())) / 1_000_000)
-            m_list.append({'Label': disp, 'Count': len(sub), 'Val': v_val, 'Dev': d_val, 'Color': color})
+        # Excess/Short: Right
+        br = s2.shapes.add_textbox(R_COL, Inches(5.6), BOX_W, Inches(1.5)).text_frame
+        for txt in [f"Excess in MINR: {excess_minr:.2f}", f"Short in MINR: {short_minr:.2f}"]:
+            p = br.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
 
-        # Centered Chart
-        c_w, c_h = Inches(8.0), Inches(3.6)
-        c_x = (prs.slide_width - c_w) / 2
+        # --- SLIDE 3: GRAPH & DATA TABLE ---
+        s3 = prs.slides.add_slide(prs.slide_layouts[6])
+        add_branding(s3)
+        status_map = {'Within Norms': 'Within Norm', 'Excess Inventory': 'Excess than Norm', 'Short Inventory': 'Short Than Norm'}
+        metrics = []
+        for sk, disp in status_map.items():
+            sub = df[df['Status'] == sk]
+            val = sub['Current Inventory - VALUE'].sum() / 1_000_000
+            dev = sub['Stock Deviation Value'].sum() / 1_000_000 if sk == 'Excess Inventory' else (abs(sub['Stock Deviation Value'].sum()) / 1_000_000 if sk == 'Short Inventory' else 0)
+            metrics.append({'Cat': disp, 'Count': len(sub), 'Val': val, 'Dev': dev})
+
         cd = CategoryChartData()
-        cd.categories = [m['Label'] for m in m_list]
-        cd.add_series('Count', [m['Count'] for m in m_list])
-        chart = s3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, c_x, Inches(1.5), c_w, c_h, cd).chart
+        cd.categories = [m['Cat'] for m in metrics]
+        cd.add_series('Part Count', [m['Count'] for m in metrics])
+        chart = s3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(0.8), Inches(1.2), Inches(5.5), Inches(3.5), cd).chart
+        colors = [RGBColor(76, 175, 80), RGBColor(33, 150, 243), RGBColor(244, 67, 54)]
         for i, pt in enumerate(chart.plots[0].series[0].points):
-            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = m_list[i]['Color']
+            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = colors[i]
 
-        # Centered Styled Table
-        t_w = Inches(11.0)
-        t_x = (prs.slide_width - t_w) / 2
-        tbl = s3.shapes.add_table(4, 4, t_x, Inches(5.2), t_w, Inches(1.6)).table
-        
-        h_labels = ["Status", "Part Count", "Value (MINR)", "Deviation (MINR)"]
-        for c, h in enumerate(h_labels):
-            cell = tbl.cell(0, c)
-            cell.text = h
-            cell.fill.solid(); cell.fill.fore_color.rgb = RGBColor(84, 130, 187)
-            p = cell.text_frame.paragraphs[0]
-            p.font.bold = True; p.font.color.rgb = RGBColor(255, 255, 255); p.font.size = Pt(18)
-
-        for r, m in enumerate(m_list, 1):
-            tbl.cell(r, 0).text = m['Label']
-            tbl.cell(r, 1).text = f"{m['Count']:,}"
-            tbl.cell(r, 2).text = f"{m['Val']:.2f}"
-            tbl.cell(r, 3).text = f"{m['Dev']:.2f}"
-            for c in range(4):
-                tbl.cell(r, c).text_frame.paragraphs[0].font.size = Pt(16)
+        tbl = s3.shapes.add_table(4, 4, Inches(0.8), Inches(5.0), Inches(10.5), Inches(1.5)).table
+        hdrs = ["Status", "Part Count", "Value (MINR)", "Deviation (MINR)"]
+        for c, h in enumerate(hdrs):
+            tbl.cell(0, c).text = h; tbl.cell(0, c).text_frame.paragraphs[0].font.bold = True
+        for r, m in enumerate(metrics, 1):
+            tbl.cell(r, 0).text = m['Cat']; tbl.cell(r, 1).text = str(m['Count']); tbl.cell(r, 2).text = f"{m['Val']:.2f}"; tbl.cell(r, 3).text = f"{m['Dev']:.2f}"
 
         ppt_out = io.BytesIO()
         prs.save(ppt_out)
