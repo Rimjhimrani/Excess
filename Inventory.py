@@ -1380,27 +1380,75 @@ class InventoryManagementSystem:
         # SLIDE 2: KPI METRICS (NO CHANGES)
         # ==========================================
         s2 = prs.slides.add_slide(prs.slide_layouts[6])
-        add_branding(s2)
-        L_COL, R_COL, BOX_W, FS = Inches(1.2), Inches(7.2), Inches(3.5), Pt(22)
-        top = s2.shapes.add_textbox(Inches(2), Inches(0.6), Inches(9.33), Inches(2.5)).text_frame
-        for txt in [f"BUSSINESS UNIT: {biz_unit}", f"PFEP REFERENCE: {pfep_ref}", f"INVENTORY DATE: {inv_date}"]:
-            p = top.add_paragraph(); p.text = txt; p.font.size = Pt(28); p.alignment = PP_ALIGN.CENTER; p.space_after = Pt(10)
+        
+        # 1. Business Unit Badge
+        badge = s2.shapes.add_shape(1, Inches(0.8), Inches(0.6), Inches(1.4), Inches(0.35))
+        badge.fill.solid(); badge.fill.fore_color.rgb = RGBColor(235, 230, 220); badge.line.width = 0
+        btf = badge.text_frame
+        btp = btf.paragraphs[0]
+        btp.text = f"📊 {biz_unit}"; btp.font.size = Pt(14); btp.font.color.rgb = COLOR_DARK; btp.alignment = PP_ALIGN.CENTER
 
-        ml = s2.shapes.add_textbox(L_COL, Inches(3.2), BOX_W, Inches(2.5)).text_frame
-        for txt in [f"Ideal Inventory in Days: {ideal_days}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in Day: {actual_inv_days:.1f}"]:
-            p = ml.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
+        # 2. Main Title
+        title_shape = s2.shapes.add_textbox(Inches(0.8), Inches(1.0), Inches(10), Inches(0.8))
+        tf = title_shape.text_frame
+        p = tf.paragraphs[0]
+        p.text = "Current Inventory Performance Overview"
+        p.font.size = Pt(44); p.font.name = FONT_SERIF; p.font.color.rgb = RGBColor(89, 81, 75)
 
-        mr = s2.shapes.add_textbox(R_COL, Inches(3.2), BOX_W, Inches(2.5)).text_frame
-        for txt in [f"Ideal Inventory in MINR: {ideal_minr:.2f}", f"Tolerance Level(%): {tolerance}%", f"Actual Inventory in MINR: {actual_minr:.2f}"]:
-            p = mr.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
+        # 3. Intro Text
+        intro_shape = s2.shapes.add_textbox(Inches(0.8), Inches(1.8), Inches(11), Inches(1))
+        p = intro_shape.text_frame.paragraphs[0]
+        p.text = f"Snapshot analysis for the {biz_unit} facility as of {inv_date}, benchmarked against PFEP standards. The data reveals significant inventory imbalances requiring immediate attention."
+        p.font.size = Pt(18); p.font.color.rgb = COLOR_DARK; p.word_wrap = True
 
-        bl = s2.shapes.add_textbox(L_COL, Inches(5.6), BOX_W, Inches(1.5)).text_frame
-        for txt in [f"Excess in Days: {excess_days:.1f}", f"Short in Days: {short_days:.1f}"]:
-            p = bl.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
+        # 4. BIG KPIs Row (Target, Actual, Variance)
+        kpi_y = Inches(2.8)
+        kpi_widths = [Inches(4), Inches(4), Inches(4)]
+        kpi_x = [Inches(1), Inches(4.5), Inches(8)]
+        
+        # Target Days
+        t_val = s2.shapes.add_textbox(kpi_x[0], kpi_y, kpi_widths[0], Inches(1)).text_frame
+        p1 = t_val.paragraphs[0]; p1.text = f"{ideal_days}"; p1.font.size = Pt(72); p1.font.name = FONT_SERIF; p1.alignment = PP_ALIGN.CENTER
+        p2 = t_val.add_paragraph(); p2.text = "Target Days"; p2.font.size = Pt(24); p2.alignment = PP_ALIGN.CENTER
+        p3 = t_val.add_paragraph(); p3.text = "Ideal inventory level"; p3.font.size = Pt(14); p3.font.color.rgb = COLOR_LIGHT; p3.alignment = PP_ALIGN.CENTER
+        
+        # Actual Days
+        a_val = s2.shapes.add_textbox(kpi_x[1], kpi_y, kpi_widths[1], Inches(1)).text_frame
+        p1 = a_val.paragraphs[0]; p1.text = f"{actual_inv_days:.1f}"; p1.font.size = Pt(72); p1.font.name = FONT_SERIF; p1.alignment = PP_ALIGN.CENTER
+        p2 = a_val.add_paragraph(); p2.text = "Actual Days"; p2.font.size = Pt(24); p2.alignment = PP_ALIGN.CENTER
+        p3 = a_val.add_paragraph(); p3.text = "Current on-hand inventory"; p3.font.size = Pt(14); p3.font.color.rgb = COLOR_LIGHT; p3.alignment = PP_ALIGN.CENTER
 
-        br = s2.shapes.add_textbox(R_COL, Inches(5.6), BOX_W, Inches(1.5)).text_frame
-        for txt in [f"Excess in MINR: {excess_minr:.2f}", f"Short in MINR: {short_minr:.2f}"]:
-            p = br.add_paragraph(); p.text = txt; p.font.size = FS; p.space_after = Pt(15)
+        # Variance
+        v_val = s2.shapes.add_textbox(kpi_x[2], kpi_y, kpi_widths[2], Inches(1)).text_frame
+        p1 = v_val.paragraphs[0]; p1.text = f"{variance_pct:,.0f}%"; p1.font.size = Pt(72); p1.font.name = FONT_SERIF; p1.alignment = PP_ALIGN.CENTER
+        p2 = v_val.add_paragraph(); p2.text = "Variance"; p2.font.size = Pt(24); p2.alignment = PP_ALIGN.CENTER
+        p3 = v_val.add_paragraph(); p3.text = "Over target inventory" if variance_pct > 0 else "Under target inventory"; p3.font.size = Pt(14); p3.font.color.rgb = COLOR_LIGHT; p3.alignment = PP_ALIGN.CENTER
+
+        # 5. Bottom Two Columns
+        col_y = Inches(4.8)
+        # Left: Inventory Value Analysis
+        l_col = s2.shapes.add_textbox(Inches(0.8), col_y, Inches(5), Inches(2)).text_frame
+        p = l_col.paragraphs[0]; p.text = "Inventory Value Analysis"; p.font.size = Pt(24); p.font.name = FONT_SERIF; p.space_after = Pt(10)
+        items = [f"Ideal Inventory: ₹{ideal_minr*10:,.2f} MINR", f"Actual Inventory: ₹{actual_minr*10:,.2f} MINR", f"Tolerance Level: {tolerance}%"]
+        for item in items:
+            bullet = l_col.add_paragraph(); bullet.text = item; bullet.font.size = Pt(18); bullet.level = 0; bullet.space_before = Pt(5)
+
+        # Right: Critical Deviations
+        r_col = s2.shapes.add_textbox(Inches(6.5), col_y, Inches(5), Inches(2)).text_frame
+        p = r_col.paragraphs[0]; p.text = "Critical Deviations"; p.font.size = Pt(24); p.font.name = FONT_SERIF; p.space_after = Pt(10)
+        devs = [f"Excess: ₹{excess_minr*10:,.2f} MINR ({excess_days:.1f} days)", f"Shortage: ₹{short_minr*10:,.2f} MINR", "Action Required: Immediate rebalancing"]
+        for dev in devs:
+            bullet = r_col.add_paragraph(); bullet.text = dev; bullet.font.size = Pt(18); bullet.level = 0; bullet.space_before = Pt(5)
+
+        # 6. Analysis Reference Footer
+        footer = s2.shapes.add_textbox(Inches(0.8), Inches(6.8), Inches(10), Inches(0.4))
+        p = footer.text_frame.paragraphs[0]
+        p.text = f"Analysis Reference: PFEP dated {pfep_ref_str} | Inventory captured {datetime.now().strftime('%d-%m-%Y')}"
+        p.font.size = Pt(14); p.font.italic = True; p.font.color.rgb = COLOR_LIGHT
+
+        # 7. Logo (Bottom Right)
+        if os.path.exists(logo_path):
+            s2.shapes.add_picture(logo_path, prs.slide_width - Inches(2.3), prs.slide_height - Inches(0.9), width=Inches(2.0))
 
         # ==========================================
         # SLIDE 3: GRAPH & DATA TABLE (NO CHANGES)
