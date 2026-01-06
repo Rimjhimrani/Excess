@@ -1356,28 +1356,38 @@ class InventoryManagementSystem:
         # SLIDE 1: COVER (Keeping Content & Logo)
         # ==========================================
         s1 = prs.slides.add_slide(prs.slide_layouts[6]) 
+        
+        # 1. Background Warehouse Image
+        bg_path = os.path.join(os.getcwd(), "background.png")
         if os.path.exists(bg_path):
             s1.shapes.add_picture(bg_path, 0, 0, width=prs.slide_width, height=prs.slide_height)
-        
-        # Title
-        title_box = s1.shapes.add_textbox(Inches(1.0), Inches(2.5), Inches(11), Inches(1.2))
+
+        # 2. Main Title: INVENTORY ANALYSER
+        title_box = s1.shapes.add_textbox(0, Inches(3.0), prs.slide_width, Inches(1.0))
         tf = title_box.text_frame
         p = tf.paragraphs[0]
         p.text = "INVENTORY ANALYSER"
-        p.font.bold = True; p.font.size = Pt(54); p.font.color.rgb = RGBColor(255, 255, 255)
+        p.font.bold = True; p.font.size = Pt(54); p.font.color.rgb = RGBColor(255, 255, 255); p.alignment = PP_ALIGN.CENTER
 
-        # Tagline
-        p2 = tf.add_paragraph()
-        p2.text = "Optimize stock levels, reduce carrying costs, and forecast smarter."
-        p2.font.size = Pt(20); p2.font.color.rgb = RGBColor(255, 255, 255)
+        # 3. Tagline
+        tagline_box = s1.shapes.add_textbox(0, Inches(4.0), prs.slide_width, Inches(0.5))
+        p2 = tagline_box.text_frame.paragraphs[0]
+        p2.text = "Optimize Stock, Reduce Costs, and Forecast Smarter with AI"
+        p2.font.size = Pt(22); p2.font.color.rgb = RGBColor(255, 255, 255); p2.alignment = PP_ALIGN.CENTER
 
-        # Credit
-        credit = s1.shapes.add_textbox(Inches(1.0), Inches(5.5), Inches(5), Inches(0.5))
-        p3 = credit.text_frame.paragraphs[0]
-        p3.text = "Developed by Agilomatrix"
-        p3.font.size = Pt(18); p3.font.bold = True; p3.font.color.rgb = RGBColor(255, 255, 255)
-        
-        add_logo_bottom_right(s1)
+        # 4. Credit Line
+        credit_box = s1.shapes.add_textbox(0, Inches(5.8), prs.slide_width, Inches(0.5))
+        p3 = credit_box.text_frame.paragraphs[0]
+        run1 = p3.add_run(); run1.text = "Developed by "
+        run2 = p3.add_run(); run2.text = "Rimjhim Rani"; run2.font.bold = True
+        run3 = p3.add_run(); run3.text = " | "
+        run4 = p3.add_run(); run4.text = "Agilomatrix"; run4.font.bold = True
+        p3.font.size = Pt(20); p3.font.color.rgb = RGBColor(255, 255, 255); p3.alignment = PP_ALIGN.CENTER
+
+        # 5. Agilomatrix Logo (Bottom Right)
+        logo_path = os.path.join(os.getcwd(), "Image.png")
+        if os.path.exists(logo_path):
+            s1.shapes.add_picture(logo_path, prs.slide_width - Inches(2.3), prs.slide_height - Inches(1.1), width=Inches(2.0))
 
         # ==========================================
         # SLIDE 2: PERFORMANCE OVERVIEW (Matching Screenshot)
