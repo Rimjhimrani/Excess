@@ -1292,199 +1292,105 @@ class InventoryManagementSystem:
                     st.rerun()
 
     def generate_ppt_report(self, analysis_results):
-        """
-        Generates a professional PowerPoint report with Cinematic Cover, 
-        KPI Overview, and Status Analysis.
-        """
         df = pd.DataFrame(analysis_results)
         
-        # --- Missing Constants Definition ---
+        # Define Colors
         COLOR_DARK = RGBColor(31, 73, 125)
-        COLOR_LIGHT = RGBColor(128, 128, 128)
         COLOR_GREEN = RGBColor(76, 175, 80)
         COLOR_BLUE = RGBColor(33, 150, 243)
         COLOR_RED = RGBColor(244, 67, 54)
-        FONT_SERIF = "Arial"  # Standard safe font for PPT
         
-        # --- Metadata & Calculations ---
+        # Metadata
         biz_unit = st.session_state.get('ppt_biz_unit', 'BUSINESS PLANT').upper()
         ideal_days = st.session_state.user_preferences.get('ideal_inventory_days', 30)
         tolerance = st.session_state.admin_tolerance
         inv_date = datetime.now().strftime('%d-%m-%Y')
         
-        pfep_ts = self.persistence.get_data_timestamp('persistent_pfep_data')
-        pfep_ref = pfep_ts.strftime('%d-%m-%Y %H:%M') if pfep_ts else "N/A"
+        # Path Debugging - This will show in your Streamlit app if the file is missing
+        logo_path = os.path.join(os.getcwd(), "Image.png")
+        bg_path = os.path.join(os.getcwd(), "background.png")
+        
+        if not os.path.exists(logo_path):
+            st.warning(f"⚠️ Logo file not found at: {logo_path}")
 
-        # Safe numeric conversions for PPT metrics
+        # Calculations
+        actual_inv_val = df['Current Inventory - VALUE'].sum()
+        actual_minr = actual_inv_val / 1_000_000
         total_qty = df['Current Inventory - Qty'].sum()
-        df['avg_numeric'] = df['AVG CONSUMPTION/DAY'].apply(self.safe_float_convert)
-        total_avg_cons = df['avg_numeric'].sum()
-        
-        actual_inv_days = total_qty / total_avg_cons if total_avg_cons > 0 else 0
-        actual_minr = df['Current Inventory - VALUE'].sum() / 1_000_000
-        
-        # Calculate Ideal Value
-        ideal_val_total = (df['avg_numeric'] * ideal_days * df['UNIT PRICE']).sum()
-        ideal_minr = ideal_val_total / 1_000_000
-        
-        # Variance Calculation
-        variance_pct = ((actual_inv_days - ideal_days) / ideal_days * 100) if ideal_days > 0 else 0
-        
-        # Status Specific Values
-        excess_minr = df[df['Status'] == 'Excess Inventory']['Stock Deviation Value'].sum() / 1_000_000
-        short_minr = abs(df[df['Status'] == 'Short Inventory']['Stock Deviation Value'].sum()) / 1_000_000
-        
-        excess_days = max(0, actual_inv_days - (ideal_days * (1 + tolerance/100)))
+        avg_cons = df['AVG CONSUMPTION/DAY'].apply(self.safe_float_convert).sum()
+        actual_days = total_qty / avg_cons if avg_cons > 0 else 0
+        variance_pct = ((actual_days - ideal_days) / ideal_days * 100) if ideal_days > 0 else 0
 
-        # --- PPT Setup ---
         prs = Presentation()
         prs.slide_width = Inches(13.33)
         prs.slide_height = Inches(7.5)
-        
-        logo_path = os.path.join(os.getcwd(), "Image.png")
-        bg_path = os.path.join(os.getcwd(), "background.png")
 
         def add_branding(slide):
-            """Add logo and customer branding to slides"""
+            """Corrected branding function with proper units"""
+            # 1. Customer Logo (Top Right)
             if 'customer_logo' in st.session_state and st.session_state.customer_logo:
                 try:
                     stream = io.BytesIO(st.session_state.customer_logo.getvalue())
                     slide.shapes.add_picture(stream, prs.slide_width - Inches(2.3), Inches(0.3), width=Inches(1.8))
-                except: pass
+                except Exception as e:
+                    logger.error(f"Customer logo error: {e}")
+
+            # 2. Agilomatrix Logo (Bottom Right) - FIXED UNITS HERE
             if os.path.exists(logo_path):
                 try:
-                    slide.shapes.add_picture(logo_path, prs.slide_width - Inches(2.3), prs.slide_height - Inches(0.9), width=2.0)
-                except: pass
+                    # width=Inches(2.0) is the crucial fix
+                    slide.shapes.add_picture(logo_path, prs.slide_width - Inches(2.2), prs.slide_height - Inches(1.0), width=Inches(1.8))
+                except Exception as e:
+                    logger.error(f"Main logo error: {e}")
 
-        # ==========================================
-        # SLIDE 1: CINEMATIC COVER
-        # ==========================================
-        s1 = prs.slides.add_slide(prs.slide_layouts[6]) 
-        
+        # --- SLIDE 1: COVER ---
+        s1 = prs.slides.add_slide(prs.slide_layouts[6])
         if os.path.exists(bg_path):
             s1.shapes.add_picture(bg_path, 0, 0, width=prs.slide_width, height=prs.slide_height)
         else:
-            # Fallback color if no image
             rect = s1.shapes.add_shape(1, 0, 0, prs.slide_width, prs.slide_height)
             rect.fill.solid(); rect.fill.fore_color.rgb = COLOR_DARK
+        
+        # Title
+        tb = s1.shapes.add_textbox(0, Inches(3), prs.slide_width, Inches(1))
+        p = tb.text_frame.paragraphs[0]
+        p.text = "INVENTORY ANALYSER"; p.font.size = Pt(54); p.font.bold = True
+        p.font.color.rgb = RGBColor(255, 255, 255); p.alignment = PP_ALIGN.CENTER
+        
+        # Add Logo to cover explicitly
+        if os.path.exists(logo_path):
+            s1.shapes.add_picture(logo_path, prs.slide_width - Inches(2.5), prs.slide_height - Inches(1.2), width=Inches(2.0))
 
-        title_box = s1.shapes.add_textbox(0, Inches(3.0), prs.slide_width, Inches(1.0))
-        tf = title_box.text_frame
-        p = tf.paragraphs[0]
-        p.text = "INVENTORY ANALYSER"
-        p.font.bold = True; p.font.size = Pt(54); p.font.color.rgb = RGBColor(255, 255, 255); p.alignment = PP_ALIGN.CENTER
-
-        tagline_box = s1.shapes.add_textbox(0, Inches(4.0), prs.slide_width, Inches(0.5))
-        p2 = tagline_box.text_frame.paragraphs[0]
-        p2.text = "Optimize Stock, Reduce Costs, and Forecast Smarter"
-        p2.font.size = Pt(22); p2.font.color.rgb = RGBColor(255, 255, 255); p2.alignment = PP_ALIGN.CENTER
-
-        credit_box = s1.shapes.add_textbox(0, Inches(5.8), prs.slide_width, Inches(0.5))
-        p3 = credit_box.text_frame.paragraphs[0]
-        p3.text = "Developed by Agilomatrix"
-        p3.font.size = Pt(20); p3.font.color.rgb = RGBColor(255, 255, 255); p3.alignment = PP_ALIGN.CENTER
-
-        # ==========================================
-        # SLIDE 2: KPI PERFORMANCE OVERVIEW
-        # ==========================================
+        # --- SLIDE 2: KPI ---
         s2 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(s2)
-
-        # Main Title
-        title_shape = s2.shapes.add_textbox(Inches(0.8), Inches(0.5), Inches(10), Inches(0.8))
-        tf = title_shape.text_frame
-        p = tf.paragraphs[0]
-        p.text = "Inventory Performance Metrics"
-        p.font.size = Pt(40); p.font.bold = True; p.font.color.rgb = COLOR_DARK
-
-        # 3 Big Metrics Row
-        kpi_y = Inches(2.0)
-        kpi_labels = ["Target Days", "Actual Days", "Variance %"]
-        kpi_values = [f"{ideal_days}", f"{actual_inv_days:.1f}", f"{variance_pct:+.1f}%"]
         
-        for i in range(3):
-            x_pos = Inches(1 + (i * 4))
-            box = s2.shapes.add_textbox(x_pos, kpi_y, Inches(3.5), Inches(1.5))
-            tf = box.text_frame
-            p1 = tf.paragraphs[0]; p1.text = kpi_values[i]; p1.font.size = Pt(60); p1.alignment = PP_ALIGN.CENTER; p1.font.bold = True
-            p2 = tf.add_paragraph(); p2.text = kpi_labels[i]; p2.font.size = Pt(20); p2.alignment = PP_ALIGN.CENTER
+        title = s2.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(10), Inches(1))
+        title.text_frame.text = "Executive KPI Summary"
+        title.text_frame.paragraphs[0].font.size = Pt(36); title.text_frame.paragraphs[0].font.bold = True
 
-        # Bottom summary boxes
-        summary_y = Inches(4.5)
-        # Left: Value Stats
-        l_box = s2.shapes.add_textbox(Inches(1), summary_y, Inches(5), Inches(2))
-        ltf = l_box.text_frame
-        ltf.paragraphs[0].text = "Financial Snapshot"
-        ltf.paragraphs[0].font.bold = True; ltf.paragraphs[0].font.size = Pt(20)
-        
-        items = [f"Actual Value: ₹{actual_minr:.2f}M", f"Ideal Value: ₹{ideal_minr:.2f}M", f"Tolerance: {tolerance}%"]
-        for item in items:
-            p = ltf.add_paragraph(); p.text = f"• {item}"; p.font.size = Pt(16)
+        # KPIs
+        for i, (lab, val) in enumerate([("Target", f"{ideal_days} Days"), ("Actual", f"{actual_days:.1f} Days"), ("Value", f"₹{actual_minr:.2f}M")]):
+            box = s2.shapes.add_textbox(Inches(1 + i*4), Inches(2.5), Inches(3), Inches(1.5))
+            p1 = box.text_frame.paragraphs[0]; p1.text = val; p1.font.size = Pt(44); p1.font.bold = True; p1.alignment = PP_ALIGN.CENTER
+            p2 = box.text_frame.add_paragraph(); p2.text = lab; p2.font.size = Pt(20); p2.alignment = PP_ALIGN.CENTER
 
-        # Right: Action Stats
-        r_box = s2.shapes.add_textbox(Inches(7), summary_y, Inches(5), Inches(2))
-        rtf = r_box.text_frame
-        rtf.paragraphs[0].text = "Critical Deviations"
-        rtf.paragraphs[0].font.bold = True; rtf.paragraphs[0].font.size = Pt(20)
-        
-        items = [f"Excess Value: ₹{excess_minr:.2f}M", f"Shortage Value: ₹{short_minr:.2f}M", f"Excess Coverage: {excess_days:.1f} Days"]
-        for item in items:
-            p = rtf.add_paragraph(); p.text = f"• {item}"; p.font.size = Pt(16)
-
-        # Footer
-        footer = s2.shapes.add_textbox(Inches(0.8), Inches(6.8), Inches(10), Inches(0.4))
-        footer.text_frame.text = f"PFEP Reference: {pfep_ref} | Report Date: {inv_date}"
-        footer.text_frame.paragraphs[0].font.size = Pt(12); footer.text_frame.paragraphs[0].font.italic = True
-
-        # ==========================================
-        # SLIDE 3: STATUS BREAKDOWN (CHART & TABLE)
-        # ==========================================
+        # --- SLIDE 3: ANALYSIS ---
         s3 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(s3)
         
-        status_categories = [
-            {'label': 'Within Norms', 'color': COLOR_GREEN},
-            {'label': 'Excess Inventory', 'color': COLOR_BLUE},
-            {'label': 'Short Inventory', 'color': COLOR_RED}
-        ]
-
-        chart_data = CategoryChartData()
-        chart_data.categories = [cat['label'] for cat in status_categories]
+        # Create Bar Chart
+        cd = CategoryChartData()
+        cd.categories = ['Within Norms', 'Excess', 'Short']
+        vals = [len(df[df['Status']=='Within Norms']), len(df[df['Status']=='Excess Inventory']), len(df[df['Status']=='Short Inventory'])]
+        cd.add_series('Parts', vals)
+        chart = s3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(1), Inches(1.5), Inches(6), Inches(4.5), cd).chart
         
-        counts = []
-        for cat in status_categories:
-            count = len(df[df['Status'] == cat['label']])
-            counts.append(count)
-        
-        chart_data.add_series('Part Count', counts)
-        
-        # Add Chart
-        x, y, cx, cy = Inches(1), Inches(1.5), Inches(6), Inches(4)
-        chart = s3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, x, y, cx, cy, chart_data).chart
+        # Coloring the bars
+        colors = [COLOR_GREEN, COLOR_BLUE, COLOR_RED]
         for i, pt in enumerate(chart.plots[0].series[0].points):
-            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = status_categories[i]['color']
+            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = colors[i]
 
-        # Add Table
-        rows, cols = 4, 4
-        tx, ty, tcx, tcy = Inches(7.2), Inches(1.5), Inches(5.5), Inches(4)
-        table = s3.shapes.add_table(rows, cols, tx, ty, tcx, tcy).table
-        
-        headers = ["Status", "Count", "Value(M)", "Dev(M)"]
-        for c, h in enumerate(headers):
-            table.cell(0, c).text = h
-            table.cell(0, c).text_frame.paragraphs[0].font.bold = True
-            
-        for i, cat in enumerate(status_categories, 1):
-            sub = df[df['Status'] == cat['label']]
-            val = sub['Current Inventory - VALUE'].sum() / 1_000_000
-            dev = abs(sub['Stock Deviation Value'].sum()) / 1_000_000
-            
-            table.cell(i, 0).text = cat['label']
-            table.cell(i, 1).text = str(len(sub))
-            table.cell(i, 2).text = f"{val:.2f}"
-            table.cell(i, 3).text = f"{dev:.2f}"
-
-        # Finalize
         ppt_out = io.BytesIO()
         prs.save(ppt_out)
         ppt_out.seek(0)
