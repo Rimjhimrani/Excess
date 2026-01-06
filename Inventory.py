@@ -1296,11 +1296,11 @@ class InventoryManagementSystem:
     def generate_ppt_report(self, analysis_results):
         """
         Generates a professional PowerPoint report.
-        Slide 1: Cover with Title, Tagline, Credit, and Logo.
-        Slide 2: Performance Overview matching the user's screenshot.
-        Slide 3: Status Breakdown matching the provided screenshot.
+        Slide 1: Cover with corrected alignment and branding.
+        Slide 2: Performance Overview (matches target design).
+        Slide 3: Status Breakdown with % labels and fixed logo overlap.
         """
-
+        import io
         df = pd.DataFrame(analysis_results)
     
         # --- 1. Colors & Constants ---
@@ -1345,7 +1345,6 @@ class InventoryManagementSystem:
         def add_logo_bottom_right(slide):
             if os.path.exists(logo_path):
                 try:
-                    # Aligned to bottom right as per your branding
                     slide.shapes.add_picture(logo_path, prs.slide_width - Inches(1.8), prs.slide_height - Inches(0.8), width=Inches(1.5))
                 except: pass
 
@@ -1362,20 +1361,19 @@ class InventoryManagementSystem:
         p.text = "INVENTORY ANALYSER"
         p.font.bold = True; p.font.size = Pt(54); p.font.color.rgb = RGBColor(255, 255, 255); p.alignment = PP_ALIGN.CENTER
 
-        # 3. Tagline
         tagline_box = s1.shapes.add_textbox(0, Inches(4.0), prs.slide_width, Inches(0.5))
         p2 = tagline_box.text_frame.paragraphs[0]
         p2.text = "Optimize Stock, Reduce Costs, and Forecast Smarter with AI"
         p2.font.size = Pt(22); p2.font.color.rgb = RGBColor(255, 255, 255); p2.alignment = PP_ALIGN.CENTER
 
-        # 4. Credit Line
         credit_box = s1.shapes.add_textbox(0, Inches(5.8), prs.slide_width, Inches(0.5))
         p3 = credit_box.text_frame.paragraphs[0]
         run1 = p3.add_run(); run1.text = "Developed by "
         run2 = p3.add_run(); run2.text = "Rimjhim Rani"; run2.font.bold = True
         run3 = p3.add_run(); run3.text = " | "
         run4 = p3.add_run(); run4.text = "Agilomatrix"; run4.font.bold = True
-        p3.font.size = Pt(20); p3.font.color.rgb = RGBColor(255, 255, 255); p3.alignment = PP_ALIGN.CENTE
+        # FIX: Changed CENTE to CENTER
+        p3.font.size = Pt(20); p3.font.color.rgb = RGBColor(255, 255, 255); p3.alignment = PP_ALIGN.CENTER
         
         add_logo_bottom_right(s1)
 
@@ -1384,140 +1382,95 @@ class InventoryManagementSystem:
         # ==========================================
         s2 = prs.slides.add_slide(prs.slide_layouts[6])
         add_logo_bottom_right(s2)
-
-        # 1. THE BADGE (Top Left)
         badge = s2.shapes.add_shape(1, Inches(0.8), Inches(0.6), Inches(1.8), Inches(0.35))
         badge.fill.solid(); badge.fill.fore_color.rgb = COLOR_BADGE_BG; badge.line.width = 0
-        btf = badge.text_frame
-        btf.paragraphs[0].text = f"📊 {biz_unit}"
-        btf.paragraphs[0].font.size = Pt(11); btf.paragraphs[0].font.color.rgb = COLOR_DARK_TEXT; btf.paragraphs[0].font.bold = True
+        badge.text_frame.paragraphs[0].text = f"📊 {biz_unit}"; badge.text_frame.paragraphs[0].font.size = Pt(11); badge.text_frame.paragraphs[0].font.bold = True
 
-        # 2. Main Title
         title_shape = s2.shapes.add_textbox(Inches(0.8), Inches(1.0), Inches(10), Inches(0.8))
         title_shape.text_frame.text = "Current Inventory Performance Overview"
         title_shape.text_frame.paragraphs[0].font.size = Pt(36); title_shape.text_frame.paragraphs[0].font.color.rgb = COLOR_DARK_TEXT
 
-        # 3. Description
         desc = s2.shapes.add_textbox(Inches(0.8), Inches(1.8), Inches(11), Inches(1))
-        dtf = desc.text_frame; dtf.word_wrap = True
-        p = dtf.paragraphs[0]
-        p.text = f"Snapshot analysis for the {biz_unit} facility as of {inv_date}, benchmarked against PFEP standards."
+        p = desc.text_frame.paragraphs[0]; p.text = f"Snapshot analysis for the {biz_unit} facility as of {inv_date}, benchmarked against PFEP standards."
         p.font.size = Pt(14); p.font.color.rgb = COLOR_DARK_TEXT
 
-        # 4. Big KPI Numbers
-        kpis = [
-            (f"{int(ideal_days)}", "Target Days", "Ideal inventory level"),
-            (f"{actual_inv_days:.1f}", "Actual Days", "Current on-hand inventory"),
-            (f"{variance_pct:,.0f}%", "Variance", "Over target inventory")
-        ]
+        kpis = [(f"{int(ideal_days)}", "Target Days", "Ideal inventory level"), (f"{actual_inv_days:.1f}", "Actual Days", "Current on-hand inventory"), (f"{variance_pct:,.0f}%", "Variance", "Over target inventory")]
         for i, (val, lab, sub) in enumerate(kpis):
             box = s2.shapes.add_textbox(Inches(1 + i*4), Inches(3.0), Inches(3.5), Inches(1.5))
             tf = box.text_frame
             p1 = tf.paragraphs[0]; p1.text = val; p1.font.size = Pt(64); p1.alignment = PP_ALIGN.CENTER; p1.font.color.rgb = COLOR_DARK_TEXT
-            p2 = tf.add_paragraph(); p2.text = lab; p2.font.size = Pt(20); p2.alignment = PP_ALIGN.CENTER; p2.font.color.rgb = COLOR_DARK_TEXT
-            p3 = tf.add_paragraph(); p3.text = sub; p3.font.size = Pt(12); p3.alignment = PP_ALIGN.CENTER; p3.font.color.rgb = COLOR_DARK_TEXT
+            p2 = tf.add_paragraph(); p2.text = lab; p2.font.size = Pt(20); p2.alignment = PP_ALIGN.CENTER
+            p3 = tf.add_paragraph(); p3.text = sub; p3.font.size = Pt(12); p3.alignment = PP_ALIGN.CENTER
 
-        # 5. Detail Sections (Bottom Bullets)
         l_box = s2.shapes.add_textbox(Inches(0.8), Inches(5.0), Inches(5), Inches(1.5))
-        ltf = l_box.text_frame
-        ltf.paragraphs[0].text = "Inventory Value Analysis"
-        ltf.paragraphs[0].font.bold = True; ltf.paragraphs[0].font.size = Pt(18)
-        
+        ltf = l_box.text_frame; ltf.paragraphs[0].text = "Inventory Value Analysis"; ltf.paragraphs[0].font.bold = True; ltf.paragraphs[0].font.size = Pt(18)
         for text in [f"Ideal Inventory: ₹{ideal_minr:,.2f} MINR", f"Actual Inventory: ₹{actual_minr:,.2f} MINR", f"Tolerance Level: {tolerance}%"]:
-            p = ltf.add_paragraph(); p.text = text; p.font.size = Pt(14); p.level = 0
+            ltf.add_paragraph().text = text
 
         r_box = s2.shapes.add_textbox(Inches(7.0), Inches(5.0), Inches(5), Inches(1.5))
-        rtf = r_box.text_frame
-        rtf.paragraphs[0].text = "Critical Deviations"
-        rtf.paragraphs[0].font.bold = True; rtf.paragraphs[0].font.size = Pt(18)
-        
+        rtf = r_box.text_frame; rtf.paragraphs[0].text = "Critical Deviations"; rtf.paragraphs[0].font.bold = True; rtf.paragraphs[0].font.size = Pt(18)
         for text in [f"Excess: ₹{excess_minr:,.2f} MINR ({excess_days_val:.1f} days)", f"Shortage: ₹{short_minr:,.2f} MINR", "Action Required: Immediate rebalancing"]:
-            p = rtf.add_paragraph(); p.text = text; p.font.size = Pt(14); p.level = 0
-
-        # Footer
-        footer = s2.shapes.add_textbox(Inches(0.8), Inches(6.8), Inches(11), Inches(0.4))
-        footer.text_frame.text = f"Analysis Reference: PFEP dated {pfep_ref} | Inventory captured {datetime.now().strftime('%d-%m-%Y')}"
-        footer.text_frame.paragraphs[0].font.size = Pt(10); footer.text_frame.paragraphs[0].font.italic = True
+            rtf.add_paragraph().text = text
 
         # ==========================================
-        # SLIDE 3: STATUS BREAKDOWN
+        # SLIDE 3: STATUS BREAKDOWN (Percentage & Overlap Fixed)
         # ==========================================
         s3 = prs.slides.add_slide(prs.slide_layouts[6])
         
-        # FIX: Adjusted logo placement to the absolute corner to avoid KPI overlap
+        # FIX: Moved logo slightly to corner to prevent overlap with KPI boxes
         if os.path.exists(logo_path):
             try:
                 s3.shapes.add_picture(logo_path, prs.slide_width - Inches(1.6), prs.slide_height - Inches(0.7), width=Inches(1.4))
             except: pass
 
-        # 1. Title
         title_box3 = s3.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11), Inches(0.8))
         title_box3.text_frame.text = "Inventory Status Breakdown by Part Classification"
         title_box3.text_frame.paragraphs[0].font.size = Pt(32)
-        title_box3.text_frame.paragraphs[0].font.color.rgb = COLOR_DARK_TEXT
 
-        # 2. Insight Summary
-        status_col = 'Status' if 'Status' in df.columns else 'INVENTORY REMARK STATUS'
-        total_parts = len(df)
-        short_count = len(df[df[status_col] == 'Short Inventory'])
-        within_count = len(df[df[status_col] == 'Within Norms'])
-        excess_count = len(df[df[status_col] == 'Excess Inventory'])
-        
-        short_pct = (short_count / total_parts) if total_parts > 0 else 0
-        within_pct = (within_count / total_parts) if total_parts > 0 else 0
-        excess_pct = (excess_count / total_parts) if total_parts > 0 else 0
+        short_count = len(df[df[status_col] == 'Short Inventory']); within_count = len(df[df[status_col] == 'Within Norms']); excess_count = len(df[df[status_col] == 'Excess Inventory'])
+        total_parts = len(df); short_pct = (short_count / total_parts) if total_parts > 0 else 0
+        within_pct = (within_count / total_parts) if total_parts > 0 else 0; excess_pct = (excess_count / total_parts) if total_parts > 0 else 0
 
         insight_box = s3.shapes.add_textbox(Inches(0.8), Inches(1.1), Inches(11.5), Inches(0.8))
-        itf = insight_box.text_frame; itf.word_wrap = True
-        p_ins = itf.paragraphs[0]
-        # Using :.0% in the f-string for the text summary
-        p_ins.text = f"Detailed analysis of {total_parts} total parts reveals critical supply chain imbalances. Over {short_pct:.0%} of parts are running below optimal levels, indicating systemic procurement challenges."
-        p_ins.font.size = Pt(16); p_ins.font.color.rgb = COLOR_DARK_TEXT
+        insight_box.text_frame.paragraphs[0].text = f"Detailed analysis of {total_parts} total parts reveals critical supply chain imbalances. Over {short_pct:.0%} of parts are running below optimal levels."
+        insight_box.text_frame.paragraphs[0].font.size = Pt(16)
 
-        # 3. Pie Chart (Middle)
         cd3 = ChartData()
         cd3.categories = ['Short', 'Within Norm', 'Excess']
         cd3.add_series('Status', (short_pct, within_pct, excess_pct))
-        
-        chart_shp = s3.shapes.add_chart(XL_CHART_TYPE.PIE, Inches(4.5), Inches(2.1), Inches(4.3), Inches(3.4), cd3)
-        chart = chart_shp.chart
-        chart.has_legend = True; chart.legend.position = XL_LEGEND_POSITION.TOP; chart.legend.include_in_layout = False
+        chart = s3.shapes.add_chart(XL_CHART_TYPE.PIE, Inches(4.5), Inches(2.1), Inches(4.3), Inches(3.4), cd3).chart
+        chart.has_legend = True; chart.legend.position = XL_LEGEND_POSITION.TOP
     
-        # Colors: Blue (Short), Red (Within), Green (Excess)
         points = chart.plots[0].series[0].points
         colors_pie = [RGBColor(79, 129, 189), RGBColor(192, 80, 77), RGBColor(155, 187, 89)]
         for i, pt in enumerate(points):
             pt.format.fill.solid(); pt.format.fill.fore_color.rgb = colors_pie[i]
             
-        # FIX: Percentage-wise labels (Removes decimals 0.58...)
+        # FIX: Data Labels configured as Percentage-only
+        chart.plots[0].has_data_labels = True
         data_labels = chart.plots[0].data_labels
         data_labels.show_percentage = True
-        data_labels.show_value = False  # This hides the 0.582191 decimal
-        data_labels.number_format = '0%' # Forces whole number percentage
-        
-        for pt in points:
-            pt.data_label.font.size = Pt(14); pt.data_label.font.bold = True; pt.data_label.font.color.rgb = RGBColor(255, 255, 255)
+        data_labels.show_value = False
+        data_labels.number_format = '0%' 
 
-        # 4. KPI Boxes (Bottom)
         within_val = df[df[status_col] == 'Within Norms']['Current Inventory - VALUE'].sum() / 1_000_000
-        box_y = Inches(5.6); box_w = Inches(3.6); box_h = Inches(1.2) # Reduced width/height slightly to avoid logo
+        box_y = Inches(5.6); box_w = Inches(3.6); box_h = Inches(1.2)
     
         def add_kpi_box(slide, x, title, body):
             shp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, x, box_y, box_w, box_h)
             shp.fill.background(); shp.line.color.rgb = RGBColor(180, 180, 180)
             tf = shp.text_frame; tf.vertical_anchor = MSO_ANCHOR.MIDDLE; tf.word_wrap = True
-            p1 = tf.paragraphs[0]; p1.text = title; p1.font.bold = True; p1.font.size = Pt(18); p1.alignment = PP_ALIGN.CENTER; p1.font.color.rgb = COLOR_DARK_TEXT
-            p2 = tf.add_paragraph(); p2.text = body; p2.font.size = Pt(10.5); p2.alignment = PP_ALIGN.CENTER; p2.font.color.rgb = COLOR_DARK_TEXT
+            p1 = tf.paragraphs[0]; p1.text = title; p1.font.bold = True; p1.font.size = Pt(18); p1.alignment = PP_ALIGN.CENTER
+            p2 = tf.add_paragraph(); p2.text = body; p2.font.size = Pt(10.5); p2.alignment = PP_ALIGN.CENTER
 
-        add_kpi_box(s3, Inches(0.8), "Within Tolerance", f"{within_count} parts ({within_pct:.0%}) operating within acceptable ranges with ₹{within_val:.2f} MINR value")
-        add_kpi_box(s3, Inches(4.7), "Excess Inventory", f"{excess_count} parts ({excess_pct:.0%}) exceed norms by ₹{excess_minr:.2f} MINR—prime candidates for redistribution")
-        add_kpi_box(s3, Inches(8.6), "Critical Shortages", f"{short_count} parts ({short_pct:.0%}) below target with ₹{short_minr:.2f} MINR shortage—urgent action needed")
+        add_kpi_box(s3, Inches(0.8), "Within Tolerance", f"{within_count} parts ({within_pct:.0%}) within range (₹{within_val:.2f} MINR)")
+        add_kpi_box(s3, Inches(4.7), "Excess Inventory", f"{excess_count} parts ({excess_pct:.0%}) excess by ₹{excess_minr:.2f} MINR")
+        add_kpi_box(s3, Inches(8.6), "Critical Shortages", f"{short_count} parts ({short_pct:.0%}) short by ₹{short_minr:.2f} MINR")
 
-        # 5. Recommendation Bar
         rec_box = s3.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.8), Inches(7.0), Inches(11.5), Inches(0.40))
-        rec_box.fill.solid(); rec_box.fill.fore_color.rgb = COLOR_BADGE_BG; rec_box.line.color.rgb = RGBColor(180, 180, 180)
-        p_rec = rec_box.text_frame.paragraphs[0]; p_rec.text = "Recommended Action: Prioritize procurement for shortage items while implementing excess stock reduction strategies."
-        p_rec.font.size = Pt(12); p_rec.font.bold = True; p_rec.font.color.rgb = COLOR_DARK_TEXT; p_rec.alignment = PP_ALIGN.CENTER
+        rec_box.fill.solid(); rec_box.fill.fore_color.rgb = COLOR_BADGE_BG
+        rec_box.text_frame.paragraphs[0].text = "Recommended Action: Prioritize procurement for shortage items while implementing excess stock reduction strategies."
+        rec_box.text_frame.paragraphs[0].font.size = Pt(12); rec_box.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
 
         ppt_out = io.BytesIO()
         prs.save(ppt_out)
