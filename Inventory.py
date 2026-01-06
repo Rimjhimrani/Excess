@@ -1437,20 +1437,24 @@ class InventoryManagementSystem:
         footer = s2.shapes.add_textbox(Inches(0.8), Inches(6.8), Inches(11), Inches(0.4))
         footer.text_frame.text = f"Analysis Reference: PFEP dated {pfep_ref} | Inventory captured {datetime.now().strftime('%d-%m-%Y')}"
         footer.text_frame.paragraphs[0].font.size = Pt(10); footer.text_frame.paragraphs[0].font.italic = True
+        
         # ==========================================
         # SLIDE 3: STATUS BREAKDOWN (Percentage & Overlap Fixed)
         # ==========================================
         s3 = prs.slides.add_slide(prs.slide_layouts[6])
         
-        # 1. Title
+        # 1. Title (Black)
         title_box3 = s3.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11.5), Inches(0.6))
         p_t3 = title_box3.text_frame.paragraphs[0]
         p_t3.text = "Inventory Status Breakdown by Part Classification"
         p_t3.font.size = Pt(32); p_t3.font.color.rgb = COLOR_BLACK
 
-        # 2. Insight Summary
-        total_parts = len(df); short_count = len(df[df[status_col] == 'Short Inventory'])
-        within_count = len(df[df[status_col] == 'Within Norms']); excess_count = len(df[df[status_col] == 'Excess Inventory'])
+        # 2. Insight Summary (Black)
+        total_parts = len(df)
+        short_count = len(df[df[status_col] == 'Short Inventory'])
+        within_count = len(df[df[status_col] == 'Within Norms'])
+        excess_count = len(df[df[status_col] == 'Excess Inventory'])
+        
         short_pct = (short_count / total_parts) if total_parts > 0 else 0
         within_pct = (within_count / total_parts) if total_parts > 0 else 0
         excess_pct = (excess_count / total_parts) if total_parts > 0 else 0
@@ -1460,30 +1464,44 @@ class InventoryManagementSystem:
         p_ins3.text = f"Detailed analysis of {total_parts} total parts reveals critical supply chain imbalances. Over {short_pct:.0%} of parts are running below optimal levels."
         p_ins3.font.size = Pt(16); p_ins3.font.color.rgb = COLOR_BLACK
 
-        # 3. Status Label & Pie Chart
+        # 3. Status Label (Centered above chart)
         st_lbl = s3.shapes.add_textbox(Inches(5.5), Inches(1.6), Inches(2.3), Inches(0.4))
         p_lbl = st_lbl.text_frame.paragraphs[0]
-        p_lbl.text = "Status"; p_lbl.font.bold = True; p_lbl.font.size = Pt(24); p_lbl.font.color.rgb = COLOR_BLACK; p_lbl.alignment = PP_ALIGN.CENTER
+        p_lbl.text = "Status"; p_lbl.font.bold = True; p_lbl.font.size = Pt(24)
+        p_lbl.font.color.rgb = COLOR_BLACK; p_lbl.alignment = PP_ALIGN.CENTER
 
+        # 4. Pie Chart
         cd3 = ChartData()
         cd3.categories = ['Short', 'Within Norm', 'Excess']
-        cd3.add_series('Status', (short_pct, within_pct, excess_pct))
-        chart = s3.shapes.add_chart(XL_CHART_TYPE.PIE, Inches(4.5), Inches(2.2), Inches(4.3), Inches(3.2), cd3).chart
-        chart.has_legend = True; chart.legend.position = XL_LEGEND_POSITION.TOP; chart.legend.include_in_layout = False
+        cd3.add_series('Inventory Status', (short_pct, within_pct, excess_pct))
+        
+        chart_shp = s3.shapes.add_chart(XL_CHART_TYPE.PIE, Inches(4.5), Inches(2.2), Inches(4.3), Inches(3.2), cd3)
+        chart = chart_shp.chart
+        
+        # FIX: Ensure chart doesn't generate its own title (prevents double Status text)
+        chart.has_title = False
+        chart.has_legend = True
+        chart.legend.position = XL_LEGEND_POSITION.TOP
+        chart.legend.include_in_layout = False
         chart.legend.font.size = Pt(18); chart.legend.font.color.rgb = COLOR_BLACK
     
         points = chart.plots[0].series[0].points
-        colors = [RGBColor(79, 129, 189), RGBColor(192, 80, 77), RGBColor(155, 187, 89)] # Blue, Red, Green
+        colors = [RGBColor(79, 129, 189), RGBColor(192, 80, 77), RGBColor(155, 187, 89)]
         for i, pt in enumerate(points):
             pt.format.fill.solid(); pt.format.fill.fore_color.rgb = colors[i]
             
+        # FIX: Force data labels to show ONLY Percentage as whole numbers (e.g. 58%)
         chart.plots[0].has_data_labels = True
         labels = chart.plots[0].data_labels
-        labels.show_percentage = True; labels.show_value = False; labels.number_format = '0%' 
+        labels.show_percentage = True
+        labels.show_value = False       # This stops decimals like 0.58 from appearing
+        labels.number_format = '0%'      # Ensures whole number formatting
+        
         for pt in points:
-            pt.data_label.font.size = Pt(14); pt.data_label.font.bold = True; pt.data_label.font.color.rgb = COLOR_BLACK
+            pt.data_label.font.size = Pt(14); pt.data_label.font.bold = True
+            pt.data_label.font.color.rgb = COLOR_BLACK
 
-        # 4. KPI Boxes
+        # 5. KPI Boxes (Black Font)
         within_val = df[df[status_col] == 'Within Norms']['Current Inventory - VALUE'].sum() / 1_000_000
         box_y = Inches(5.5); box_w = Inches(3.7); box_h = Inches(1.0)
     
@@ -1491,14 +1509,16 @@ class InventoryManagementSystem:
             shp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, x, box_y, box_w, box_h)
             shp.fill.background(); shp.line.color.rgb = RGBColor(180, 180, 180)
             tf = shp.text_frame; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-            p1 = tf.paragraphs[0]; p1.text = title; p1.font.bold = True; p1.font.size = Pt(18); p1.alignment = PP_ALIGN.CENTER; p1.font.color.rgb = COLOR_BLACK
-            p2 = tf.add_paragraph(); p2.text = body; p2.font.size = Pt(10); p2.alignment = PP_ALIGN.CENTER; p2.font.color.rgb = COLOR_BLACK
+            p1 = tf.paragraphs[0]; p1.text = title; p1.font.bold = True; p1.font.size = Pt(18)
+            p1.alignment = PP_ALIGN.CENTER; p1.font.color.rgb = COLOR_BLACK
+            p2 = tf.add_paragraph(); p2.text = body; p2.font.size = Pt(10)
+            p2.alignment = PP_ALIGN.CENTER; p2.font.color.rgb = COLOR_BLACK
 
         add_kpi_box_black(s3, Inches(0.8), "Within Tolerance", f"{within_count} parts ({within_pct:.0%}) within range (₹{within_val:.2f} MINR)")
         add_kpi_box_black(s3, Inches(4.8), "Excess Inventory", f"{excess_count} parts ({excess_pct:.0%}) excess by ₹{excess_minr:.2f} MINR")
         add_kpi_box_black(s3, Inches(8.8), "Critical Shortages", f"{short_count} parts ({short_pct:.0%}) short by ₹{short_minr:.2f} MINR")
 
-        # 5. Recommendation Bar & Logo (Separated to avoid overlap)
+        # 6. Recommendation Bar & Logo
         rec_box = s3.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.8), Inches(6.75), Inches(10.5), Inches(0.40))
         rec_box.fill.solid(); rec_box.fill.fore_color.rgb = COLOR_BADGE_BG; rec_box.line.color.rgb = RGBColor(180, 180, 180)
         p_rec = rec_box.text_frame.paragraphs[0]
@@ -1507,7 +1527,6 @@ class InventoryManagementSystem:
 
         if os.path.exists(logo_path):
             try:
-                # Placed specifically to the right of the bar in the corner
                 s3.shapes.add_picture(logo_path, prs.slide_width - Inches(1.9), prs.slide_height - Inches(0.7), width=Inches(1.6))
             except: pass
 
