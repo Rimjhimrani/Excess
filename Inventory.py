@@ -1390,7 +1390,7 @@ class InventoryManagementSystem:
 
         credit_box = s1.shapes.add_textbox(0, Inches(5.8), prs.slide_width, Inches(0.5))
         p3 = credit_box.text_frame.paragraphs[0]
-        p3.text = "Developed by Agilomatrix"
+        p3.text = "Developed by Rimjhim | Agilomatrix"
         p3.font.size = Pt(20); p3.font.color.rgb = RGBColor(255, 255, 255); p3.alignment = PP_ALIGN.CENTER
 
         # ==========================================
