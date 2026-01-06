@@ -1383,36 +1383,60 @@ class InventoryManagementSystem:
         # ==========================================
         s2 = prs.slides.add_slide(prs.slide_layouts[6])
         add_logo_bottom_right(s2)
+
+        # 1. THE BADGE (Top Left)
         badge = s2.shapes.add_shape(1, Inches(0.8), Inches(0.6), Inches(1.8), Inches(0.35))
         badge.fill.solid(); badge.fill.fore_color.rgb = COLOR_BADGE_BG; badge.line.width = 0
-        badge.text_frame.paragraphs[0].text = f"📊 {biz_unit}"; badge.text_frame.paragraphs[0].font.size = Pt(11); badge.text_frame.paragraphs[0].font.bold = True
+        btf = badge.text_frame
+        btf.paragraphs[0].text = f"📊 {biz_unit}"
+        btf.paragraphs[0].font.size = Pt(11); btf.paragraphs[0].font.color.rgb = COLOR_DARK_TEXT; btf.paragraphs[0].font.bold = True
 
+        # 2. Main Title
         title_shape = s2.shapes.add_textbox(Inches(0.8), Inches(1.0), Inches(10), Inches(0.8))
         title_shape.text_frame.text = "Current Inventory Performance Overview"
         title_shape.text_frame.paragraphs[0].font.size = Pt(36); title_shape.text_frame.paragraphs[0].font.color.rgb = COLOR_DARK_TEXT
 
+        # 3. Description
         desc = s2.shapes.add_textbox(Inches(0.8), Inches(1.8), Inches(11), Inches(1))
-        p = desc.text_frame.paragraphs[0]; p.text = f"Snapshot analysis for the {biz_unit} facility as of {inv_date}, benchmarked against PFEP standards."
+        dtf = desc.text_frame; dtf.word_wrap = True
+        p = dtf.paragraphs[0]
+        p.text = f"Snapshot analysis for the {biz_unit} facility as of {inv_date}, benchmarked against PFEP standards."
         p.font.size = Pt(14); p.font.color.rgb = COLOR_DARK_TEXT
 
-        kpis = [(f"{int(ideal_days)}", "Target Days", "Ideal inventory level"), (f"{actual_inv_days:.1f}", "Actual Days", "Current on-hand inventory"), (f"{variance_pct:,.0f}%", "Variance", "Over target inventory")]
+        # 4. Big KPI Numbers
+        kpis = [
+            (f"{int(ideal_days)}", "Target Days", "Ideal inventory level"),
+            (f"{actual_inv_days:.1f}", "Actual Days", "Current on-hand inventory"),
+            (f"{variance_pct:,.0f}%", "Variance", "Over target inventory")
+        ]
         for i, (val, lab, sub) in enumerate(kpis):
             box = s2.shapes.add_textbox(Inches(1 + i*4), Inches(3.0), Inches(3.5), Inches(1.5))
             tf = box.text_frame
             p1 = tf.paragraphs[0]; p1.text = val; p1.font.size = Pt(64); p1.alignment = PP_ALIGN.CENTER; p1.font.color.rgb = COLOR_DARK_TEXT
-            p2 = tf.add_paragraph(); p2.text = lab; p2.font.size = Pt(20); p2.alignment = PP_ALIGN.CENTER
-            p3 = tf.add_paragraph(); p3.text = sub; p3.font.size = Pt(12); p3.alignment = PP_ALIGN.CENTER
+            p2 = tf.add_paragraph(); p2.text = lab; p2.font.size = Pt(20); p2.alignment = PP_ALIGN.CENTER; p2.font.color.rgb = COLOR_DARK_TEXT
+            p3 = tf.add_paragraph(); p3.text = sub; p3.font.size = Pt(12); p3.alignment = PP_ALIGN.CENTER; p3.font.color.rgb = COLOR_DARK_TEXT
 
+        # 5. Detail Sections (Bottom Bullets)
         l_box = s2.shapes.add_textbox(Inches(0.8), Inches(5.0), Inches(5), Inches(1.5))
-        ltf = l_box.text_frame; ltf.paragraphs[0].text = "Inventory Value Analysis"; ltf.paragraphs[0].font.bold = True; ltf.paragraphs[0].font.size = Pt(18)
+        ltf = l_box.text_frame
+        ltf.paragraphs[0].text = "Inventory Value Analysis"
+        ltf.paragraphs[0].font.bold = True; ltf.paragraphs[0].font.size = Pt(18)
+        
         for text in [f"Ideal Inventory: ₹{ideal_minr:,.2f} MINR", f"Actual Inventory: ₹{actual_minr:,.2f} MINR", f"Tolerance Level: {tolerance}%"]:
-            ltf.add_paragraph().text = text
+            p = ltf.add_paragraph(); p.text = text; p.font.size = Pt(14); p.level = 0
 
         r_box = s2.shapes.add_textbox(Inches(7.0), Inches(5.0), Inches(5), Inches(1.5))
-        rtf = r_box.text_frame; rtf.paragraphs[0].text = "Critical Deviations"; rtf.paragraphs[0].font.bold = True; rtf.paragraphs[0].font.size = Pt(18)
+        rtf = r_box.text_frame
+        rtf.paragraphs[0].text = "Critical Deviations"
+        rtf.paragraphs[0].font.bold = True; rtf.paragraphs[0].font.size = Pt(18)
+        
         for text in [f"Excess: ₹{excess_minr:,.2f} MINR ({excess_days_val:.1f} days)", f"Shortage: ₹{short_minr:,.2f} MINR", "Action Required: Immediate rebalancing"]:
-            rtf.add_paragraph().text = text
+            p = rtf.add_paragraph(); p.text = text; p.font.size = Pt(14); p.level = 0
 
+        # Footer
+        footer = s2.shapes.add_textbox(Inches(0.8), Inches(6.8), Inches(11), Inches(0.4))
+        footer.text_frame.text = f"Analysis Reference: PFEP dated {pfep_ref} | Inventory captured {datetime.now().strftime('%d-%m-%Y')}"
+        footer.text_frame.paragraphs[0].font.size = Pt(10); footer.text_frame.paragraphs[0].font.italic = True
         # ==========================================
         # SLIDE 3: STATUS BREAKDOWN (Percentage & Overlap Fixed)
         # ==========================================
