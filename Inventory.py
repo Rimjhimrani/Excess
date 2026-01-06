@@ -1293,192 +1293,198 @@ class InventoryManagementSystem:
 
     def generate_ppt_report(self, analysis_results):
         """
-        Slide 1: Custom Cinematic Cover (Matches Image).
-        Slide 2 & 3: Your original logic (Shows Business Unit/PFEP/Date).
+        Generates a professional PowerPoint report with Cinematic Cover, 
+        KPI Overview, and Status Analysis.
         """
         df = pd.DataFrame(analysis_results)
         
-        # --- Metadata ---
-        biz_unit = st.session_state.get('ppt_biz_unit', 'BUS PLANT').upper()
+        # --- Missing Constants Definition ---
+        COLOR_DARK = RGBColor(31, 73, 125)
+        COLOR_LIGHT = RGBColor(128, 128, 128)
+        COLOR_GREEN = RGBColor(76, 175, 80)
+        COLOR_BLUE = RGBColor(33, 150, 243)
+        COLOR_RED = RGBColor(244, 67, 54)
+        FONT_SERIF = "Arial"  # Standard safe font for PPT
+        
+        # --- Metadata & Calculations ---
+        biz_unit = st.session_state.get('ppt_biz_unit', 'BUSINESS PLANT').upper()
         ideal_days = st.session_state.user_preferences.get('ideal_inventory_days', 30)
         tolerance = st.session_state.admin_tolerance
         inv_date = datetime.now().strftime('%d-%m-%Y')
+        
         pfep_ts = self.persistence.get_data_timestamp('persistent_pfep_data')
         pfep_ref = pfep_ts.strftime('%d-%m-%Y %H:%M') if pfep_ts else "N/A"
 
-        # --- Calculations ---
+        # Safe numeric conversions for PPT metrics
         total_qty = df['Current Inventory - Qty'].sum()
-        total_avg_cons = df['AVG CONSUMPTION/DAY'].apply(self.safe_float_convert).sum()
+        df['avg_numeric'] = df['AVG CONSUMPTION/DAY'].apply(self.safe_float_convert)
+        total_avg_cons = df['avg_numeric'].sum()
+        
         actual_inv_days = total_qty / total_avg_cons if total_avg_cons > 0 else 0
         actual_minr = df['Current Inventory - VALUE'].sum() / 1_000_000
-        ideal_val_total = (df['AVG CONSUMPTION/DAY'].apply(self.safe_float_convert) * ideal_days * df['UNIT PRICE']).sum()
+        
+        # Calculate Ideal Value
+        ideal_val_total = (df['avg_numeric'] * ideal_days * df['UNIT PRICE']).sum()
         ideal_minr = ideal_val_total / 1_000_000
+        
+        # Variance Calculation
+        variance_pct = ((actual_inv_days - ideal_days) / ideal_days * 100) if ideal_days > 0 else 0
+        
+        # Status Specific Values
         excess_minr = df[df['Status'] == 'Excess Inventory']['Stock Deviation Value'].sum() / 1_000_000
         short_minr = abs(df[df['Status'] == 'Short Inventory']['Stock Deviation Value'].sum()) / 1_000_000
+        
         excess_days = max(0, actual_inv_days - (ideal_days * (1 + tolerance/100)))
-        short_days = max(0, (ideal_days * (1 - tolerance/100)) - actual_inv_days)
 
         # --- PPT Setup ---
         prs = Presentation()
         prs.slide_width = Inches(13.33)
         prs.slide_height = Inches(7.5)
         
-        C_LOGO_W, C_LOGO_H = Inches(1.8), Inches(0.8)
-        A_LOGO_W, A_LOGO_H = Inches(2.2), Inches(0.8)
+        logo_path = os.path.join(os.getcwd(), "Image.png")
+        bg_path = os.path.join(os.getcwd(), "background.png")
 
         def add_branding(slide):
-            """Original branding for Slide 2 and 3"""
+            """Add logo and customer branding to slides"""
             if 'customer_logo' in st.session_state and st.session_state.customer_logo:
                 try:
                     stream = io.BytesIO(st.session_state.customer_logo.getvalue())
-                    slide.shapes.add_picture(stream, prs.slide_width - C_LOGO_W - Inches(0.5), Inches(0.3), C_LOGO_W, C_LOGO_H)
+                    slide.shapes.add_picture(stream, prs.slide_width - Inches(2.3), Inches(0.3), width=Inches(1.8))
                 except: pass
-            logo_path = os.path.join(os.getcwd(), "Image.png")
             if os.path.exists(logo_path):
                 try:
-                    slide.shapes.add_picture(logo_path, prs.slide_width - A_LOGO_W - Inches(0.5), prs.slide_height - A_LOGO_H - Inches(0.3), A_LOGO_W, A_LOGO_H)
+                    slide.shapes.add_picture(logo_path, prs.slide_width - Inches(2.3), prs.slide_height - Inches(0.9), width=2.0)
                 except: pass
 
         # ==========================================
-        # SLIDE 1: UPDATED CINEMATIC COVER
+        # SLIDE 1: CINEMATIC COVER
         # ==========================================
         s1 = prs.slides.add_slide(prs.slide_layouts[6]) 
         
-        # 1. Background Warehouse Image
-        bg_path = os.path.join(os.getcwd(), "background.png")
         if os.path.exists(bg_path):
             s1.shapes.add_picture(bg_path, 0, 0, width=prs.slide_width, height=prs.slide_height)
+        else:
+            # Fallback color if no image
+            rect = s1.shapes.add_shape(1, 0, 0, prs.slide_width, prs.slide_height)
+            rect.fill.solid(); rect.fill.fore_color.rgb = COLOR_DARK
 
-        # 2. Main Title: INVENTORY ANALYSER
         title_box = s1.shapes.add_textbox(0, Inches(3.0), prs.slide_width, Inches(1.0))
         tf = title_box.text_frame
         p = tf.paragraphs[0]
         p.text = "INVENTORY ANALYSER"
         p.font.bold = True; p.font.size = Pt(54); p.font.color.rgb = RGBColor(255, 255, 255); p.alignment = PP_ALIGN.CENTER
 
-        # 3. Tagline
         tagline_box = s1.shapes.add_textbox(0, Inches(4.0), prs.slide_width, Inches(0.5))
         p2 = tagline_box.text_frame.paragraphs[0]
-        p2.text = "Optimize Stock, Reduce Costs, and Forecast Smarter with AI"
+        p2.text = "Optimize Stock, Reduce Costs, and Forecast Smarter"
         p2.font.size = Pt(22); p2.font.color.rgb = RGBColor(255, 255, 255); p2.alignment = PP_ALIGN.CENTER
 
-        # 4. Credit Line
         credit_box = s1.shapes.add_textbox(0, Inches(5.8), prs.slide_width, Inches(0.5))
         p3 = credit_box.text_frame.paragraphs[0]
-        run1 = p3.add_run(); run1.text = "Developed by "
-        run2 = p3.add_run(); run2.text = "Rimjhim Rani"; run2.font.bold = True
-        run3 = p3.add_run(); run3.text = " | "
-        run4 = p3.add_run(); run4.text = "Agilomatrix"; run4.font.bold = True
+        p3.text = "Developed by Agilomatrix"
         p3.font.size = Pt(20); p3.font.color.rgb = RGBColor(255, 255, 255); p3.alignment = PP_ALIGN.CENTER
 
-        # 5. Agilomatrix Logo (Bottom Right)
-        logo_path = os.path.join(os.getcwd(), "Image.png")
-        if os.path.exists(logo_path):
-            s1.shapes.add_picture(logo_path, prs.slide_width - Inches(2.3), prs.slide_height - Inches(1.1), width=Inches(2.0))
-
         # ==========================================
-        # SLIDE 2: KPI METRICS (NO CHANGES)
+        # SLIDE 2: KPI PERFORMANCE OVERVIEW
         # ==========================================
         s2 = prs.slides.add_slide(prs.slide_layouts[6])
-        
-        # 1. Business Unit Badge
-        badge = s2.shapes.add_shape(1, Inches(0.8), Inches(0.6), Inches(1.4), Inches(0.35))
-        badge.fill.solid(); badge.fill.fore_color.rgb = RGBColor(235, 230, 220); badge.line.width = 0
-        btf = badge.text_frame
-        btp = btf.paragraphs[0]
-        btp.text = f"📊 {biz_unit}"; btp.font.size = Pt(14); btp.font.color.rgb = COLOR_DARK; btp.alignment = PP_ALIGN.CENTER
+        add_branding(s2)
 
-        # 2. Main Title
-        title_shape = s2.shapes.add_textbox(Inches(0.8), Inches(1.0), Inches(10), Inches(0.8))
+        # Main Title
+        title_shape = s2.shapes.add_textbox(Inches(0.8), Inches(0.5), Inches(10), Inches(0.8))
         tf = title_shape.text_frame
         p = tf.paragraphs[0]
-        p.text = "Current Inventory Performance Overview"
-        p.font.size = Pt(44); p.font.name = FONT_SERIF; p.font.color.rgb = RGBColor(89, 81, 75)
+        p.text = "Inventory Performance Metrics"
+        p.font.size = Pt(40); p.font.bold = True; p.font.color.rgb = COLOR_DARK
 
-        # 3. Intro Text
-        intro_shape = s2.shapes.add_textbox(Inches(0.8), Inches(1.8), Inches(11), Inches(1))
-        p = intro_shape.text_frame.paragraphs[0]
-        p.text = f"Snapshot analysis for the {biz_unit} facility as of {inv_date}, benchmarked against PFEP standards. The data reveals significant inventory imbalances requiring immediate attention."
-        p.font.size = Pt(18); p.font.color.rgb = COLOR_DARK; p.word_wrap = True
-
-        # 4. BIG KPIs Row (Target, Actual, Variance)
-        kpi_y = Inches(2.8)
-        kpi_widths = [Inches(4), Inches(4), Inches(4)]
-        kpi_x = [Inches(1), Inches(4.5), Inches(8)]
+        # 3 Big Metrics Row
+        kpi_y = Inches(2.0)
+        kpi_labels = ["Target Days", "Actual Days", "Variance %"]
+        kpi_values = [f"{ideal_days}", f"{actual_inv_days:.1f}", f"{variance_pct:+.1f}%"]
         
-        # Target Days
-        t_val = s2.shapes.add_textbox(kpi_x[0], kpi_y, kpi_widths[0], Inches(1)).text_frame
-        p1 = t_val.paragraphs[0]; p1.text = f"{ideal_days}"; p1.font.size = Pt(72); p1.font.name = FONT_SERIF; p1.alignment = PP_ALIGN.CENTER
-        p2 = t_val.add_paragraph(); p2.text = "Target Days"; p2.font.size = Pt(24); p2.alignment = PP_ALIGN.CENTER
-        p3 = t_val.add_paragraph(); p3.text = "Ideal inventory level"; p3.font.size = Pt(14); p3.font.color.rgb = COLOR_LIGHT; p3.alignment = PP_ALIGN.CENTER
+        for i in range(3):
+            x_pos = Inches(1 + (i * 4))
+            box = s2.shapes.add_textbox(x_pos, kpi_y, Inches(3.5), Inches(1.5))
+            tf = box.text_frame
+            p1 = tf.paragraphs[0]; p1.text = kpi_values[i]; p1.font.size = Pt(60); p1.alignment = PP_ALIGN.CENTER; p1.font.bold = True
+            p2 = tf.add_paragraph(); p2.text = kpi_labels[i]; p2.font.size = Pt(20); p2.alignment = PP_ALIGN.CENTER
+
+        # Bottom summary boxes
+        summary_y = Inches(4.5)
+        # Left: Value Stats
+        l_box = s2.shapes.add_textbox(Inches(1), summary_y, Inches(5), Inches(2))
+        ltf = l_box.text_frame
+        ltf.paragraphs[0].text = "Financial Snapshot"
+        ltf.paragraphs[0].font.bold = True; ltf.paragraphs[0].font.size = Pt(20)
         
-        # Actual Days
-        a_val = s2.shapes.add_textbox(kpi_x[1], kpi_y, kpi_widths[1], Inches(1)).text_frame
-        p1 = a_val.paragraphs[0]; p1.text = f"{actual_inv_days:.1f}"; p1.font.size = Pt(72); p1.font.name = FONT_SERIF; p1.alignment = PP_ALIGN.CENTER
-        p2 = a_val.add_paragraph(); p2.text = "Actual Days"; p2.font.size = Pt(24); p2.alignment = PP_ALIGN.CENTER
-        p3 = a_val.add_paragraph(); p3.text = "Current on-hand inventory"; p3.font.size = Pt(14); p3.font.color.rgb = COLOR_LIGHT; p3.alignment = PP_ALIGN.CENTER
-
-        # Variance
-        v_val = s2.shapes.add_textbox(kpi_x[2], kpi_y, kpi_widths[2], Inches(1)).text_frame
-        p1 = v_val.paragraphs[0]; p1.text = f"{variance_pct:,.0f}%"; p1.font.size = Pt(72); p1.font.name = FONT_SERIF; p1.alignment = PP_ALIGN.CENTER
-        p2 = v_val.add_paragraph(); p2.text = "Variance"; p2.font.size = Pt(24); p2.alignment = PP_ALIGN.CENTER
-        p3 = v_val.add_paragraph(); p3.text = "Over target inventory" if variance_pct > 0 else "Under target inventory"; p3.font.size = Pt(14); p3.font.color.rgb = COLOR_LIGHT; p3.alignment = PP_ALIGN.CENTER
-
-        # 5. Bottom Two Columns
-        col_y = Inches(4.8)
-        # Left: Inventory Value Analysis
-        l_col = s2.shapes.add_textbox(Inches(0.8), col_y, Inches(5), Inches(2)).text_frame
-        p = l_col.paragraphs[0]; p.text = "Inventory Value Analysis"; p.font.size = Pt(24); p.font.name = FONT_SERIF; p.space_after = Pt(10)
-        items = [f"Ideal Inventory: ₹{ideal_minr*10:,.2f} MINR", f"Actual Inventory: ₹{actual_minr*10:,.2f} MINR", f"Tolerance Level: {tolerance}%"]
+        items = [f"Actual Value: ₹{actual_minr:.2f}M", f"Ideal Value: ₹{ideal_minr:.2f}M", f"Tolerance: {tolerance}%"]
         for item in items:
-            bullet = l_col.add_paragraph(); bullet.text = item; bullet.font.size = Pt(18); bullet.level = 0; bullet.space_before = Pt(5)
+            p = ltf.add_paragraph(); p.text = f"• {item}"; p.font.size = Pt(16)
 
-        # Right: Critical Deviations
-        r_col = s2.shapes.add_textbox(Inches(6.5), col_y, Inches(5), Inches(2)).text_frame
-        p = r_col.paragraphs[0]; p.text = "Critical Deviations"; p.font.size = Pt(24); p.font.name = FONT_SERIF; p.space_after = Pt(10)
-        devs = [f"Excess: ₹{excess_minr*10:,.2f} MINR ({excess_days:.1f} days)", f"Shortage: ₹{short_minr*10:,.2f} MINR", "Action Required: Immediate rebalancing"]
-        for dev in devs:
-            bullet = r_col.add_paragraph(); bullet.text = dev; bullet.font.size = Pt(18); bullet.level = 0; bullet.space_before = Pt(5)
+        # Right: Action Stats
+        r_box = s2.shapes.add_textbox(Inches(7), summary_y, Inches(5), Inches(2))
+        rtf = r_box.text_frame
+        rtf.paragraphs[0].text = "Critical Deviations"
+        rtf.paragraphs[0].font.bold = True; rtf.paragraphs[0].font.size = Pt(20)
+        
+        items = [f"Excess Value: ₹{excess_minr:.2f}M", f"Shortage Value: ₹{short_minr:.2f}M", f"Excess Coverage: {excess_days:.1f} Days"]
+        for item in items:
+            p = rtf.add_paragraph(); p.text = f"• {item}"; p.font.size = Pt(16)
 
-        # 6. Analysis Reference Footer
+        # Footer
         footer = s2.shapes.add_textbox(Inches(0.8), Inches(6.8), Inches(10), Inches(0.4))
-        p = footer.text_frame.paragraphs[0]
-        p.text = f"Analysis Reference: PFEP dated {pfep_ref_str} | Inventory captured {datetime.now().strftime('%d-%m-%Y')}"
-        p.font.size = Pt(14); p.font.italic = True; p.font.color.rgb = COLOR_LIGHT
-
-        # 7. Logo (Bottom Right)
-        if os.path.exists(logo_path):
-            s2.shapes.add_picture(logo_path, prs.slide_width - Inches(2.3), prs.slide_height - Inches(0.9), width=Inches(2.0))
+        footer.text_frame.text = f"PFEP Reference: {pfep_ref} | Report Date: {inv_date}"
+        footer.text_frame.paragraphs[0].font.size = Pt(12); footer.text_frame.paragraphs[0].font.italic = True
 
         # ==========================================
-        # SLIDE 3: GRAPH & DATA TABLE (NO CHANGES)
+        # SLIDE 3: STATUS BREAKDOWN (CHART & TABLE)
         # ==========================================
         s3 = prs.slides.add_slide(prs.slide_layouts[6])
         add_branding(s3)
-        status_map = {'Within Norms': 'Within Norm', 'Excess Inventory': 'Excess than Norm', 'Short Inventory': 'Short Than Norm'}
-        metrics = []
-        for sk, disp in status_map.items():
-            sub = df[df['Status'] == sk]
-            val = sub['Current Inventory - VALUE'].sum() / 1_000_000
-            dev = sub['Stock Deviation Value'].sum() / 1_000_000 if sk == 'Excess Inventory' else (abs(sub['Stock Deviation Value'].sum()) / 1_000_000 if sk == 'Short Inventory' else 0)
-            metrics.append({'Cat': disp, 'Count': len(sub), 'Val': val, 'Dev': dev})
+        
+        status_categories = [
+            {'label': 'Within Norms', 'color': COLOR_GREEN},
+            {'label': 'Excess Inventory', 'color': COLOR_BLUE},
+            {'label': 'Short Inventory', 'color': COLOR_RED}
+        ]
 
-        cd = CategoryChartData()
-        cd.categories = [m['Cat'] for m in metrics]
-        cd.add_series('Part Count', [m['Count'] for m in metrics])
-        chart = s3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Inches(3.41), Inches(1.2), Inches(6.5), Inches(3.5), cd).chart
-        colors = [RGBColor(76, 175, 80), RGBColor(33, 150, 243), RGBColor(244, 67, 54)]
+        chart_data = CategoryChartData()
+        chart_data.categories = [cat['label'] for cat in status_categories]
+        
+        counts = []
+        for cat in status_categories:
+            count = len(df[df['Status'] == cat['label']])
+            counts.append(count)
+        
+        chart_data.add_series('Part Count', counts)
+        
+        # Add Chart
+        x, y, cx, cy = Inches(1), Inches(1.5), Inches(6), Inches(4)
+        chart = s3.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, x, y, cx, cy, chart_data).chart
         for i, pt in enumerate(chart.plots[0].series[0].points):
-            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = colors[i]
+            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = status_categories[i]['color']
 
-        tbl = s3.shapes.add_table(4, 4, Inches(2.41), Inches(5.0), Inches(8.5), Inches(1.5)).table
-        hdrs = ["Status", "Part Count", "Value (MINR)", "Deviation (MINR)"]
-        for c, h in enumerate(hdrs):
-            cell = tbl.cell(0, c); cell.text = h; cell.text_frame.paragraphs[0].font.bold = True; cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
-        for r, m in enumerate(metrics, 1):
-            for c, text in enumerate([m['Cat'], str(m['Count']), f"{m['Val']:.2f}", f"{m['Dev']:.2f}"]):
-                cell = tbl.cell(r, c); cell.text = text; cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
-                
+        # Add Table
+        rows, cols = 4, 4
+        tx, ty, tcx, tcy = Inches(7.2), Inches(1.5), Inches(5.5), Inches(4)
+        table = s3.shapes.add_table(rows, cols, tx, ty, tcx, tcy).table
+        
+        headers = ["Status", "Count", "Value(M)", "Dev(M)"]
+        for c, h in enumerate(headers):
+            table.cell(0, c).text = h
+            table.cell(0, c).text_frame.paragraphs[0].font.bold = True
+            
+        for i, cat in enumerate(status_categories, 1):
+            sub = df[df['Status'] == cat['label']]
+            val = sub['Current Inventory - VALUE'].sum() / 1_000_000
+            dev = abs(sub['Stock Deviation Value'].sum()) / 1_000_000
+            
+            table.cell(i, 0).text = cat['label']
+            table.cell(i, 1).text = str(len(sub))
+            table.cell(i, 2).text = f"{val:.2f}"
+            table.cell(i, 3).text = f"{dev:.2f}"
+
+        # Finalize
         ppt_out = io.BytesIO()
         prs.save(ppt_out)
         ppt_out.seek(0)
