@@ -1444,7 +1444,66 @@ class InventoryManagementSystem:
         # ==========================================
         s3 = prs.slides.add_slide(prs.slide_layouts[6])
         add_logo_bottom_right(s3)
-        # (Insert your Slide 3 logic here)
+
+        # 1. Title
+        title_box3 = s3.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11), Inches(0.8))
+        title_box3.text_frame.text = "Inventory Status Breakdown by Part Classification"
+        title_box3.text_frame.paragraphs[0].font.size = Pt(32)
+        title_box3.text_frame.paragraphs[0].font.color.rgb = COLOR_DARK_TEXT
+
+        # 2. Insight Summary
+        total_parts = len(df)
+        short_count = len(df[df[status_col] == 'Short Inventory'])
+        within_count = len(df[df[status_col] == 'Within Norms'])
+        excess_count = len(df[df[status_col] == 'Excess Inventory'])
+        short_pct = (short_count / total_parts * 100) if total_parts > 0 else 0
+        within_pct = (within_count / total_parts * 100) if total_parts > 0 else 0
+        excess_pct = (excess_count / total_parts * 100) if total_parts > 0 else 0
+
+        insight_box = s3.shapes.add_textbox(Inches(0.8), Inches(1.1), Inches(11.5), Inches(0.8))
+        itf = insight_box.text_frame; itf.word_wrap = True
+        p_ins = itf.paragraphs[0]
+        p_ins.text = f"Detailed analysis of {total_parts} total parts reveals critical supply chain imbalances. Over {short_pct:.0f}% of parts are running below optimal levels, indicating systemic procurement challenges."
+        p_ins.font.size = Pt(16); p_ins.font.color.rgb = COLOR_DARK_TEXT
+
+        # 3. Pie Chart (Middle)
+        cd3 = ChartData()
+        cd3.categories = ['Short', 'Within Norm', 'Excess']
+        cd3.add_series('Status', (short_pct/100, within_pct/100, excess_pct/100))
+        chart_shp = s3.shapes.add_chart(XL_CHART_TYPE.PIE, Inches(4.5), Inches(2.1), Inches(4.3), Inches(3.4), cd3)
+        chart = chart_shp.chart
+        chart.has_legend = True; chart.legend.position = XL_LEGEND_POSITION.TOP; chart.legend.include_in_layout = False
+        
+        # Colors: Blue (Short), Red (Within), Green (Excess)
+        points = chart.plots[0].series[0].points
+        colors_pie = [RGBColor(79, 129, 189), RGBColor(192, 80, 77), RGBColor(155, 187, 89)]
+        for i, pt in enumerate(points):
+            pt.format.fill.solid(); pt.format.fill.fore_color.rgb = colors_pie[i]
+        chart.plots[0].has_data_labels = True
+        for i, pt in enumerate(points):
+            pt.data_label.font.size = Pt(14); pt.data_label.font.bold = True; pt.data_label.font.color.rgb = RGBColor(255, 255, 255)
+
+        # 4. KPI Boxes (Bottom)
+        within_val = df[df[status_col] == 'Within Norms']['Current Inventory - VALUE'].sum() / 1_000_000
+        box_y = Inches(5.6); box_w = Inches(3.7); box_h = Inches(1.3)
+        
+        def add_kpi_box(slide, x, title, body):
+            shp = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, x, box_y, box_w, box_h)
+            shp.fill.background(); shp.line.color.rgb = RGBColor(150, 150, 150)
+            tf = shp.text_frame; tf.vertical_anchor = MSO_ANCHOR.MIDDLE; tf.word_wrap = True
+            p1 = tf.paragraphs[0]; p1.text = title; p1.font.bold = True; p1.font.size = Pt(18); p1.alignment = PP_ALIGN.CENTER; p1.font.color.rgb = COLOR_DARK_TEXT
+            p2 = tf.add_paragraph(); p2.text = body; p2.font.size = Pt(11); p2.alignment = PP_ALIGN.CENTER; p2.font.color.rgb = COLOR_DARK_TEXT
+
+        add_kpi_box(s3, Inches(0.8), "Within Tolerance", f"{within_count} parts ({within_pct:.0f}%) operating within acceptable ranges with ₹{within_val:.2f} MINR value")
+        add_kpi_box(s3, Inches(4.7), "Excess Inventory", f"{excess_count} parts ({excess_pct:.0f}%) exceed norms by ₹{excess_minr:.2f} MINR—prime candidates for redistribution")
+        add_kpi_box(s3, Inches(8.6), "Critical Shortages", f"{short_count} parts ({short_pct:.0f}%) below target with ₹{short_minr:.2f} MINR shortage—urgent action needed")
+
+        # 5. Recommendation Bar
+        rec_box = s3.shapes.add_shape(MSO_SHAPE.RECTANGLE, Inches(0.8), Inches(7.0), Inches(11.5), Inches(0.45))
+        rec_box.fill.solid(); rec_box.fill.fore_color.rgb = COLOR_BADGE_BG; rec_box.line.color.rgb = RGBColor(150, 150, 150)
+        p_rec = rec_box.text_frame.paragraphs[0]; p_rec.text = "Recommended Action: Prioritize procurement for shortage items while implementing excess stock reduction strategies."
+        p_rec.font.size = Pt(12); p_rec.font.bold = True; p_rec.font.color.rgb = COLOR_DARK_TEXT; p_rec.alignment = PP_ALIGN.CENTER
+
 
         ppt_out = io.BytesIO()
         prs.save(ppt_out)
