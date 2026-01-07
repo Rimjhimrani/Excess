@@ -1076,10 +1076,10 @@ class InventoryManagementSystem:
             new_tolerance = st.selectbox(
                 "Tolerance Zone (+/-)",
                 options=[0, 10, 20, 30, 40, 50],
-                index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance),
-                format_func=lambda x: f"{x}%",
-                help="Defines the range for 'Within Norms' status."
+                index=[0, 10, 20, 30, 40, 50].index(st.session_state.get('admin_tolerance', 30)),
+                format_func=lambda x: f"{x}%"
             )
+            st.session_state.admin_tolerance = new_tolerance
             if new_tolerance != st.session_state.admin_tolerance:
                 st.session_state.admin_tolerance = new_tolerance
                 st.success(f"✅ Tolerance updated to {new_tolerance}%")
