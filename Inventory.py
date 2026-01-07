@@ -443,6 +443,14 @@ class InventoryManagementSystem:
         for key in self.persistent_keys:
             if key not in st.session_state:
                 st.session_state[key] = None  # BUG: should be None, not empty list
+        # NEW: Check Disk for persistent PFEP data
+        disk_data, is_locked = self.persistence.load_from_disk()
+        
+        if disk_data and st.session_state.get('persistent_pfep_data') is None:
+            st.session_state['persistent_pfep_data'] = disk_data
+            st.session_state['persistent_pfep_locked'] = is_locked
+            logger.info("Loaded PFEP data from Disk Persistence")
+    
     def safe_print(self, message):
         """Safely print to streamlit or console"""
         try:
