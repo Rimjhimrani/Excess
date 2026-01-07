@@ -1199,86 +1199,53 @@ class InventoryManagementSystem:
             st.dataframe(df_preview, use_container_width=True)
     
     def user_inventory_upload(self):
-        """
-        User interface for inventory upload and analysis.
-        Accessible only when PFEP data is locked by Admin.
-        """
-        st.header("📦 User: Current Inventory Analysis")
+        st.header("📦 User: Inventory Upload & Analysis")
         
-        # 1. Check if PFEP data is available and locked
         pfep_data = st.session_state.get('persistent_pfep_data')
         pfep_locked = st.session_state.get('persistent_pfep_locked', False)
         
-        if not pfep_locked or not pfep_data:
-            st.error("❌ Access Denied: PFEP Master Data is not locked.")
-            st.info("Please contact the Admin to upload and lock the PFEP Master file before proceeding.")
+        if not pfep_locked:
+            st.error("❌ PFEP Master Data is not locked by Admin.")
             return
-        
-        # 2. Display PFEP Status (Read-Only)
-        st.success(f"✅ PFEP Master Data is Active: {len(pfep_data)} parts loaded.")
-        with st.expander("📖 View Locked Master Data (Read-Only)"):
-            st.dataframe(pd.DataFrame(pfep_data), use_container_width=True)
 
-        st.markdown("---")
-        
-        # 3. Upload Inventory Dump
-        st.subheader("📊 Upload Current Inventory Dump")
-        uploaded_inv = st.file_uploader(
-            "Choose Current Inventory Excel/CSV", 
-            type=['xlsx', 'xls', 'csv'], 
-            key="user_inv_uploader"
-        )
+        # 1. UI for Upload
+        uploaded_inv = st.file_uploader("Upload Current Inventory Dump", type=['xlsx', 'csv'])
         
         if uploaded_inv:
-            try:
-                # Read Inventory File
-                df_inv = pd.read_csv(uploaded_inv) if uploaded_inv.name.endswith('.csv') else pd.read_excel(uploaded_inv)
+            df_inv = pd.read_csv(uploaded_inv) if uploaded_inv.name.endswith('.csv') else pd.read_excel(uploaded_inv)
+            standardized_inv = self.standardize_current_inventory(df_inv)
+            
+            if standardized_inv:
+                # MATCH CHECK (DEBUGGING)
+                pfep_keys = set(str(item['Part_No']).strip().upper() for item in pfep_data)
+                inv_keys = set(str(item['Part_No']).strip().upper() for item in standardized_inv)
+                matches = pfep_keys.intersection(inv_keys)
                 
-                # Standardize
-                standardized_inv = self.standardize_current_inventory(df_inv)
+                st.info(f"🔍 Match Check: Found {len(matches)} parts in Inventory that exist in PFEP Master.")
                 
-                if standardized_inv:
-                    st.success(f"✅ Inventory Dump Processed: {len(standardized_inv)} items.")
-                    
-                    # 4. Trigger Analysis
-                    if st.button("🚀 Run Analysis & Generate Dashboard", type="primary"):
-                        with st.spinner("Analyzing inventory against Master PFEP..."):
-                            # Get tolerance from admin settings
-                            tolerance = st.session_state.get('admin_tolerance', 30)
-                            
-                            # Execute Analysis
-                            analysis_results = self.analyzer.analyze_inventory(
-                                pfep_data,
-                                standardized_inv,
-                                tolerance=tolerance
-                            )
-                            
-                            if analysis_results:
-                                # Save results to session state
-                                st.session_state.persistent_analysis_results = analysis_results
-                                st.session_state.persistent_inventory_data = standardized_inv
-                                st.success("📈 Analysis Complete!")
-                                st.rerun()
-                            else:
-                                st.error("❌ Analysis failed. No matching parts found between PFEP and Inventory.")
-                else:
-                    st.error("❌ Failed to standardize inventory file. Check column names.")
-                    
-            except Exception as e:
-                st.error(f"❌ Error processing inventory file: {str(e)}")
+                if len(matches) == 0:
+                    st.error("❌ Zero matches found! Please check if 'Part Number' formats are the same in both files.")
+                    with st.expander("Show Sample Part Numbers"):
+                        st.write("PFEP Sample:", list(pfep_keys)[:5])
+                        st.write("Inventory Sample:", list(inv_keys)[:5])
 
-        # 5. Display Dashboard if results exist
-        if st.session_state.get('persistent_analysis_results'):
+                # 2. RUN BUTTON
+                if st.button("🚀 Run Analysis", type="primary"):
+                    results = self.analyzer.analyze_inventory(pfep_data, standardized_inv, tolerance=st.session_state.admin_tolerance)
+                    
+                    if results:
+                        # CRITICAL: Save to session state so dashboard sees it
+                        st.session_state['persistent_analysis_results'] = results
+                        st.success(f"✅ Analysis generated for {len(results)} items.")
+                        st.rerun()
+                    else:
+                        st.error("❌ Analysis resulted in 0 items. Ensure Part Numbers match exactly.")
+
+        # 3. SHOW DASHBOARD
+        analysis_results = st.session_state.get('persistent_analysis_results')
+        if analysis_results:
             st.markdown("---")
-            # This calls your main dashboard logic (Metrics, Charts, PPT Export)
             self.display_analysis_results()
-
-        # 6. Option to Clear Current Analysis (to upload a new dump)
-        if st.session_state.get('persistent_analysis_results'):
-            if st.sidebar.button("🗑️ Clear Current Analysis"):
-                st.session_state.persistent_analysis_results = None
-                st.session_state.persistent_inventory_data = None
-                st.rerun()
                 
     def generate_ppt_report(self, analysis_results):
         """
