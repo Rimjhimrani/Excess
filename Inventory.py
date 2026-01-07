@@ -1531,68 +1531,53 @@ class InventoryManagementSystem:
             except: pass
 
         s4 = prs.slides.add_slide(prs.slide_layouts[6])
-
+        
+        # 1. Main Title
         title_shp4 = s4.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(12), Inches(0.8))
         p_t4 = title_shp4.text_frame.paragraphs[0]
         p_t4.text = "Visual Inventory Analytics Dashboard"
         p_t4.font.size = Pt(40); p_t4.font.color.rgb = COLOR_BLACK
 
-        sub_shp4 = s4.shapes.add_textbox(Inches(0.8), Inches(1.1), Inches(11.5), Inches(0.6))
-        p_sub4 = sub_shp4.text_frame.paragraphs[0]
-        p_sub4.text = f"Visual identification of inventory imbalances for procurement and planning teams."
-        p_sub4.font.size = Pt(14); p_sub4.font.color.rgb = COLOR_BLACK
-
-        # --- Data Prep for Charts (FIXED COLUMN NAMES) ---
-        # 1. Top 10 Excess Parts
+        # 2. Data Processing (Pure Deviations)
         df_exc_top = df[df[status_col] == 'Excess Inventory'].sort_values('Stock Deviation Value', ascending=False).head(10)
-        # 2. Top 10 Short Parts
         df_shrt_top = df[df[status_col] == 'Short Inventory'].sort_values('Stock Deviation Value', ascending=True).head(10)
         
-        # 3. Top 10 Vendors (Excess) - Grouping by 'Vendor Name' (MATCHES ANALYZER)
-        df_v_exc = df[df[status_col] == 'Excess Inventory'].groupby('Vendor Name').agg({
-            'Stock Deviation Value': 'sum', 
-            'avg_numeric': 'sum', 
-            'unit_price_numeric': 'mean'
-        }).reset_index()
-        df_v_exc['Ideal_Val'] = df_v_exc['avg_numeric'] * ideal_days * df_v_exc['unit_price_numeric']
-        df_v_exc = df_v_exc.sort_values('Stock Deviation Value', ascending=False).head(10)
-        
-        # 4. Top 10 Vendors (Short)
-        df_v_shrt = df[df[status_col] == 'Short Inventory'].groupby('Vendor Name').agg({
-            'Stock Deviation Value': 'sum', 
-            'avg_numeric': 'sum', 
-            'unit_price_numeric': 'mean'
-        }).reset_index()
+        # Vendor Aggregation
+        df_v_exc = df[df[status_col] == 'Excess Inventory'].groupby('Vendor Name')['Stock Deviation Value'].sum().reset_index().sort_values('Stock Deviation Value', ascending=False).head(10)
+        df_v_shrt = df[df[status_col] == 'Short Inventory'].groupby('Vendor Name')['Stock Deviation Value'].sum().reset_index()
         df_v_shrt['Abs_Dev'] = abs(df_v_shrt['Stock Deviation Value'])
-        df_v_shrt['Ideal_Val'] = df_v_shrt['avg_numeric'] * ideal_days * df_v_shrt['unit_price_numeric']
         df_v_shrt = df_v_shrt.sort_values('Abs_Dev', ascending=False).head(10)
 
-        chart_y = Inches(2.2); chart_h = Inches(3.2); chart_w = Inches(3.1)
-        
-        def add_dashboard_chart(x_pos, title, categories, series1_data, series1_name, series2_data, series2_name, color):
+        # 3. Simple Bar Chart Helper (No Target)
+        def add_simple_bar(x_pos, title, categories, data, color):
             chart_data = ChartData()
             chart_data.categories = [str(c)[:12] for c in categories] 
-            chart_data.add_series(series1_name, [v / 100_000 for v in series1_data])
-            chart_data.add_series(series2_name, [v / 100_000 for v in series2_data])
-            c_shp = s4.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, x_pos, chart_y, chart_w, chart_h, chart_data)
+            chart_data.add_series('Value (Lakhs)', [v / 100_000 for v in data])
+            
+            c_shp = s4.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, x_pos, Inches(2.2), Inches(3.1), Inches(3.2), chart_data)
             chart = c_shp.chart
             chart.has_title = True; chart.chart_title.text_frame.text = title
-            chart.chart_title.text_frame.paragraphs[0].font.size = Pt(9)
-            chart.has_legend = True; chart.legend.position = XL_LEGEND_POSITION.TOP; chart.legend.font.size = Pt(7)
+            chart.chart_title.text_frame.paragraphs[0].font.size = Pt(9); chart.chart_title.text_frame.paragraphs[0].font.color.rgb = COLOR_BLACK
+            chart.has_legend = False # Removed legend as there is only 1 series
+            
+            # Formatting
             for pt in chart.series[0].points:
                 pt.format.fill.solid(); pt.format.fill.fore_color.rgb = color
             chart.category_axis.tick_labels.font.size = Pt(7); chart.value_axis.tick_labels.font.size = Pt(7)
 
-        # Draw Charts
-        add_dashboard_chart(Inches(0.2), "Top 10 Excess Parts (Lakhs)", df_exc_top['PART NO'], df_exc_top['Stock Deviation Value'], "Excess", (df_exc_top['avg_numeric'] * ideal_days * df_exc_top['unit_price_numeric']), "Target", RGBColor(33, 150, 243))
-        add_dashboard_chart(Inches(3.4), "Top 10 Short Parts (Lakhs)", df_shrt_top['PART NO'], abs(df_shrt_top['Stock Deviation Value']), "Shortage", (df_shrt_top['avg_numeric'] * ideal_days * df_shrt_top['unit_price_numeric']), "Target", RGBColor(244, 67, 54))
-        add_dashboard_chart(Inches(6.6), "Top 10 Excess Vendors", df_v_exc['Vendor Name'], df_v_exc['Stock Deviation Value'], "Excess", df_v_exc['Ideal_Val'], "Target", RGBColor(33, 150, 243))
-        add_dashboard_chart(Inches(9.8), "Top 10 Short Vendors", df_v_shrt['Vendor Name'], df_v_shrt['Abs_Dev'], "Shortage", df_v_shrt['Ideal_Val'], "Target", RGBColor(244, 67, 54))
+        # Draw the 4 Bar Charts
+        add_simple_bar(Inches(0.2), "Top 10 Excess Parts", df_exc_top['PART NO'], df_exc_top['Stock Deviation Value'], RGBColor(33, 150, 243))
+        add_simple_bar(Inches(3.4), "Top 10 Short Parts", df_shrt_top['PART NO'], abs(df_shrt_top['Stock Deviation Value']), RGBColor(244, 67, 54))
+        add_simple_bar(Inches(6.6), "Top 10 Excess Vendors", df_v_exc['Vendor Name'], df_v_exc['Stock Deviation Value'], RGBColor(33, 150, 243))
+        add_simple_bar(Inches(9.8), "Top 10 Short Vendors", df_v_shrt['Vendor Name'], df_v_shrt['Abs_Dev'], RGBColor(244, 67, 54))
 
+        # Bottom Footer Box
         bot_shp = s4.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(6.0), Inches(11.5), Inches(0.6))
         bot_shp.fill.solid(); bot_shp.fill.fore_color.rgb = COLOR_BADGE_BG
-        bot_shp.text_frame.paragraphs[0].text = "📊 Visualizations support data-driven decision making for procurement planning teams."
-        bot_shp.text_frame.paragraphs[0].font.size = Pt(14); bot_shp.text_frame.paragraphs[0].font.color.rgb = COLOR_BLACK
+        p_bot = bot_shp.text_frame.paragraphs[0]
+        p_bot.text = "📊 Visual analysis showing highest inventory imbalances for rapid identification and action."
+        p_bot.font.size = Pt(14); p_bot.font.color.rgb = COLOR_BLACK
+        
         add_logo_bottom_right(s4)
         
         ppt_out = io.BytesIO()
