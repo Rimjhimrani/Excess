@@ -108,6 +108,39 @@ st.markdown("""
 
 class DataPersistence:
     """Handle data persistence across sessions"""
+    STORAGE_FILE = "pfep_master_data.pkl"
+    LOCK_FILE = "pfep_lock_status.txt"
+
+    @staticmethod
+    def save_to_disk(data, locked=True):
+        """Saves the PFEP data to a physical file on the server"""
+        with open(DataPersistence.STORAGE_FILE, 'wb') as f:
+            pickle.dump(data, f)
+        with open(DataPersistence.LOCK_FILE, 'w') as f:
+            f.write("locked" if locked else "unlocked")
+
+    @staticmethod
+    def load_from_disk():
+        """Loads data from the physical file if it exists"""
+        if os.path.exists(DataPersistence.STORAGE_FILE):
+            with open(DataPersistence.STORAGE_FILE, 'rb') as f:
+                data = pickle.load(f)
+            
+            lock_status = False
+            if os.path.exists(DataPersistence.LOCK_FILE):
+                with open(DataPersistence.LOCK_FILE, 'r') as f:
+                    lock_status = (f.read() == "locked")
+            
+            return data, lock_status
+        return None, False
+
+    @staticmethod
+    def delete_from_disk():
+        """Removes the files when admin unlocks/deletes"""
+        if os.path.exists(DataPersistence.STORAGE_FILE):
+            os.remove(DataPersistence.STORAGE_FILE)
+        if os.path.exists(DataPersistence.LOCK_FILE):
+            os.remove(DataPersistence.LOCK_FILE)
     
     @staticmethod
     def save_data_to_session_state(key, data):
