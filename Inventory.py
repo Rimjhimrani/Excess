@@ -2799,9 +2799,10 @@ class InventoryManagementSystem:
             
     def display_analysis_results(self):
         """Main method to display all analysis results"""
-        analysis_results = self.persistence.load_data_from_session_state('persistent_analysis_results')
+        analysis_results = st.session_state.get('persistent_analysis_results')
+        
         if not analysis_results:
-            st.error("❌ No analysis results available.")
+            st.warning("⚠️ No analysis results available yet. Please upload inventory and click 'Run Analysis'.")
             return
         # Debug: show sample keys to catch missing columns
         st.code(f"Sample columns: {list(analysis_results[0].keys())}" if analysis_results else "No data structure found.")
