@@ -1070,14 +1070,18 @@ class InventoryManagementSystem:
         }
         
     def admin_data_management(self):
-        """Admin-only PFEP data management interface"""
+        """
+        Admin-only PFEP data management interface.
+        Handles settings, file upload, disk persistence, and locking.
+        """
         st.header("🔧 Admin Dashboard - PFEP Data Management")
+        
+        # --- 1. GLOBAL SETTINGS ---
         st.markdown("### ⚙️ Global Analysis Settings")
         config_col1, config_col2 = st.columns(2)
 
         with config_col1:
             st.subheader("📐 Analysis Tolerance")
-            # Initialize admin_tolerance if not exists
             if "admin_tolerance" not in st.session_state:
                 st.session_state.admin_tolerance = 30
 
@@ -1086,149 +1090,133 @@ class InventoryManagementSystem:
                 options=[0, 10, 20, 30, 40, 50],
                 index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance),
                 format_func=lambda x: f"{x}%",
-                key="tolerance_selector_main",
                 help="Defines the range for 'Within Norms' status."
             )
             if new_tolerance != st.session_state.admin_tolerance:
                 st.session_state.admin_tolerance = new_tolerance
                 st.success(f"✅ Tolerance updated to {new_tolerance}%")
-                if st.session_state.get('persistent_analysis_results'):
-                    st.info("🔄 Analysis will refresh on next run.")
 
         with config_col2:
             st.subheader("📅 Ideal Inventory Target")
-            # Ensure the key exists in session state
             if 'user_preferences' not in st.session_state:
                 st.session_state.user_preferences = {'ideal_inventory_days': 30}
         
-            # Centered input for Ideal Days
             st.session_state.user_preferences['ideal_inventory_days'] = st.number_input(
                 "Ideal Inventory Days",
-                min_value=1,
-                max_value=365,
+                min_value=1, max_value=365,
                 value=st.session_state.user_preferences.get('ideal_inventory_days', 30),
                 step=1,
-                help="Used to calculate the black 'Ideal Inventory Line' on charts (Avg Consumption * Days)",
-                key="admin_ideal_days_main"
+                key="admin_ideal_days_input"
             )
             st.info(f"Target: {st.session_state.user_preferences['ideal_inventory_days']} Days of Stock")
 
         st.markdown("---")
         
-        # Check if PFEP data is locked
+        # --- 2. LOCK STATUS CHECK ---
         pfep_locked = st.session_state.get('persistent_pfep_locked', False)
         
         if pfep_locked:
-            st.warning("🔒 PFEP data is PERMANENTLY SAVED and locked for users.")
-            if st.button("🔓 Delete & Unlock Master PFEP", type="secondary"):
-                # Remove from disk
-                self.persistence.delete_from_disk()
-                # Clear session
-                st.session_state.persistent_pfep_data = None
-                st.session_state.persistent_pfep_locked = False
-                st.session_state.persistent_analysis_results = None
-                st.success("✅ Permanent Master PFEP deleted from server.")
-                st.rerun()
-            # ... rest of preview logic ...
-        else:
-            # Inside your "Save PFEP Data" button logic:
-            if st.button("💾 Save & Lock PFEP Permanently", type="primary"):
-                # Save to session
-                self.persistence.save_data_to_session_state('persistent_pfep_data', standardized_data)
-                st.session_state.persistent_pfep_locked = True
-                # SAVE TO DISK (This makes it stay for days/weeks)
-                self.persistence.save_to_disk(standardized_data, locked=True)
-                st.success("✅ PFEP data saved to server disk!")
-                st.rerun()
+            st.warning("🔒 PFEP Master Data is currently LOCKED and active for Users.")
+            col_a, col_b = st.columns([3, 1])
+            with col_a:
+                st.info("The PFEP file is saved on the server disk and will persist across sessions.")
+            with col_b:
+                if st.button("🔓 Unlock & Delete", type="secondary", help="Removes file from disk and session"):
+                    # 1. Clear session
+                    st.session_state.persistent_pfep_data = None
+                    st.session_state.persistent_pfep_locked = False
+                    st.session_state.persistent_analysis_results = None
+                    # 2. Clear disk (Optional: You can add delete_from_disk method in DataPersistence)
+                    if hasattr(self.persistence, 'delete_from_disk'):
+                        self.persistence.delete_from_disk()
+                    st.success("✅ PFEP deleted. System is ready for new upload.")
+                    st.rerun()
             
-            # Display current PFEP data if available
-            pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
+            # Show preview of currently locked data
+            pfep_data = st.session_state.get('persistent_pfep_data')
             if pfep_data:
                 self.display_pfep_data_preview(pfep_data)
             return
-        
-        st.subheader("📊 PFEP Master Data Management")
-        tab1, tab2, tab3 = st.tabs(["📁 Upload File", "🧪 Load Sample", "📋 Current Data"])
+
+        # --- 3. UPLOAD INTERFACE (Visible only when unlocked) ---
+        st.subheader("📊 PFEP Master Data Upload")
+        tab1, tab2, tab3 = st.tabs(["📁 Upload File", "🧪 Load Sample", "📋 Status"])
     
         with tab1:
             st.markdown("**Upload PFEP Excel/CSV File**")
-            uploaded_file = st.file_uploader("Choose PFEP file", type=['xlsx', 'xls', 'csv'])
+            uploaded_file = st.file_uploader("Choose PFEP file", type=['xlsx', 'xls', 'csv'], key="admin_pfep_uploader")
+            
             if uploaded_file is not None:
                 try:
+                    # Read the file
                     df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith('.csv') else pd.read_excel(uploaded_file)
-                    st.success(f"✅ File loaded: {len(df)} rows")
-                    with st.expander("📋 Preview Raw Data"):
-                        st.dataframe(df.head())
-                    standardized_data = self.standardize_pfep_data(df)
-                    if standardized_data:
-                        st.success(f"✅ Standardized: {len(standardized_data)} valid records")
-                        if st.button("💾 Save PFEP Data", type="primary"):
-                            self.persistence.save_data_to_session_state('persistent_pfep_data', standardized_data)
-                            st.success("✅ PFEP data saved successfully!")
-                            st.rerun()
+                    
+                    # Standardize the data
+                    processed_data = self.standardize_pfep_data(df)
+                    
+                    if processed_data:
+                        # CRITICAL: Store in a temp session key to prevent UnboundLocalError on button click
+                        st.session_state['temp_admin_pfep_data'] = processed_data
+                        
+                        st.success(f"✅ Processed {len(processed_data)} valid records.")
+                        with st.expander("🔍 Preview processed data"):
+                            st.dataframe(pd.DataFrame(processed_data).head(10))
+                        
+                        # SAVE BUTTON
+                        if st.button("💾 Save & Lock PFEP Permanently", type="primary"):
+                            final_data = st.session_state.get('temp_admin_pfep_data')
+                            if final_data:
+                                # 1. Save to session
+                                st.session_state.persistent_pfep_data = final_data
+                                st.session_state.persistent_pfep_locked = True
+                                
+                                # 2. Save to physical disk (Persistence)
+                                if hasattr(self.persistence, 'save_to_disk'):
+                                    self.persistence.save_to_disk(final_data, locked=True)
+                                
+                                # 3. Cleanup temp
+                                del st.session_state['temp_admin_pfep_data']
+                                
+                                st.success("✅ PFEP Master Data saved to disk and locked for users!")
+                                st.rerun()
+                    else:
+                        st.error("❌ Data standardization failed. Check column names.")
                 except Exception as e:
-                    st.error(f"❌ Error: {str(e)}")
+                    st.error(f"❌ File processing error: {str(e)}")
 
         with tab2:
-            st.markdown("**Load Sample PFEP Data for Testing**")
-            if st.button("🧪 Load Sample PFEP Data", type="secondary"):
-                sample_data = self.load_sample_pfep_data()
-                self.persistence.save_data_to_session_state('persistent_pfep_data', sample_data)
-                st.success(f"✅ Sample PFEP data loaded: {len(sample_data)} parts")
-                st.rerun()
+            st.info("🧪 Use this for demonstration purposes.")
+            if st.button("Load Sample PFEP Data"):
+                sample = self.load_sample_pfep_data()
+                st.session_state['temp_admin_pfep_data'] = sample
+                st.success("Sample data loaded into preview. Click 'Save' in Tab 1 to lock it.")
 
         with tab3:
-            st.markdown("**Current PFEP Data Status**")
-            pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
-            if pfep_data:
-                self.display_pfep_data_preview(pfep_data)
-                st.markdown("---")
-                st.markdown("**🔒 Lock Data for Users**")
-                if st.button("🔒 Lock PFEP Data", type="primary"):
-                    st.session_state.persistent_pfep_locked = True
-                    st.success("✅ PFEP data locked!")
-                    st.rerun()
+            st.markdown("**Current Storage Status**")
+            if not pfep_locked:
+                st.info("No Master Data is currently locked. The User dashboard is disabled.")
             else:
-                st.warning("❌ No PFEP data available.")
-    
+                st.success("Master Data is active.")
+
     def display_pfep_data_preview(self, pfep_data):
-        """Display PFEP data preview with statistics"""
-        st.markdown("**📊 PFEP Data Overview**")
+        """Displays statistics for the currently loaded PFEP data"""
+        df_preview = pd.DataFrame(pfep_data)
         
-        # Statistics
         col1, col2, col3, col4 = st.columns(4)
         with col1:
-            st.metric("Total Parts", len(pfep_data))
+            st.metric("Total Parts", len(df_preview))
         with col2:
-            vendors = set(item.get('Vendor_Name', 'Unknown') for item in pfep_data)
-            st.metric("Unique Vendors", len(vendors))
+            v_col = 'Vendor Name' if 'Vendor Name' in df_preview.columns else 'Vendor_Name'
+            unique_v = df_preview[v_col].nunique() if v_col in df_preview.columns else 0
+            st.metric("Unique Vendors", unique_v)
         with col3:
-            total_rm_qty = sum(item.get('RM_IN_QTY', 0) for item in pfep_data)
-            st.metric("Total RM Qty", f"{total_rm_qty:,.0f}")
+            total_val = (df_preview['unit_price'] * df_preview['RM_IN_QTY']).sum() if 'unit_price' in df_preview.columns else 0
+            st.metric("Total Master Value", f"₹{total_val/1000000:.1f}M")
         with col4:
-            avg_unit_price = sum(item.get('Unit_Price', 0) for item in pfep_data) / len(pfep_data)
-            st.metric("Avg Unit Price", f"₹{avg_unit_price:.2f}")
-        
-        # Data preview
-        with st.expander("📋 Data Preview (First 10 rows)"):
-            preview_df = pd.DataFrame(pfep_data[:10])
-            st.dataframe(preview_df)
-        
-        # Vendor summary
-        with st.expander("📈 Vendor Summary"):
-            vendor_summary = {}
-            for item in pfep_data:
-                vendor = item.get('Vendor_Name', 'Unknown')
-                if vendor not in vendor_summary:
-                    vendor_summary[vendor] = {'count': 0, 'total_qty': 0}
-                vendor_summary[vendor]['count'] += 1
-                vendor_summary[vendor]['total_qty'] += item.get('RM_IN_QTY', 0)
-            
-            vendor_df = pd.DataFrame([
-                {'Vendor': k, 'Parts Count': v['count'], 'Total RM Qty': v['total_qty']}
-                for k, v in vendor_summary.items()
-            ])
-            st.dataframe(vendor_df)
+            st.metric("Status", "Locked")
+
+        with st.expander("📋 View Master Data"):
+            st.dataframe(df_preview, use_container_width=True)
     
     def user_inventory_upload(self):
         """User interface for inventory upload and analysis"""
