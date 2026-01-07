@@ -1592,8 +1592,7 @@ class InventoryManagementSystem:
         # SLIDE 5: CRITICAL ACTION ITEMS (MATCHING SCREENSHOT)
         # ==========================================
         s5 = prs.slides.add_slide(prs.slide_layouts[6])
-        add_logo(s5)
-
+        
         # 1. Main Title
         title_box5 = s5.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11), Inches(0.8))
         p_t5 = title_box5.text_frame.paragraphs[0]
@@ -1672,6 +1671,7 @@ class InventoryManagementSystem:
 
         create_action_table(s5, Inches(0.8), df_exc, is_excess=True)
         create_action_table(s5, Inches(7.2), df_shrt, is_excess=False)
+        add_logo_bottom_right(s5)
         
         ppt_out = io.BytesIO()
         prs.save(ppt_out)
