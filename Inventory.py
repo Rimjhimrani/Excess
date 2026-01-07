@@ -419,17 +419,37 @@ class InventoryManagementSystem:
         }
         
     def initialize_session_state(self):
-        """Initialize session state variables"""
+        """
+        Initialize session state variables with disk persistence.
+        Ensures Tolerance, Ideal Days, and PFEP Data survive browser refreshes.
+        """
+        # 1. Initialize User Role
         if 'user_role' not in st.session_state:
             st.session_state.user_role = None
-        
+
+        # 2. Load Global Settings (Tolerance and Ideal Days) from Disk
+        # This prevents the values from reverting to 30 on refresh
+        saved_settings = self.persistence.load_settings()
+
+        # 3. Initialize Analysis Tolerance
+        if 'admin_tolerance' not in st.session_state:
+            if saved_settings and 'admin_tolerance' in saved_settings:
+                st.session_state.admin_tolerance = saved_settings['admin_tolerance']
+            else:
+                st.session_state.admin_tolerance = 30  # Default fallback if no disk file exists
+
+        # 4. Initialize User Preferences (Ideal Inventory Days)
         if 'user_preferences' not in st.session_state:
+            default_ideal_days = 30
+            if saved_settings and 'ideal_inventory_days' in saved_settings:
+                default_ideal_days = saved_settings['ideal_inventory_days']
+            
             st.session_state.user_preferences = {
-                'default_tolerance': 30,
+                'ideal_inventory_days': default_ideal_days,
                 'chart_theme': 'plotly'
             }
-        
-        # Initialize persistent data keys
+
+        # 5. Define and Initialize Persistent Data Keys
         self.persistent_keys = [
             'persistent_pfep_data',
             'persistent_pfep_locked',
@@ -438,25 +458,18 @@ class InventoryManagementSystem:
             'persistent_analysis_results'
         ]
         
-        # Initialize persistent data if not exists
         for key in self.persistent_keys:
             if key not in st.session_state:
-                st.session_state[key] = None  # BUG: should be None, not empty list
-        # NEW: Check Disk for persistent PFEP data
+                st.session_state[key] = None
+
+        # 6. Load Master PFEP Data and Lock Status from Disk
+        # This ensures the "Locked" status persists for the Admin and User
         disk_data, is_locked = self.persistence.load_from_disk()
         
         if disk_data and st.session_state.get('persistent_pfep_data') is None:
             st.session_state['persistent_pfep_data'] = disk_data
             st.session_state['persistent_pfep_locked'] = is_locked
-            logger.info("Loaded PFEP data from Disk Persistence")
-        if 'admin_tolerance' not in st.session_state:
-            st.session_state.admin_tolerance = 30  # Default to 30%
-            
-        if 'user_preferences' not in st.session_state:
-            st.session_state.user_preferences = {
-                'ideal_inventory_days': 30,
-                'chart_theme': 'plotly'
-            }
+            logger.info("✅ Master Data and Lock Status synchronized from Disk Persistence.")
     
     def safe_print(self, message):
         """Safely print to streamlit or console"""
