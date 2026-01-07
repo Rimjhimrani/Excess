@@ -1307,6 +1307,7 @@ class InventoryManagementSystem:
         COLOR_DARK_TEXT = RGBColor(89, 81, 75)   # Dark brownish-grey
         COLOR_BADGE_BG = RGBColor(235, 230, 220) # Light tan
         COLOR_BLACK = RGBColor(0, 0, 0)  
+        COLOR_DARK_TITLE = RGBColor(89, 81, 75)
     
         # --- 2. Calculations ---
         biz_unit = st.session_state.get('ppt_biz_unit', 'BUS PLANT').upper()
