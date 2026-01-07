@@ -1239,7 +1239,12 @@ class InventoryManagementSystem:
 
                 # 2. RUN BUTTON
                 if st.button("🚀 Run Analysis", type="primary"):
-                    results = self.analyzer.analyze_inventory(pfep_data, standardized_inv, tolerance=st.session_state.admin_tolerance)
+                    current_tolerance = st.session_state.get('admin_tolerance', 30)
+                    results = self.analyzer.analyze_inventory(
+                        pfep_data, 
+                        standardized_inv, 
+                        tolerance=current_tolerance
+                    )
                     
                     if results:
                         # CRITICAL: Save to session state so dashboard sees it
