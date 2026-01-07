@@ -465,10 +465,14 @@ class InventoryManagementSystem:
 
         # 6. Load Master PFEP Data and Lock Status from Disk
         # This ensures the "Locked" status persists for the Admin and User
-        disk_data, is_locked = self.persistence.load_from_disk()
+        disk_data, is_locked, disk_ts = self.persistence.load_from_disk()
         
-        if disk_data and st.session_state.get('persistent_pfep_data') is None:
-            st.session_state['persistent_pfep_data'] = disk_data
+        if disk_data:
+            # Structuring as a dict so self.persistence.get_data_timestamp works for the PPT
+            st.session_state['persistent_pfep_data'] = {
+                'data': disk_data,
+                'timestamp': disk_ts
+            }
             st.session_state['persistent_pfep_locked'] = is_locked
             logger.info("✅ Master Data and Lock Status synchronized from Disk Persistence.")
     
