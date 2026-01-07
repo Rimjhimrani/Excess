@@ -901,8 +901,7 @@ class InventoryManagementSystem:
                 if 'unit_price' in mapped_columns:
                     raw_price = row[mapped_columns['unit_price']]
                     unit_price_value = self.safe_float_convert(raw_price)
-                    if self.debug and idx < 3:  # Debug first 3 rows
-                        st.write(f"🔍 Row {idx+1} Unit Price: '{raw_price}' -> {unit_price_value}")
+                
                     # Extract AVG CONSUMPTION/DAY with proper handling
                     avg_consumption_value = ""  # Default empty string
                     if 'avg_consumption_per_day' in mapped_columns:
@@ -910,8 +909,7 @@ class InventoryManagementSystem:
                         # Handle different data types
                         if pd.notna(raw_consumption) and str(raw_consumption).strip() != '':
                             avg_consumption_value = self.safe_float_convert(raw_consumption)
-                        if self.debug and idx < 3:  # Debug first 3 rows
-                            st.write(f"🔍 Row {idx+1} AVG CONSUMPTION/DAY: '{raw_consumption}' -> {avg_consumption_value}")
+                        
                 item = {
                     'Part_No': str(row[mapped_columns['part_no']]).strip(),
                     'Description': str(row.get(mapped_columns.get('description', ''), '')).strip(),
