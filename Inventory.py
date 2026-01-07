@@ -1267,54 +1267,53 @@ class InventoryManagementSystem:
     def user_inventory_upload(self):
         st.header("📦 User: Inventory Upload & Analysis")
         
-        pfep_data = st.session_state.get('persistent_pfep_data')
+        # 1. Fetch the container (Dictionary)
+        pfep_container = st.session_state.get('persistent_pfep_data')
         pfep_locked = st.session_state.get('persistent_pfep_locked', False)
         
-        if not pfep_locked:
+        if not pfep_locked or pfep_container is None:
             st.error("❌ PFEP Master Data is not locked by Admin.")
             return
 
-        # 1. UI for Upload
-        uploaded_inv = st.file_uploader("Upload Current Inventory Dump", type=['xlsx', 'csv'])
+        # 2. FIX: Extract the actual list of parts from the container
+        if isinstance(pfep_container, dict) and 'data' in pfep_container:
+            pfep_data = pfep_container['data']
+        else:
+            pfep_data = pfep_container # Fallback for old list format
+
+        # 3. UI for Inventory Upload
+        uploaded_inv = st.file_uploader("Upload Current Inventory Dump", type=['xlsx', 'csv'], key="inv_up_user")
         
         if uploaded_inv:
             df_inv = pd.read_csv(uploaded_inv) if uploaded_inv.name.endswith('.csv') else pd.read_excel(uploaded_inv)
             standardized_inv = self.standardize_current_inventory(df_inv)
             
             if standardized_inv:
-                # MATCH CHECK (DEBUGGING)
+                # MATCH CHECK (Now using the extracted list)
                 pfep_keys = set(str(item['Part_No']).strip().upper() for item in pfep_data)
                 inv_keys = set(str(item['Part_No']).strip().upper() for item in standardized_inv)
                 matches = pfep_keys.intersection(inv_keys)
                 
-                st.info(f"🔍 Match Check: Found {len(matches)} parts in Inventory that exist in PFEP Master.")
-                
-                if len(matches) == 0:
-                    st.error("❌ Zero matches found! Please check if 'Part Number' formats are the same in both files.")
-                    with st.expander("Show Sample Part Numbers"):
-                        st.write("PFEP Sample:", list(pfep_keys)[:5])
-                        st.write("Inventory Sample:", list(inv_keys)[:5])
+                st.info(f"🔍 Match Check: Found {len(matches)} matching parts.")
 
-                # 2. RUN BUTTON
+                # 4. RUN BUTTON (Passing the corrected list)
                 if st.button("🚀 Run Analysis", type="primary"):
                     current_tolerance = st.session_state.get('admin_tolerance', 30)
                     results = self.analyzer.analyze_inventory(
-                        pfep_data, 
+                        pfep_data, # This is now the correct list
                         standardized_inv, 
                         tolerance=current_tolerance
                     )
                     
                     if results:
-                        # CRITICAL: Save to session state so dashboard sees it
                         st.session_state['persistent_analysis_results'] = results
                         st.success(f"✅ Analysis generated for {len(results)} items.")
                         st.rerun()
                     else:
-                        st.error("❌ Analysis resulted in 0 items. Ensure Part Numbers match exactly.")
+                        st.error("❌ Analysis resulted in 0 items. Ensure Part Numbers match PFEP.")
 
-        # 3. SHOW DASHBOARD
-        analysis_results = st.session_state.get('persistent_analysis_results')
-        if analysis_results:
+        # 5. SHOW DASHBOARD
+        if st.session_state.get('persistent_analysis_results'):
             st.markdown("---")
             self.display_analysis_results()
                 
