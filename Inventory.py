@@ -1219,113 +1219,87 @@ class InventoryManagementSystem:
             st.dataframe(df_preview, use_container_width=True)
     
     def user_inventory_upload(self):
-        """User interface for inventory upload and analysis"""
-        st.header("📦 Inventory Analysis System")
+        """
+        User interface for inventory upload and analysis.
+        Accessible only when PFEP data is locked by Admin.
+        """
+        st.header("📦 User: Current Inventory Analysis")
         
-        # Check if PFEP data is available and locked
-        pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
+        # 1. Check if PFEP data is available and locked
+        pfep_data = st.session_state.get('persistent_pfep_data')
         pfep_locked = st.session_state.get('persistent_pfep_locked', False)
         
-        if not pfep_data or not pfep_locked:
-            st.error("❌ PFEP master data is not available or not locked by admin.")
-            st.info("Please contact admin to load and lock PFEP data first.")
+        if not pfep_locked or not pfep_data:
+            st.error("❌ Access Denied: PFEP Master Data is not locked.")
+            st.info("Please contact the Admin to upload and lock the PFEP Master file before proceeding.")
             return
         
-        # Display PFEP status
-        st.success(f"✅ PFEP Master Data: {len(pfep_data)} parts available")
-        
-        # Check if inventory is already loaded and locked
-        inventory_data = self.persistence.load_data_from_session_state('persistent_inventory_data')
-        inventory_locked = st.session_state.get('persistent_inventory_locked', False)
-        
-        if inventory_locked and inventory_data:
-            st.info("🔒 Inventory data is locked. Proceeding to analysis...")
-            self.display_analysis_interface()
-            return
-        
-        # Inventory upload interface
-        st.subheader("📊 Upload Current Inventory Data")
-        
-        # Tab interface
-        tab1, tab2 = st.tabs(["📁 Upload File", "🧪 Load Sample"])
-        
-        with tab1:
-            st.markdown("**Upload Current Inventory Excel/CSV File**")
-            uploaded_file = st.file_uploader(
-                "Choose inventory file",
-                type=['xlsx', 'xls', 'csv'],
-                help="Upload your current inventory data file"
-            )
-            
-            if uploaded_file is not None:
-                try:
-                    # Read file
-                    if uploaded_file.name.endswith('.csv'):
-                        df = pd.read_csv(uploaded_file)
-                    else:
-                        df = pd.read_excel(uploaded_file)
-                    
-                    st.success(f"✅ File loaded: {len(df)} rows")
-                    
-                    # Show preview
-                    with st.expander("📋 Preview Raw Data"):
-                        st.dataframe(df.head())
-                    
-                    # Standardize data
-                    standardized_data = self.standardize_current_inventory(df)
-                    
-                    if standardized_data:
-                        st.success(f"✅ Standardized: {len(standardized_data)} valid records")
-                        
-                        # Validate against PFEP
-                        validation_result = self.validate_inventory_against_pfep(standardized_data)
-                        
-                        # Display validation results
-                        self.display_validation_results(validation_result)
-                        
-                        if validation_result['is_valid']:
-                            # Show standardized preview
-                            with st.expander("📋 Preview Standardized Data"):
-                                preview_df = pd.DataFrame(standardized_data[:5])
-                                st.dataframe(preview_df)
-                            
-                            # Save and lock button
-                            if st.button("💾 Save & Lock Inventory Data", type="primary"):
-                                self.persistence.save_data_to_session_state(
-                                    'persistent_inventory_data', 
-                                    standardized_data
-                                )
-                                st.session_state.persistent_inventory_locked = True
-                                st.success("✅ Inventory data saved and locked!")
-                                st.rerun()
-                        else:
-                            st.error("❌ Please fix validation issues before proceeding")
-                    else:
-                        st.error("❌ No valid data found after standardization")
-                        
-                except Exception as e:
-                    st.error(f"❌ Error processing file: {str(e)}")
-        
-        with tab2:
-            st.markdown("**Load Sample Inventory Data for Testing**")
-            st.info("This will load pre-configured sample inventory data")
-            
-            if st.button("🧪 Load Sample Inventory Data", type="secondary"):
-                sample_data = self.load_sample_current_inventory()
-                
-                # Validate sample data
-                validation_result = self.validate_inventory_against_pfep(sample_data)
-                self.display_validation_results(validation_result)
-                
-                if validation_result['is_valid']:
-                    self.persistence.save_data_to_session_state(
-                        'persistent_inventory_data', 
-                        sample_data
-                    )
-                    st.session_state.persistent_inventory_locked = True
-                    st.success(f"✅ Sample inventory data loaded and locked: {len(sample_data)} parts")
-                    st.rerun()
+        # 2. Display PFEP Status (Read-Only)
+        st.success(f"✅ PFEP Master Data is Active: {len(pfep_data)} parts loaded.")
+        with st.expander("📖 View Locked Master Data (Read-Only)"):
+            st.dataframe(pd.DataFrame(pfep_data), use_container_width=True)
 
+        st.markdown("---")
+        
+        # 3. Upload Inventory Dump
+        st.subheader("📊 Upload Current Inventory Dump")
+        uploaded_inv = st.file_uploader(
+            "Choose Current Inventory Excel/CSV", 
+            type=['xlsx', 'xls', 'csv'], 
+            key="user_inv_uploader"
+        )
+        
+        if uploaded_inv:
+            try:
+                # Read Inventory File
+                df_inv = pd.read_csv(uploaded_inv) if uploaded_inv.name.endswith('.csv') else pd.read_excel(uploaded_inv)
+                
+                # Standardize
+                standardized_inv = self.standardize_current_inventory(df_inv)
+                
+                if standardized_inv:
+                    st.success(f"✅ Inventory Dump Processed: {len(standardized_inv)} items.")
+                    
+                    # 4. Trigger Analysis
+                    if st.button("🚀 Run Analysis & Generate Dashboard", type="primary"):
+                        with st.spinner("Analyzing inventory against Master PFEP..."):
+                            # Get tolerance from admin settings
+                            tolerance = st.session_state.get('admin_tolerance', 30)
+                            
+                            # Execute Analysis
+                            analysis_results = self.analyzer.analyze_inventory(
+                                pfep_data,
+                                standardized_inv,
+                                tolerance=tolerance
+                            )
+                            
+                            if analysis_results:
+                                # Save results to session state
+                                st.session_state.persistent_analysis_results = analysis_results
+                                st.session_state.persistent_inventory_data = standardized_inv
+                                st.success("📈 Analysis Complete!")
+                                st.rerun()
+                            else:
+                                st.error("❌ Analysis failed. No matching parts found between PFEP and Inventory.")
+                else:
+                    st.error("❌ Failed to standardize inventory file. Check column names.")
+                    
+            except Exception as e:
+                st.error(f"❌ Error processing inventory file: {str(e)}")
+
+        # 5. Display Dashboard if results exist
+        if st.session_state.get('persistent_analysis_results'):
+            st.markdown("---")
+            # This calls your main dashboard logic (Metrics, Charts, PPT Export)
+            self.display_analysis_results()
+
+        # 6. Option to Clear Current Analysis (to upload a new dump)
+        if st.session_state.get('persistent_analysis_results'):
+            if st.sidebar.button("🗑️ Clear Current Analysis"):
+                st.session_state.persistent_analysis_results = None
+                st.session_state.persistent_inventory_data = None
+                st.rerun()
+                
     def generate_ppt_report(self, analysis_results):
         """
         Generates a professional PowerPoint report.
