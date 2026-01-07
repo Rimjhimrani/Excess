@@ -1593,85 +1593,96 @@ class InventoryManagementSystem:
         # SLIDE 5: CRITICAL ACTION ITEMS (MATCHING SCREENSHOT)
         # ==========================================
         s5 = prs.slides.add_slide(prs.slide_layouts[6])
-        
+
         # 1. Main Title
         title_box5 = s5.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(11), Inches(0.8))
         p_t5 = title_box5.text_frame.paragraphs[0]
         p_t5.text = "Critical Action Items: Top 10 Parts"
         p_t5.font.size = Pt(44); p_t5.font.color.rgb = COLOR_DARK_TITLE
 
-        # 2. Main Description
-        desc_box5 = s5.shapes.add_textbox(Inches(0.8), Inches(1.3), Inches(11.5), Inches(0.6))
-        p_d5 = desc_box5.text_frame.paragraphs[0]
+        # 2. FIXED: Main Description with Word Wrap
+        desc_box5 = s5.shapes.add_textbox(Inches(0.8), Inches(1.3), Inches(11.5), Inches(0.8))
+        tf_d5 = desc_box5.text_frame
+        tf_d5.word_wrap = True  # FIX: Ensures text wraps inside the box
+        p_d5 = tf_d5.paragraphs[0]
         p_d5.text = "Focus areas for immediate inventory optimization. These parts represent the highest priority opportunities to reduce carrying costs and prevent production disruptions."
         p_d5.font.size = Pt(15); p_d5.font.color.rgb = COLOR_BLACK
 
-        # 3. Headers and Sub-descriptions for the two columns
-        # --- LEFT: Excess ---
+        # 3. Sub-headers and Sub-descriptions
+        # LEFT SIDE
         exc_title = s5.shapes.add_textbox(Inches(0.8), Inches(2.2), Inches(5.5), Inches(0.5))
-        exc_title.text_frame.text = "Top 10 Excess Inventory Parts"
+        exc_title.text_frame.paragraphs[0].text = "Top 10 Excess Inventory Parts"
         exc_title.text_frame.paragraphs[0].font.size = Pt(24); exc_title.text_frame.paragraphs[0].font.color.rgb = COLOR_DARK_TITLE
         
-        exc_desc = s5.shapes.add_textbox(Inches(0.8), Inches(2.7), Inches(5.3), Inches(0.8))
-        exc_desc.text_frame.word_wrap = True
-        exc_desc.text_frame.text = "Overstocked items tying up working capital and warehouse space. Priority candidates for consumption acceleration or supplier agreement adjustments."
-        exc_desc.text_frame.paragraphs[0].font.size = Pt(12); exc_desc.text_frame.paragraphs[0].font.color.rgb = COLOR_BLACK
+        exc_desc_box = s5.shapes.add_textbox(Inches(0.8), Inches(2.7), Inches(5.3), Inches(0.8))
+        exc_desc_box.text_frame.word_wrap = True
+        exc_desc_box.text_frame.paragraphs[0].text = "Overstocked items tying up working capital. Priority candidates for consumption acceleration."
+        exc_desc_box.text_frame.paragraphs[0].font.size = Pt(12); exc_desc_box.text_frame.paragraphs[0].font.color.rgb = COLOR_BLACK
 
-        # --- RIGHT: Short ---
+        # RIGHT SIDE
         shrt_title = s5.shapes.add_textbox(Inches(7.2), Inches(2.2), Inches(5.5), Inches(0.5))
-        shrt_title.text_frame.text = "Top 10 Short Inventory Parts"
+        shrt_title.text_frame.paragraphs[0].text = "Top 10 Short Inventory Parts"
         shrt_title.text_frame.paragraphs[0].font.size = Pt(24); shrt_title.text_frame.paragraphs[0].font.color.rgb = COLOR_DARK_TITLE
         
-        shrt_desc = s5.shapes.add_textbox(Inches(7.2), Inches(2.7), Inches(5.3), Inches(0.8))
-        shrt_desc.text_frame.word_wrap = True
-        shrt_desc.text_frame.text = "Critical shortage items requiring expedited procurement action to maintain production continuity and meet customer commitments."
-        shrt_desc.text_frame.paragraphs[0].font.size = Pt(12); shrt_desc.text_frame.paragraphs[0].font.color.rgb = COLOR_BLACK
+        shrt_desc_box = s5.shapes.add_textbox(Inches(7.2), Inches(2.7), Inches(5.3), Inches(0.8))
+        shrt_desc_box.text_frame.word_wrap = True
+        shrt_desc_box.text_frame.paragraphs[0].text = "Critical shortage items requiring expedited procurement action to maintain production continuity."
+        shrt_desc_box.text_frame.paragraphs[0].font.size = Pt(12); shrt_desc_box.text_frame.paragraphs[0].font.color.rgb = COLOR_BLACK
 
-        # 4. Tables Construction
-        def create_action_table(slide, x_pos, data_df, is_excess=True):
-            # 6 rows (header + 5 items), 4 columns (Rank, Part No, Description, Value Lakhs)
-            rows, cols = 6, 4
-            table_shp = slide.shapes.add_table(rows, cols, x_pos, Inches(3.6), Inches(5.3), Inches(2.5))
+        # 4. Table Helper with Qty column
+        def create_action_table_with_qty(slide, x_pos, data_df, is_excess=True):
+            # 6 rows, 5 columns (#, Part No, Description, Qty, Value)
+            rows, cols = 6, 5
+            table_shp = slide.shapes.add_table(rows, cols, x_pos, Inches(3.6), Inches(5.8), Inches(2.5))
             table = table_shp.table
             
-            # Set Column Widths
-            table.columns[0].width = Inches(0.5) # Rank
-            table.columns[1].width = Inches(1.3) # Part No
-            table.columns[2].width = Inches(2.5) # Description
-            table.columns[3].width = Inches(1.0) # Value
+            # Column Widths
+            table.columns[0].width = Inches(0.4) # #
+            table.columns[1].width = Inches(1.2) # Part No
+            table.columns[2].width = Inches(2.3) # Description
+            table.columns[3].width = Inches(0.9) # Qty
+            table.columns[4].width = Inches(1.0) # Value Lakhs
             
             # Header
-            headers = ["#", "Part No", "Description", "Value (L)"]
+            headers = ["#", "Part No", "Description", "Qty", "Value(L)"]
             for i, h in enumerate(headers):
                 cell = table.cell(0, i)
                 cell.text = h
                 cell.text_frame.paragraphs[0].font.bold = True
                 cell.text_frame.paragraphs[0].font.size = Pt(11)
                 cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+                cell.text_frame.paragraphs[0].font.color.rgb = COLOR_BLACK
             
-            # Populate Data (Top 5)
+            # Fill Data (Top 5)
             for row_idx, (_, row_data) in enumerate(data_df.head(5).iterrows(), start=1):
-                val = row_data['Stock Deviation Value']
-                if not is_excess: val = abs(val)
+                # Using Absolute Value for Qty display
+                raw_qty = row_data.get('Stock Deviation Qty w.r.t Revised Norm', 0)
+                disp_qty = abs(raw_qty)
+                
+                val = abs(row_data['Stock Deviation Value'])
                 
                 content = [
                     str(row_idx),
                     str(row_data['PART NO'])[:15],
-                    str(row_data['PART DESCRIPTION'])[:25],
+                    str(row_data['PART DESCRIPTION'])[:22],
+                    f"{disp_qty:,.0f}",
                     f"{val/100000:.2f}"
                 ]
                 for col_idx, text in enumerate(content):
                     cell = table.cell(row_idx, col_idx)
                     cell.text = text
-                    cell.text_frame.paragraphs[0].font.size = Pt(10)
-                    cell.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER if col_idx != 2 else PP_ALIGN.LEFT
+                    p = cell.text_frame.paragraphs[0]
+                    p.font.size = Pt(10)
+                    p.font.color.rgb = COLOR_BLACK
+                    # Align numbers center, description left
+                    p.alignment = PP_ALIGN.CENTER if col_idx != 2 else PP_ALIGN.LEFT
 
         # Filter Data
         df_exc = df[df[status_col] == 'Excess Inventory'].sort_values('Stock Deviation Value', ascending=False)
         df_shrt = df[df[status_col] == 'Short Inventory'].sort_values('Stock Deviation Value', ascending=True)
 
-        create_action_table(s5, Inches(0.8), df_exc, is_excess=True)
-        create_action_table(s5, Inches(7.2), df_shrt, is_excess=False)
+        create_action_table_with_qty(s5, Inches(0.4), df_exc, is_excess=True)
+        create_action_table_with_qty(s5, Inches(7.0), df_shrt, is_excess=False)
         add_logo_bottom_right(s5)
         
         ppt_out = io.BytesIO()
