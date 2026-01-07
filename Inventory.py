@@ -430,6 +430,14 @@ class InventoryManagementSystem:
             st.session_state['persistent_pfep_data'] = disk_data
             st.session_state['persistent_pfep_locked'] = is_locked
             logger.info("Loaded PFEP data from Disk Persistence")
+        if 'admin_tolerance' not in st.session_state:
+            st.session_state.admin_tolerance = 30  # Default to 30%
+            
+        if 'user_preferences' not in st.session_state:
+            st.session_state.user_preferences = {
+                'ideal_inventory_days': 30,
+                'chart_theme': 'plotly'
+            }
     
     def safe_print(self, message):
         """Safely print to streamlit or console"""
