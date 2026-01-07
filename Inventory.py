@@ -110,6 +110,25 @@ class DataPersistence:
     """Handle data persistence across sessions"""
     STORAGE_FILE = "pfep_master_data.pkl"
     LOCK_FILE = "pfep_lock_status.txt"
+    SETTINGS_FILE = "inventory_settings.pkl" # NEW FILE FOR SETTINGS
+
+    @staticmethod
+    def save_settings(tolerance, ideal_days):
+        """Saves tolerance and ideal days to disk"""
+        settings = {
+            'admin_tolerance': tolerance,
+            'ideal_inventory_days': ideal_days
+        }
+        with open(DataPersistence.SETTINGS_FILE, 'wb') as f:
+            pickle.dump(settings, f)
+
+    @staticmethod
+    def load_settings():
+        """Loads settings from disk"""
+        if os.path.exists(DataPersistence.SETTINGS_FILE):
+            with open(DataPersistence.SETTINGS_FILE, 'rb') as f:
+                return pickle.load(f)
+        return None
 
     @staticmethod
     def save_to_disk(data, locked=True):
