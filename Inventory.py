@@ -1210,16 +1210,20 @@ class InventoryManagementSystem:
                         if st.button("💾 Save & Lock PFEP Permanently", type="primary"):
                             final_data = st.session_state.get('temp_standardized_pfep')
                             if final_data:
-                                # Save to session
-                                st.session_state.persistent_pfep_data = final_data
+                                current_now = datetime.now()
+                                
+                                # 1. Save to session (Structured for PPT date logic)
+                                st.session_state.persistent_pfep_data = {
+                                    'data': final_data,
+                                    'timestamp': current_now
+                                }
                                 st.session_state.persistent_pfep_locked = True
                                 
-                                # Save to Disk (PERSISTENCE)
+                                # 2. Save to Disk (Writes the timestamp into the file)
                                 self.persistence.save_to_disk(final_data, locked=True)
                                 
-                                # Cleanup
+                                st.success(f"✅ Master PFEP locked on server. Date: {current_now.strftime('%d-%m-%Y')}")
                                 del st.session_state['temp_standardized_pfep']
-                                st.success("✅ PFEP Master Data locked on server!")
                                 st.rerun()
                     else:
                         st.error("❌ Data standardization failed. Please check column headers.")
