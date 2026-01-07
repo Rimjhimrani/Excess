@@ -132,26 +132,27 @@ class DataPersistence:
 
     @staticmethod
     def save_to_disk(data, locked=True):
-        """Saves the PFEP data to a physical file on the server"""
+        """Saves Master Data AND the current Date/Time to the server disk"""
+        save_package = {
+            'payload': data,
+            'timestamp': datetime.now(), # <--- This is the date for the PPT
+            'is_locked': locked
+        }
         with open(DataPersistence.STORAGE_FILE, 'wb') as f:
-            pickle.dump(data, f)
-        with open(DataPersistence.LOCK_FILE, 'w') as f:
-            f.write("locked" if locked else "unlocked")
-
+            pickle.dump(save_package, f)
+            
     @staticmethod
     def load_from_disk():
-        """Loads data from the physical file if it exists"""
+        """Loads the payload and the saved timestamp"""
         if os.path.exists(DataPersistence.STORAGE_FILE):
             with open(DataPersistence.STORAGE_FILE, 'rb') as f:
-                data = pickle.load(f)
-            
-            lock_status = False
-            if os.path.exists(DataPersistence.LOCK_FILE):
-                with open(DataPersistence.LOCK_FILE, 'r') as f:
-                    lock_status = (f.read() == "locked")
-            
-            return data, lock_status
-        return None, False
+                package = pickle.load(f)
+                # Check if it's the new dictionary format or old list format
+                if isinstance(package, dict) and 'payload' in package:
+                    return package['payload'], package.get('is_locked', False), package.get('timestamp')
+                else:
+                    return package, False, None # Fallback for old files
+        return None, False, None
 
     @staticmethod
     def delete_from_disk():
