@@ -1530,53 +1530,61 @@ class InventoryManagementSystem:
                 s3.shapes.add_picture(logo_path, prs.slide_width - Inches(1.9), prs.slide_height - Inches(0.7), width=Inches(1.6))
             except: pass
 
+        # ==========================================
+        # SLIDE 4: DASHBOARD (Restored Title & No Targets)
+        # ==========================================
         s4 = prs.slides.add_slide(prs.slide_layouts[6])
         
-        # 1. Main Title
+        # RESTORED TITLE BOX
         title_shp4 = s4.shapes.add_textbox(Inches(0.8), Inches(0.4), Inches(12), Inches(0.8))
         p_t4 = title_shp4.text_frame.paragraphs[0]
         p_t4.text = "Visual Inventory Analytics Dashboard"
         p_t4.font.size = Pt(40); p_t4.font.color.rgb = COLOR_BLACK
 
-        # 2. Data Processing (Pure Deviations)
+        # Descriptive subtitle
+        sub_shp4 = s4.shapes.add_textbox(Inches(0.8), Inches(1.1), Inches(11.5), Inches(0.6))
+        sub_shp4.text_frame.paragraphs[0].text = f"Visual identification of inventory imbalances at the {biz_unit} facility."
+        sub_shp4.text_frame.paragraphs[0].font.size = Pt(14); sub_shp4.text_frame.paragraphs[0].font.color.rgb = COLOR_BLACK
+
+        # Data Prep (Pure Value Deviations in Lakhs)
         df_exc_top = df[df[status_col] == 'Excess Inventory'].sort_values('Stock Deviation Value', ascending=False).head(10)
         df_shrt_top = df[df[status_col] == 'Short Inventory'].sort_values('Stock Deviation Value', ascending=True).head(10)
         
-        # Vendor Aggregation
+        # Vendor Aggregation using standardized column 'Vendor Name'
         df_v_exc = df[df[status_col] == 'Excess Inventory'].groupby('Vendor Name')['Stock Deviation Value'].sum().reset_index().sort_values('Stock Deviation Value', ascending=False).head(10)
         df_v_shrt = df[df[status_col] == 'Short Inventory'].groupby('Vendor Name')['Stock Deviation Value'].sum().reset_index()
         df_v_shrt['Abs_Dev'] = abs(df_v_shrt['Stock Deviation Value'])
         df_v_shrt = df_v_shrt.sort_values('Abs_Dev', ascending=False).head(10)
 
-        # 3. Simple Bar Chart Helper (No Target)
-        def add_simple_bar(x_pos, title, categories, data, color):
+        # Simple Bar Chart Helper (No Target comparison)
+        def add_dashboard_bar(x_pos, title, categories, data, color):
             chart_data = ChartData()
-            chart_data.categories = [str(c)[:12] for c in categories] 
+            chart_data.categories = [str(c)[:10] for c in categories] # Short labels
             chart_data.add_series('Value (Lakhs)', [v / 100_000 for v in data])
             
             c_shp = s4.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, x_pos, Inches(2.2), Inches(3.1), Inches(3.2), chart_data)
             chart = c_shp.chart
             chart.has_title = True; chart.chart_title.text_frame.text = title
             chart.chart_title.text_frame.paragraphs[0].font.size = Pt(9); chart.chart_title.text_frame.paragraphs[0].font.color.rgb = COLOR_BLACK
-            chart.has_legend = False # Removed legend as there is only 1 series
+            chart.has_legend = False
             
-            # Formatting
+            # Color formatting
             for pt in chart.series[0].points:
                 pt.format.fill.solid(); pt.format.fill.fore_color.rgb = color
             chart.category_axis.tick_labels.font.size = Pt(7); chart.value_axis.tick_labels.font.size = Pt(7)
 
-        # Draw the 4 Bar Charts
-        add_simple_bar(Inches(0.2), "Top 10 Excess Parts", df_exc_top['PART NO'], df_exc_top['Stock Deviation Value'], RGBColor(33, 150, 243))
-        add_simple_bar(Inches(3.4), "Top 10 Short Parts", df_shrt_top['PART NO'], abs(df_shrt_top['Stock Deviation Value']), RGBColor(244, 67, 54))
-        add_simple_bar(Inches(6.6), "Top 10 Excess Vendors", df_v_exc['Vendor Name'], df_v_exc['Stock Deviation Value'], RGBColor(33, 150, 243))
-        add_simple_bar(Inches(9.8), "Top 10 Short Vendors", df_v_shrt['Vendor Name'], df_v_shrt['Abs_Dev'], RGBColor(244, 67, 54))
+        # Draw the 4 Charts
+        add_dashboard_bar(Inches(0.2), "Top 10 Excess Parts", df_exc_top['PART NO'], df_exc_top['Stock Deviation Value'], RGBColor(33, 150, 243))
+        add_dashboard_bar(Inches(3.4), "Top 10 Short Parts", df_shrt_top['PART NO'], abs(df_shrt_top['Stock Deviation Value']), RGBColor(244, 67, 54))
+        add_dashboard_bar(Inches(6.6), "Top 10 Excess Vendors", df_v_exc['Vendor Name'], df_v_exc['Stock Deviation Value'], RGBColor(33, 150, 243))
+        add_dashboard_bar(Inches(9.8), "Top 10 Short Vendors", df_v_shrt['Vendor Name'], df_v_shrt['Abs_Dev'], RGBColor(244, 67, 54))
 
-        # Bottom Footer Box
+        # Bottom Recommendation Box
         bot_shp = s4.shapes.add_shape(MSO_SHAPE.ROUNDED_RECTANGLE, Inches(0.8), Inches(6.0), Inches(11.5), Inches(0.6))
         bot_shp.fill.solid(); bot_shp.fill.fore_color.rgb = COLOR_BADGE_BG
         p_bot = bot_shp.text_frame.paragraphs[0]
-        p_bot.text = "📊 Visual analysis showing highest inventory imbalances for rapid identification and action."
-        p_bot.font.size = Pt(14); p_bot.font.color.rgb = COLOR_BLACK
+        p_bot.text = "📊 Visual analysis focused on magnitude of deviation to prioritize high-impact procurement actions."
+        p_bot.font.size = Pt(14); p_bot.font.color.rgb = COLOR_BLACK; p_bot.alignment = PP_ALIGN.CENTER
         
         add_logo_bottom_right(s4)
         
