@@ -1119,23 +1119,27 @@ class InventoryManagementSystem:
         pfep_locked = st.session_state.get('persistent_pfep_locked', False)
         
         if pfep_locked:
-            st.warning("🔒 PFEP data is currently locked. Users are working with this data.")
-            col1, col2, col3 = st.columns([2, 1, 1])
-            with col1:
-                st.info("To modify PFEP data, first unlock it. This will reset all user analysis.")
-            with col2:
-                if st.button("🔓 Unlock Data", type="secondary"):
-                    st.session_state.persistent_pfep_locked = False
-                    # Clear related data when PFEP is unlocked
-                    st.session_state.persistent_inventory_data = None
-                    st.session_state.persistent_inventory_locked = False
-                    st.session_state.persistent_analysis_results = None
-                    st.success("✅ PFEP data unlocked. Users need to re-upload inventory data.")
-                    st.rerun()
-            with col3:
-                if st.button("👤 Go to User View", type="primary", help="Switch to user interface"):
-                    st.session_state.user_role = "User"
-                    st.rerun()
+            st.warning("🔒 PFEP data is PERMANENTLY SAVED and locked for users.")
+            if st.button("🔓 Delete & Unlock Master PFEP", type="secondary"):
+                # Remove from disk
+                self.persistence.delete_from_disk()
+                # Clear session
+                st.session_state.persistent_pfep_data = None
+                st.session_state.persistent_pfep_locked = False
+                st.session_state.persistent_analysis_results = None
+                st.success("✅ Permanent Master PFEP deleted from server.")
+                st.rerun()
+            # ... rest of preview logic ...
+        else:
+            # Inside your "Save PFEP Data" button logic:
+            if st.button("💾 Save & Lock PFEP Permanently", type="primary"):
+                # Save to session
+                self.persistence.save_data_to_session_state('persistent_pfep_data', standardized_data)
+                st.session_state.persistent_pfep_locked = True
+                # SAVE TO DISK (This makes it stay for days/weeks)
+                self.persistence.save_to_disk(standardized_data, locked=True)
+                st.success("✅ PFEP data saved to server disk!")
+                st.rerun()
             
             # Display current PFEP data if available
             pfep_data = self.persistence.load_data_from_session_state('persistent_pfep_data')
