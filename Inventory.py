@@ -113,45 +113,37 @@ class DataPersistence:
     SETTINGS_FILE = "inventory_settings.pkl" # NEW FILE FOR SETTINGS
 
     @staticmethod
+    def get_path(company_id, filename):
+        if not os.path.exists('data'): os.makedirs('data')
+        return f"data/{company_id}_{filename}"
+
+    @staticmethod
     def save_settings(tolerance, ideal_days):
-        """Saves tolerance and ideal days to disk"""
-        settings = {
-            'admin_tolerance': tolerance,
-            'ideal_inventory_days': ideal_days
-        }
-        with open(DataPersistence.SETTINGS_FILE, 'wb') as f:
-            pickle.dump(settings, f)
+        path = DataPersistence.get_path(company_id, "settings.pkl")
+        with open(path, 'wb') as f:
+            pickle.dump({'admin_tolerance': tolerance, 'ideal_inventory_days': ideal_days}, f)
 
     @staticmethod
     def load_settings():
-        """Loads settings from disk"""
-        if os.path.exists(DataPersistence.SETTINGS_FILE):
-            with open(DataPersistence.SETTINGS_FILE, 'rb') as f:
-                return pickle.load(f)
+        path = DataPersistence.get_path(company_id, "settings.pkl")
+        if os.path.exists(path):
+            with open(path, 'rb') as f: return pickle.load(f)
         return None
 
     @staticmethod
     def save_to_disk(data, locked=True):
-        """Saves Master Data AND the current Date/Time to the server disk"""
-        save_package = {
-            'payload': data,
-            'timestamp': datetime.now(), # <--- This is the date for the PPT
-            'is_locked': locked
-        }
-        with open(DataPersistence.STORAGE_FILE, 'wb') as f:
-            pickle.dump(save_package, f)
+        path = DataPersistence.get_path(company_id, "pfep_master.pkl")
+        save_obj = {'payload': data, 'timestamp': datetime.now(), 'is_locked': locked}
+        with open(path, 'wb') as f:
+            pickle.dump(save_obj, f)
             
     @staticmethod
     def load_from_disk():
-        """Loads the payload and the saved timestamp"""
-        if os.path.exists(DataPersistence.STORAGE_FILE):
-            with open(DataPersistence.STORAGE_FILE, 'rb') as f:
-                package = pickle.load(f)
-                # Check if it's the new dictionary format or old list format
-                if isinstance(package, dict) and 'payload' in package:
-                    return package['payload'], package.get('is_locked', False), package.get('timestamp')
-                else:
-                    return package, False, None # Fallback for old files
+        path = DataPersistence.get_path(company_id, "pfep_master.pkl")
+        if os.path.exists(path):
+            with open(path, 'rb') as f:
+                obj = pickle.load(f)
+                return obj['payload'], obj['is_locked'], obj['timestamp']
         return None, False, None
 
     @staticmethod
