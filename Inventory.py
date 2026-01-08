@@ -413,25 +413,32 @@ class InventoryManagementSystem:
         
     def initialize_session_state(self):
         """
-        Initialize session state variables with disk persistence.
-        Ensures Tolerance, Ideal Days, and PFEP Data survive browser refreshes.
+        Initialize session state variables with SaaS Disk Persistence.
+        Separates data between companies using the company_id prefix.
         """
-        # 1. Initialize User Role
+        # 1. Initialize Authentication Keys
         if 'user_role' not in st.session_state:
             st.session_state.user_role = None
+        if 'company_id' not in st.session_state:
+            st.session_state.company_id = None
 
-        # 2. Load Global Settings (Tolerance and Ideal Days) from Disk
-        # This prevents the values from reverting to 30 on refresh
-        saved_settings = self.persistence.load_settings()
+        # Stop here if no company is logged in yet
+        comp_id = st.session_state.get('company_id')
+        if not comp_id:
+            return
 
-        # 3. Initialize Analysis Tolerance
+        # 2. Load Global Settings for THIS Company (Tolerance and Ideal Days)
+        # This prevents Company A's settings from affecting Company B
+        saved_settings = self.persistence.load_settings(comp_id)
+
+        # 3. Initialize Analysis Tolerance for Company
         if 'admin_tolerance' not in st.session_state:
             if saved_settings and 'admin_tolerance' in saved_settings:
                 st.session_state.admin_tolerance = saved_settings['admin_tolerance']
             else:
-                st.session_state.admin_tolerance = 30  # Default fallback if no disk file exists
+                st.session_state.admin_tolerance = 30  # Default fallback
 
-        # 4. Initialize User Preferences (Ideal Inventory Days)
+        # 4. Initialize User Preferences for Company
         if 'user_preferences' not in st.session_state:
             default_ideal_days = 30
             if saved_settings and 'ideal_inventory_days' in saved_settings:
@@ -455,18 +462,18 @@ class InventoryManagementSystem:
             if key not in st.session_state:
                 st.session_state[key] = None
 
-        # 6. Load Master PFEP Data and Lock Status from Disk
-        # This ensures the "Locked" status persists for the Admin and User
-        disk_data, is_locked, disk_ts = self.persistence.load_from_disk()
+        # 6. Load Master PFEP Data and Lock Status from Disk (Unique to Company)
+        # This ensures the "Locked" status persists for the Admin and User of this company
+        disk_data, is_locked, disk_ts = self.persistence.load_from_disk(comp_id)
         
-        if disk_data:
-            # Structuring as a dict so self.persistence.get_data_timestamp works for the PPT
+        if disk_data and st.session_state.get('persistent_pfep_data') is None:
+            # We maintain the dictionary format so the PPT date generation works
             st.session_state['persistent_pfep_data'] = {
                 'data': disk_data,
                 'timestamp': disk_ts
             }
             st.session_state['persistent_pfep_locked'] = is_locked
-            logger.info("✅ Master Data and Lock Status synchronized from Disk Persistence.")
+            logger.info(f"✅ Master Data for client {comp_id} synchronized from Disk Persistence.")
     
     def safe_print(self, message):
         """Safely print to streamlit or console"""
