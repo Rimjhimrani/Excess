@@ -114,7 +114,7 @@ class DataPersistence:
 
     @staticmethod
     def get_path(company_id, filename):
-         if not os.path.exists('data'): 
+        if not os.path.exists('data'): 
             os.makedirs('data')
         return f"data/{company_id}_{filename}"
 
