@@ -107,11 +107,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 class DataPersistence:
-    """Handle data persistence across sessions"""
-    STORAGE_FILE = "pfep_master_data.pkl"
-    LOCK_FILE = "pfep_lock_status.txt"
-    SETTINGS_FILE = "inventory_settings.pkl" # NEW FILE FOR SETTINGS
-
+    """SaaS Persistence: Separates files by Company ID"""
+    
     @staticmethod
     def get_path(company_id, filename):
         if not os.path.exists('data'): 
@@ -119,15 +116,15 @@ class DataPersistence:
         return f"data/{company_id}_{filename}"
 
     @staticmethod
-    def save_settings(tolerance, ideal_days):
-        """Saves tolerance and ideal days per company"""
+    def save_settings(company_id, tolerance, ideal_days):
+        """Accepted 3 arguments: company_id, tolerance, ideal_days"""
         path = DataPersistence.get_path(company_id, "settings.pkl")
         with open(path, 'wb') as f:
             pickle.dump({'admin_tolerance': tolerance, 'ideal_inventory_days': ideal_days}, f)
             
     @staticmethod
-    def load_settings():
-        """Accepted 1 argument: company_id"""
+    def load_settings(company_id):
+        """FIXED: Added company_id to the signature"""
         path = DataPersistence.get_path(company_id, "settings.pkl")
         if os.path.exists(path):
             with open(path, 'rb') as f:
@@ -135,14 +132,16 @@ class DataPersistence:
         return None
 
     @staticmethod
-    def save_to_disk(data, locked=True):
+    def save_to_disk(company_id, data, locked=True):
+        """FIXED: Added company_id to the signature"""
         path = DataPersistence.get_path(company_id, "pfep_master.pkl")
         save_obj = {'payload': data, 'timestamp': datetime.now(), 'is_locked': locked}
         with open(path, 'wb') as f:
             pickle.dump(save_obj, f)
             
     @staticmethod
-    def load_from_disk():
+    def load_from_disk(company_id):
+        """FIXED: Added company_id to the signature"""
         path = DataPersistence.get_path(company_id, "pfep_master.pkl")
         if os.path.exists(path):
             with open(path, 'rb') as f:
@@ -153,40 +152,11 @@ class DataPersistence:
         return None, False, None
 
     @staticmethod
-    def delete_from_disk():
+    def delete_from_disk(company_id):
+        """FIXED: Added company_id to the signature"""
         path = DataPersistence.get_path(company_id, "pfep_master.pkl")
         if os.path.exists(path): 
             os.remove(path)
-    
-    @staticmethod
-    def save_data_to_session_state(key, data):
-        """Save data with timestamp to session state"""
-        st.session_state[key] = {
-            'data': data,
-            'timestamp': datetime.now(),
-            'saved': True
-        }
-    
-    @staticmethod
-    def load_data_from_session_state(key):
-        """Load data from session state if it exists"""
-        if key in st.session_state and isinstance(st.session_state[key], dict):
-            return st.session_state[key].get('data')
-        return None
-    
-    @staticmethod
-    def is_data_saved(key):
-        """Check if data is saved"""
-        if key in st.session_state and isinstance(st.session_state[key], dict):
-            return st.session_state[key].get('saved', False)
-        return False
-    
-    @staticmethod
-    def get_data_timestamp(key):
-        """Get data timestamp"""
-        if key in st.session_state and isinstance(st.session_state[key], dict):
-            return st.session_state[key].get('timestamp')
-        return None
 
 class InventoryAnalyzer:
     """Enhanced inventory analysis with comprehensive reporting"""
@@ -417,33 +387,51 @@ class InventoryManagementSystem:
         
     def initialize_session_state(self):
         """
-        Initialize session state variables with SaaS Disk Persistence.
+        Initialize session state variables. 
+        Only loads data if a company_id is present in the session.
         """
-        if 'user_role' not in st.session_state: st.session_state.user_role = None
-        if 'company_id' not in st.session_state: st.session_state.company_id = None
-        
+        # Initialize basic keys if they don't exist
+        if 'user_role' not in st.session_state:
+            st.session_state.user_role = None
+        if 'company_id' not in st.session_state:
+            st.session_state.company_id = None
+
+        # Stop here if no company is logged in yet
         comp_id = st.session_state.get('company_id')
-        if not comp_id:
+        if comp_id is None:
             return 
 
         # Load specific settings for THIS company
         saved_settings = DataPersistence.load_settings(comp_id)
 
-        if 'admin_tolerance' not in st.session_state:
+        # Apply settings to session
+        if 'admin_tolerance' not in st.session_state or st.session_state.admin_tolerance == 30:
             st.session_state.admin_tolerance = saved_settings['admin_tolerance'] if saved_settings else 30
             
         if 'user_preferences' not in st.session_state:
             ideal = saved_settings['ideal_inventory_days'] if saved_settings else 30
-            st.session_state.user_preferences = {'ideal_inventory_days': ideal, 'chart_theme': 'plotly'}
+            st.session_state.user_preferences = {
+                'ideal_inventory_days': ideal,
+                'chart_theme': 'plotly'
+            }
 
-        self.persistent_keys = ['persistent_pfep_data', 'persistent_pfep_locked', 'persistent_inventory_data', 'persistent_analysis_results']
+        # Initialize Data Keys
+        self.persistent_keys = [
+            'persistent_pfep_data', 'persistent_pfep_locked',
+            'persistent_inventory_data', 'persistent_analysis_results'
+        ]
         for key in self.persistent_keys:
-            if key not in st.session_state: st.session_state[key] = None
+            if key not in st.session_state:
+                st.session_state[key] = None
 
-        # Load Master Data for THIS company
+        # Load Master PFEP Data for THIS company
         disk_data, is_locked, disk_ts = DataPersistence.load_from_disk(comp_id)
+        
         if disk_data and st.session_state.get('persistent_pfep_data') is None:
-            st.session_state['persistent_pfep_data'] = {'data': disk_data, 'timestamp': disk_ts}
+            st.session_state['persistent_pfep_data'] = {
+                'data': disk_data,
+                'timestamp': disk_ts
+            }
             st.session_state['persistent_pfep_locked'] = is_locked
     
     def safe_print(self, message):
