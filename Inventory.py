@@ -114,20 +114,24 @@ class DataPersistence:
 
     @staticmethod
     def get_path(company_id, filename):
-        if not os.path.exists('data'): os.makedirs('data')
+        if not os.path.exists('data'): 
+            os.makedirs('data')
         return f"data/{company_id}_{filename}"
 
     @staticmethod
     def save_settings(tolerance, ideal_days):
+        """Saves tolerance and ideal days per company"""
         path = DataPersistence.get_path(company_id, "settings.pkl")
         with open(path, 'wb') as f:
             pickle.dump({'admin_tolerance': tolerance, 'ideal_inventory_days': ideal_days}, f)
-
+            
     @staticmethod
     def load_settings():
+        """FIXED: Now correctly accepts company_id argument"""
         path = DataPersistence.get_path(company_id, "settings.pkl")
         if os.path.exists(path):
-            with open(path, 'rb') as f: return pickle.load(f)
+            with open(path, 'rb') as f:
+                return pickle.load(f)
         return None
 
     @staticmethod
@@ -143,16 +147,16 @@ class DataPersistence:
         if os.path.exists(path):
             with open(path, 'rb') as f:
                 obj = pickle.load(f)
-                return obj['payload'], obj['is_locked'], obj['timestamp']
+                # Check if it's a dict or old list format
+                if isinstance(obj, dict) and 'payload' in obj:
+                    return obj['payload'], obj.get('is_locked', False), obj.get('timestamp')
+                return obj, False, None
         return None, False, None
 
     @staticmethod
     def delete_from_disk():
-        """Removes the files when admin unlocks/deletes"""
-        if os.path.exists(DataPersistence.STORAGE_FILE):
-            os.remove(DataPersistence.STORAGE_FILE)
-        if os.path.exists(DataPersistence.LOCK_FILE):
-            os.remove(DataPersistence.LOCK_FILE)
+        path = DataPersistence.get_path(company_id, "pfep_master.pkl")
+        if os.path.exists(path): os.remove(path)
     
     @staticmethod
     def save_data_to_session_state(key, data):
@@ -414,7 +418,6 @@ class InventoryManagementSystem:
     def initialize_session_state(self):
         """
         Initialize session state variables with SaaS Disk Persistence.
-        Separates data between companies using the company_id prefix.
         """
         # 1. Initialize Authentication Keys
         if 'user_role' not in st.session_state:
@@ -427,47 +430,38 @@ class InventoryManagementSystem:
         if not comp_id:
             return
 
-        # 2. Load Global Settings for THIS Company (Tolerance and Ideal Days)
-        # This prevents Company A's settings from affecting Company B
+        # 2. Load Global Settings for THIS Company
+        # Passing comp_id to the fixed load_settings method
         saved_settings = self.persistence.load_settings(comp_id)
 
-        # 3. Initialize Analysis Tolerance for Company
+        # 3. Initialize Analysis Tolerance
         if 'admin_tolerance' not in st.session_state:
             if saved_settings and 'admin_tolerance' in saved_settings:
                 st.session_state.admin_tolerance = saved_settings['admin_tolerance']
             else:
-                st.session_state.admin_tolerance = 30  # Default fallback
+                st.session_state.admin_tolerance = 30
 
-        # 4. Initialize User Preferences for Company
+        # 4. Initialize User Preferences
         if 'user_preferences' not in st.session_state:
-            default_ideal_days = 30
-            if saved_settings and 'ideal_inventory_days' in saved_settings:
-                default_ideal_days = saved_settings['ideal_inventory_days']
-            
+            default_ideal_days = saved_settings['ideal_inventory_days'] if saved_settings else 30
             st.session_state.user_preferences = {
                 'ideal_inventory_days': default_ideal_days,
                 'chart_theme': 'plotly'
             }
 
-        # 5. Define and Initialize Persistent Data Keys
+        # 5. Persistent Data Keys
         self.persistent_keys = [
-            'persistent_pfep_data',
-            'persistent_pfep_locked',
-            'persistent_inventory_data', 
-            'persistent_inventory_locked',
+            'persistent_pfep_data', 'persistent_pfep_locked',
+            'persistent_inventory_data', 'persistent_inventory_locked',
             'persistent_analysis_results'
         ]
-        
         for key in self.persistent_keys:
-            if key not in st.session_state:
-                st.session_state[key] = None
+            if key not in st.session_state: st.session_state[key] = None
 
         # 6. Load Master PFEP Data and Lock Status from Disk (Unique to Company)
-        # This ensures the "Locked" status persists for the Admin and User of this company
         disk_data, is_locked, disk_ts = self.persistence.load_from_disk(comp_id)
         
         if disk_data and st.session_state.get('persistent_pfep_data') is None:
-            # We maintain the dictionary format so the PPT date generation works
             st.session_state['persistent_pfep_data'] = {
                 'data': disk_data,
                 'timestamp': disk_ts
