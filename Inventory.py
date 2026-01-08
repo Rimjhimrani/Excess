@@ -686,7 +686,7 @@ class InventoryManagementSystem:
                     if st.button("🔒 Lock Settings"):
                         st.session_state.admin_tolerance = new_tol
                         st.session_state.user_preferences['ideal_inventory_days'] = new_ideal
-                        self.persistence.save_settings(st.session_state.company_id, new_tol, new_ideal)
+                        DataPersistence.save_settings(st.session_state.company_id, new_tol, new_ideal)
                         st.success("Settings saved for Company")
 
             st.sidebar.markdown("---")
