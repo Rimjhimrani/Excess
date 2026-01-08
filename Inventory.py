@@ -383,52 +383,32 @@ class InventoryManagementSystem:
         }
         
     def initialize_session_state(self):
-        """
-        Initialize session state variables. 
-        Only loads data if a company_id is present in the session.
-        """
-        # Initialize basic keys if they don't exist
-        if 'user_role' not in st.session_state:
-            st.session_state.user_role = None
-        if 'company_id' not in st.session_state:
-            st.session_state.company_id = None
-
-        # Stop here if no company is logged in yet
+        """Initialize session state with company-specific data."""
+        if 'user_role' not in st.session_state: st.session_state.user_role = None
+        if 'company_id' not in st.session_state: st.session_state.company_id = None
+        
         comp_id = st.session_state.get('company_id')
-        if comp_id is None:
-            return 
+        if not comp_id: # If not logged in, don't try to load files
+            return
 
         # Load specific settings for THIS company
         saved_settings = DataPersistence.load_settings(comp_id)
 
-        # Apply settings to session
-        if 'admin_tolerance' not in st.session_state or st.session_state.admin_tolerance == 30:
+        if 'admin_tolerance' not in st.session_state:
             st.session_state.admin_tolerance = saved_settings['admin_tolerance'] if saved_settings else 30
             
         if 'user_preferences' not in st.session_state:
             ideal = saved_settings['ideal_inventory_days'] if saved_settings else 30
-            st.session_state.user_preferences = {
-                'ideal_inventory_days': ideal,
-                'chart_theme': 'plotly'
-            }
+            st.session_state.user_preferences = {'ideal_inventory_days': ideal, 'chart_theme': 'plotly'}
 
-        # Initialize Data Keys
-        self.persistent_keys = [
-            'persistent_pfep_data', 'persistent_pfep_locked',
-            'persistent_inventory_data', 'persistent_analysis_results'
-        ]
+        self.persistent_keys = ['persistent_pfep_data', 'persistent_pfep_locked', 'persistent_inventory_data', 'persistent_analysis_results']
         for key in self.persistent_keys:
-            if key not in st.session_state:
-                st.session_state[key] = None
+            if key not in st.session_state: st.session_state[key] = None
 
-        # Load Master PFEP Data for THIS company
+        # Load Master Data for THIS company
         disk_data, is_locked, disk_ts = DataPersistence.load_from_disk(comp_id)
-        
         if disk_data and st.session_state.get('persistent_pfep_data') is None:
-            st.session_state['persistent_pfep_data'] = {
-                'data': disk_data,
-                'timestamp': disk_ts
-            }
+            st.session_state['persistent_pfep_data'] = {'data': disk_data, 'timestamp': disk_ts}
             st.session_state['persistent_pfep_locked'] = is_locked
     
     def safe_print(self, message):
