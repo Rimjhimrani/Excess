@@ -1118,8 +1118,9 @@ class InventoryManagementSystem:
             # If changed, update session AND disk immediately
             if new_ideal_days != current_ideal:
                 st.session_state.user_preferences['ideal_inventory_days'] = new_ideal_days
-                # Save to disk persistence
-                self.persistence.save_settings(
+                # FIX: Added st.session_state.company_id as the first argument
+                DataPersistence.save_settings(
+                    st.session_state.company_id, 
                     st.session_state.admin_tolerance, 
                     st.session_state.user_preferences['ideal_inventory_days']
                 )
