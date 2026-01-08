@@ -114,7 +114,7 @@ class DataPersistence:
 
     @staticmethod
     def get_path(company_id, filename):
-        if not os.path.exists('data'): 
+         if not os.path.exists('data'): 
             os.makedirs('data')
         return f"data/{company_id}_{filename}"
 
@@ -127,7 +127,7 @@ class DataPersistence:
             
     @staticmethod
     def load_settings():
-        """FIXED: Now correctly accepts company_id argument"""
+        """Accepted 1 argument: company_id"""
         path = DataPersistence.get_path(company_id, "settings.pkl")
         if os.path.exists(path):
             with open(path, 'rb') as f:
@@ -147,7 +147,6 @@ class DataPersistence:
         if os.path.exists(path):
             with open(path, 'rb') as f:
                 obj = pickle.load(f)
-                # Check if it's a dict or old list format
                 if isinstance(obj, dict) and 'payload' in obj:
                     return obj['payload'], obj.get('is_locked', False), obj.get('timestamp')
                 return obj, False, None
@@ -156,7 +155,8 @@ class DataPersistence:
     @staticmethod
     def delete_from_disk():
         path = DataPersistence.get_path(company_id, "pfep_master.pkl")
-        if os.path.exists(path): os.remove(path)
+        if os.path.exists(path): 
+            os.remove(path)
     
     @staticmethod
     def save_data_to_session_state(key, data):
@@ -419,53 +419,31 @@ class InventoryManagementSystem:
         """
         Initialize session state variables with SaaS Disk Persistence.
         """
-        # 1. Initialize Authentication Keys
-        if 'user_role' not in st.session_state:
-            st.session_state.user_role = None
-        if 'company_id' not in st.session_state:
-            st.session_state.company_id = None
-
-        # Stop here if no company is logged in yet
+        if 'user_role' not in st.session_state: st.session_state.user_role = None
+        if 'company_id' not in st.session_state: st.session_state.company_id = None
+        
         comp_id = st.session_state.get('company_id')
         if not comp_id:
-            return
+            return 
 
-        # 2. Load Global Settings for THIS Company
-        # Passing comp_id to the fixed load_settings method
-        saved_settings = self.persistence.load_settings(comp_id)
+        # Load specific settings for THIS company
+        saved_settings = DataPersistence.load_settings(comp_id)
 
-        # 3. Initialize Analysis Tolerance
         if 'admin_tolerance' not in st.session_state:
-            if saved_settings and 'admin_tolerance' in saved_settings:
-                st.session_state.admin_tolerance = saved_settings['admin_tolerance']
-            else:
-                st.session_state.admin_tolerance = 30
-
-        # 4. Initialize User Preferences
+            st.session_state.admin_tolerance = saved_settings['admin_tolerance'] if saved_settings else 30
+            
         if 'user_preferences' not in st.session_state:
-            default_ideal_days = saved_settings['ideal_inventory_days'] if saved_settings else 30
-            st.session_state.user_preferences = {
-                'ideal_inventory_days': default_ideal_days,
-                'chart_theme': 'plotly'
-            }
+            ideal = saved_settings['ideal_inventory_days'] if saved_settings else 30
+            st.session_state.user_preferences = {'ideal_inventory_days': ideal, 'chart_theme': 'plotly'}
 
-        # 5. Persistent Data Keys
-        self.persistent_keys = [
-            'persistent_pfep_data', 'persistent_pfep_locked',
-            'persistent_inventory_data', 'persistent_inventory_locked',
-            'persistent_analysis_results'
-        ]
+        self.persistent_keys = ['persistent_pfep_data', 'persistent_pfep_locked', 'persistent_inventory_data', 'persistent_analysis_results']
         for key in self.persistent_keys:
             if key not in st.session_state: st.session_state[key] = None
 
-        # 6. Load Master PFEP Data and Lock Status from Disk (Unique to Company)
-        disk_data, is_locked, disk_ts = self.persistence.load_from_disk(comp_id)
-        
+        # Load Master Data for THIS company
+        disk_data, is_locked, disk_ts = DataPersistence.load_from_disk(comp_id)
         if disk_data and st.session_state.get('persistent_pfep_data') is None:
-            st.session_state['persistent_pfep_data'] = {
-                'data': disk_data,
-                'timestamp': disk_ts
-            }
+            st.session_state['persistent_pfep_data'] = {'data': disk_data, 'timestamp': disk_ts}
             st.session_state['persistent_pfep_locked'] = is_locked
             logger.info(f"✅ Master Data for client {comp_id} synchronized from Disk Persistence.")
     
