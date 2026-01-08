@@ -1171,24 +1171,30 @@ class InventoryManagementSystem:
                         # THE SAVE & LOCK BUTTON
                         if st.button("💾 Save & Lock PFEP Permanently", type="primary"):
                             final_data = st.session_state.get('temp_standardized_pfep')
-                            if final_data:
+                            
+                            # FIX: Get the current logged in company ID
+                            comp_id = st.session_state.get('company_id')
+                            
+                            if final_data and comp_id:
                                 current_now = datetime.now()
                                 
-                                # 1. Save to session (Structured for PPT date logic)
+                                # 1. Save to session state container
                                 st.session_state.persistent_pfep_data = {
                                     'data': final_data,
                                     'timestamp': current_now
                                 }
                                 st.session_state.persistent_pfep_locked = True
                                 
-                                # 2. Save to Disk (Writes the timestamp into the file)
-                                self.persistence.save_to_disk(final_data, locked=True)
+                                # 2. FIX: Pass comp_id as the first argument
+                                DataPersistence.save_to_disk(comp_id, final_data, locked=True)
                                 
-                                st.success(f"✅ Master PFEP locked on server. Date: {current_now.strftime('%d-%m-%Y')}")
+                                st.success(f"✅ Master PFEP locked for {comp_id}. Date: {current_now.strftime('%d-%m-%Y')}")
+                                
+                                # Cleanup
                                 del st.session_state['temp_standardized_pfep']
                                 st.rerun()
-                    else:
-                        st.error("❌ Data standardization failed. Please check column headers.")
+                            else:
+                                st.error("❌ Error: Missing data or Company ID. Please log in again.")
                 except Exception as e:
                     st.error(f"❌ File processing error: {str(e)}")
 
