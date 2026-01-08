@@ -124,7 +124,7 @@ class DataPersistence:
             
     @staticmethod
     def load_settings(company_id):
-        """FIXED: Added company_id to the signature"""
+        """Accepted 1 argument: company_id"""
         path = DataPersistence.get_path(company_id, "settings.pkl")
         if os.path.exists(path):
             with open(path, 'rb') as f:
@@ -133,7 +133,6 @@ class DataPersistence:
 
     @staticmethod
     def save_to_disk(company_id, data, locked=True):
-        """FIXED: Added company_id to the signature"""
         path = DataPersistence.get_path(company_id, "pfep_master.pkl")
         save_obj = {'payload': data, 'timestamp': datetime.now(), 'is_locked': locked}
         with open(path, 'wb') as f:
@@ -141,7 +140,6 @@ class DataPersistence:
             
     @staticmethod
     def load_from_disk(company_id):
-        """FIXED: Added company_id to the signature"""
         path = DataPersistence.get_path(company_id, "pfep_master.pkl")
         if os.path.exists(path):
             with open(path, 'rb') as f:
@@ -153,7 +151,6 @@ class DataPersistence:
 
     @staticmethod
     def delete_from_disk(company_id):
-        """FIXED: Added company_id to the signature"""
         path = DataPersistence.get_path(company_id, "pfep_master.pkl")
         if os.path.exists(path): 
             os.remove(path)
