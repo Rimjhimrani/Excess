@@ -193,7 +193,7 @@ class InventoryAnalyzer:
     
     def __init__(self):
         self.debug = False
-        self.persistence = self
+        self.persistence = DataPersistence()
         self.status_colors = {
             'Within Norms': '#4CAF50',    # Green
             'Excess Inventory': '#2196F3', # Blue
