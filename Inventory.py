@@ -445,7 +445,6 @@ class InventoryManagementSystem:
         if disk_data and st.session_state.get('persistent_pfep_data') is None:
             st.session_state['persistent_pfep_data'] = {'data': disk_data, 'timestamp': disk_ts}
             st.session_state['persistent_pfep_locked'] = is_locked
-            logger.info(f"✅ Master Data for client {comp_id} synchronized from Disk Persistence.")
     
     def safe_print(self, message):
         """Safely print to streamlit or console"""
