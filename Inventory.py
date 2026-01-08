@@ -107,7 +107,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 class DataPersistence:
-    """SaaS Persistence: Separates files by Company ID"""
+    """SaaS Persistence: Separates files by Company ID and handles session state"""
     
     @staticmethod
     def get_path(company_id, filename):
@@ -115,16 +115,15 @@ class DataPersistence:
             os.makedirs('data')
         return f"data/{company_id}_{filename}"
 
+    # --- DISK METHODS (Saves to server) ---
     @staticmethod
     def save_settings(company_id, tolerance, ideal_days):
-        """Accepted 3 arguments: company_id, tolerance, ideal_days"""
         path = DataPersistence.get_path(company_id, "settings.pkl")
         with open(path, 'wb') as f:
             pickle.dump({'admin_tolerance': tolerance, 'ideal_inventory_days': ideal_days}, f)
             
     @staticmethod
     def load_settings(company_id):
-        """Accepted 1 argument: company_id"""
         path = DataPersistence.get_path(company_id, "settings.pkl")
         if os.path.exists(path):
             with open(path, 'rb') as f:
@@ -155,6 +154,32 @@ class DataPersistence:
         if os.path.exists(path): 
             os.remove(path)
 
+    # --- SESSION METHODS (Fixes your AttributeError) ---
+    @staticmethod
+    def save_data_to_session_state(key, data):
+        """Saves data to session state with a timestamp"""
+        st.session_state[key] = {
+            'data': data,
+            'timestamp': datetime.now(),
+            'saved': True
+        }
+    
+    @staticmethod
+    def load_data_from_session_state(key):
+        """Loads actual data from the session state container"""
+        container = st.session_state.get(key)
+        if container and isinstance(container, dict):
+            return container.get('data')
+        return container # Return raw if not a dict
+    
+    @staticmethod
+    def get_data_timestamp(key):
+        """Retrieves the timestamp for PPT generation"""
+        container = st.session_state.get(key)
+        if container and isinstance(container, dict):
+            return container.get('timestamp')
+        return None
+        
 class InventoryAnalyzer:
     """Enhanced inventory analysis with comprehensive reporting"""
     
@@ -383,32 +408,35 @@ class InventoryManagementSystem:
         }
         
     def initialize_session_state(self):
-        """Initialize session state with company-specific data."""
+        """Initializes keys and loads company-specific data from disk"""
         if 'user_role' not in st.session_state: st.session_state.user_role = None
         if 'company_id' not in st.session_state: st.session_state.company_id = None
         
         comp_id = st.session_state.get('company_id')
-        if not comp_id: # If not logged in, don't try to load files
-            return
+        if not comp_id:
+            return 
 
-        # Load specific settings for THIS company
+        # Load settings
         saved_settings = DataPersistence.load_settings(comp_id)
-
         if 'admin_tolerance' not in st.session_state:
             st.session_state.admin_tolerance = saved_settings['admin_tolerance'] if saved_settings else 30
-            
         if 'user_preferences' not in st.session_state:
             ideal = saved_settings['ideal_inventory_days'] if saved_settings else 30
             st.session_state.user_preferences = {'ideal_inventory_days': ideal, 'chart_theme': 'plotly'}
 
+        # Initialize data slots
         self.persistent_keys = ['persistent_pfep_data', 'persistent_pfep_locked', 'persistent_inventory_data', 'persistent_analysis_results']
         for key in self.persistent_keys:
             if key not in st.session_state: st.session_state[key] = None
 
-        # Load Master Data for THIS company
+        # Load master data from disk for this company
         disk_data, is_locked, disk_ts = DataPersistence.load_from_disk(comp_id)
         if disk_data and st.session_state.get('persistent_pfep_data') is None:
-            st.session_state['persistent_pfep_data'] = {'data': disk_data, 'timestamp': disk_ts}
+            # We store it in the same dict format the session methods expect
+            st.session_state['persistent_pfep_data'] = {
+                'data': disk_data, 
+                'timestamp': disk_ts
+            }
             st.session_state['persistent_pfep_locked'] = is_locked
     
     def safe_print(self, message):
