@@ -660,100 +660,97 @@ class InventoryManagementSystem:
         st.dataframe(summary_df, use_container_width=True)
 
     def authenticate_user(self):
-        """Enhanced authentication system with better UX and user switching"""
-        st.sidebar.markdown("### 🔐 Authentication")
+        """SaaS Authentication: Multi-company support with local credential storage"""
+        st.sidebar.markdown("### 🔐 Corporate Login")
         
+        # Internal helper to load the list of paying companies
+        def load_company_registry():
+            path = "data/company_registry.pkl"
+            if os.path.exists(path):
+                with open(path, "rb") as f: return pickle.load(f)
+            return {"AGILOMATRIX": "Agilo@123"} # Default first account
+
         if st.session_state.user_role is None:
-            role = st.sidebar.selectbox(
-                "Select Role", 
-                ["Select Role", "Admin", "User"],
-                help="Choose your role to access appropriate features"
-            )
+            # 1. Company Identification
+            comp_id_input = st.sidebar.text_input("Company ID", help="Enter your registered Company Code").upper().strip()
+            
+            role = st.sidebar.selectbox("Select Role", ["Select Role", "Admin", "User"])
             
             if role == "Admin":
-                with st.sidebar.container():
-                    st.markdown("**Admin Login**")
-                    password = st.text_input("Admin Password", type="password", key="admin_pass")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("🔑 Login", key="admin_login"):
-                            if password == "Agilomatrix@123":  # BUG: wrong password
-                                st.session_state.user_role = "Admin"
-                                st.success("✅ Admin authenticated!")
-                                st.rerun()
-                            else:
-                                st.error("❌ Invalid password")
-                    with col2:
-                        if st.button("🏠 Demo", key="admin_demo"):
-                            st.session_state.user_role = "Admin"
-                            st.info("🎮 Demo mode activated!")
-                            st.rerun()
+                password = st.sidebar.text_input("Admin Password", type="password")
+                if st.sidebar.button("🔑 Login as Admin"):
+                    registry = load_company_registry()
+                    if comp_id_input in registry and password == registry[comp_id_input]:
+                        st.session_state.user_role = "Admin"
+                        st.session_state.company_id = comp_id_input
+                        self.initialize_session_state() # Load specific company data
+                        st.success(f"✅ {comp_id_input} Admin Authenticated")
+                        st.rerun()
+                    else:
+                        st.sidebar.error("❌ Invalid Company ID or Password")
             
             elif role == "User":
-                if st.sidebar.button("👤 Enter as User", key="user_login"):
-                    st.session_state.user_role = "User"
-                    st.sidebar.success("✅ User access granted!")
-                    st.rerun()
-        else:
-            # User info and controls
-            st.sidebar.success(f"✅ **{st.session_state.user_role}** logged in")
-            
-            # Display data status
-            self.display_data_status()
-            
-            # User switching option for Admin
-            if st.session_state.user_role == "Admin":
-                # ✅ Show PFEP lock status
-                pfep_locked = st.session_state.get("persistent_pfep_locked", False)
-                st.sidebar.markdown(f"🔒 PFEP Locked: **{pfep_locked}**")
-                # ✅ Always show switch role if PFEP is locked
-                if pfep_locked:
-                    st.sidebar.markdown("### 🔄 Switch Role")
-                    if st.sidebar.button("👤 Switch to User View", key="switch_to_user"):
+                if st.sidebar.button("👤 Enter as User"):
+                    registry = load_company_registry()
+                    if comp_id_input in registry:
                         st.session_state.user_role = "User"
-                        st.sidebar.success("✅ Switched to User view!")
+                        st.session_state.company_id = comp_id_input
+                        self.initialize_session_state()
                         st.rerun()
-                else:
-                    st.sidebar.info("ℹ️ PFEP is not locked. Lock PFEP to allow switching to User.")
+                    else:
+                        st.sidebar.error("❌ Company ID not recognized")
+        else:
+            # LOGGED IN VIEW
+            st.sidebar.success(f"🏢 **{st.session_state.company_id}**")
+            st.sidebar.info(f"👤 Role: {st.session_state.user_role}")
+            
+            self.display_data_status()
 
-            
-            # User preferences (for Admin only)
+            # Admin Quick-Switch
             if st.session_state.user_role == "Admin":
-                with st.sidebar.expander("⚙️ Preferences"):
-                    st.session_state.user_preferences['default_tolerance'] = st.selectbox(
-                        "Default Tolerance", [0, 10, 20, 30, 40, 50], 
-                        index=2, key="pref_tolerance"
-                    )
-                    # ✅ NEW: Admin setting for Ideal Inventory Days
-                    st.session_state.user_preferences['ideal_inventory_days'] = st.number_input(
-                        "Ideal Inventory Days",
-                        min_value=1,
-                        value=30,
-                        step=1,
-                        help="Used to calculate Ideal Inventory (Avg Consumption * Days)",
-                        key="admin_ideal_days"
-                    )
+                pfep_locked = st.session_state.get("persistent_pfep_locked", False)
+                if pfep_locked:
+                    if st.sidebar.button("🔄 Switch to User View"):
+                        st.session_state.user_role = "User"
+                        st.rerun()
+
+                # Settings Expander (Locked to Company ID)
+                with st.sidebar.expander("⚙️ Analysis Settings"):
+                    new_tol = st.selectbox("Tolerance %", [0, 10, 20, 30, 40, 50], 
+                                           index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance))
+                    new_ideal = st.number_input("Ideal Days", value=st.session_state.user_preferences['ideal_inventory_days'])
                     
-                    st.session_state.user_preferences['chart_theme'] = st.selectbox(
-                        "Chart Theme", ['plotly', 'plotly_white', 'plotly_dark'],
-                        key="pref_theme"
-                    )
-            
-            # Logout button
+                    if st.button("🔒 Lock Settings"):
+                        st.session_state.admin_tolerance = new_tol
+                        st.session_state.user_preferences['ideal_inventory_days'] = new_ideal
+                        self.persistence.save_settings(st.session_state.company_id, new_tol, new_ideal)
+                        st.success("Settings saved for Company")
+
             st.sidebar.markdown("---")
-            if st.sidebar.button("🚪 Logout", key="logout_btn"):
-                # Only clear user session, not persistent data
-                keys_to_keep = self.persistent_keys + ['user_preferences']
-                session_copy = {k: v for k, v in st.session_state.items() if k in keys_to_keep}
-                
-                # Clear all session state
-                st.session_state.clear()
-                
-                # Restore persistent data
-                for k, v in session_copy.items():
-                    st.session_state[k] = v
-                
+            if st.sidebar.button("🚪 Logout"):
+                st.session_state.user_role = None
+                st.session_state.company_id = None
                 st.rerun()
+        
+        # Hidden Developer console for YOU to add new clients
+        self.developer_console()
+
+    def developer_console(self):
+        """Secret tool for Agilomatrix to add new customers"""
+        with st.sidebar.expander("🛠️ Developer Console"):
+            dev_key = st.text_input("Master Key", type="password")
+            if dev_key == "AgiloSaaS2026": # ONLY YOU KNOW THIS
+                st.write("---")
+                new_c = st.text_input("New Client ID").upper().strip()
+                new_p = st.text_input("Set Admin Password")
+                if st.button("➕ Register New Client"):
+                    path = "data/company_registry.pkl"
+                    if os.path.exists(path):
+                        with open(path, "rb") as f: reg = pickle.load(f)
+                    else: reg = {}
+                    reg[new_c] = new_p
+                    with open(path, "wb") as f: pickle.dump(reg, f)
+                    st.success(f"Client {new_c} added!")
     
     def display_data_status(self):
         """Display current data loading status in sidebar"""
