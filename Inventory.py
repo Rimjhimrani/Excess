@@ -707,7 +707,7 @@ class InventoryManagementSystem:
             if dev_key == "AgiloSaaS2026":
                 st.subheader("Register New Corporate Client")
                 new_c = st.text_input("New Company ID").upper().strip()
-                client_email = st.text_input("Admin Recovery Email") # NEW
+                admin_email = st.text_input("Admin Recovery Email") # Added Email field
             
                 if st.button("➕ Register Client"):
                     path = "data/company_registry.pkl"
@@ -718,11 +718,12 @@ class InventoryManagementSystem:
                     reg[new_c] = {
                         "password": "Welcome@123",
                         "status": "FIRST_LOGIN",
-                        "email": client_email # NEW: Store email
+                        "email": admin_email  # Save email to registry
                     }
                 
+                    if not os.path.exists('data'): os.makedirs('data')
                     with open(path, "wb") as f: pickle.dump(reg, f)
-                    st.success(f"✅ {new_c} registered with recovery email.")
+                    st.success(f"✅ {new_c} registered. Recovery email: {admin_email}")
 
     def handle_password_change(self, comp_id, registry):
         """UI for clients to set their private password"""
@@ -756,12 +757,13 @@ class InventoryManagementSystem:
     def send_otp_email(target_email, otp_code):
         # SETTINGS: Update these with your own SMTP details
         sender_email = "your-email@gmail.com" 
-        sender_password = "your-app-password-here" # Create an 'App Password' in Google Account Security
-        
-        msg = MIMEText(f"Your Inventory Management password reset code is: {otp_code}\n\nThis code will expire when you close your browser.")
-        msg['Subject'] = 'Password Reset Code - Inventory System'
+        sender_password = "your-app-password" # Use a Google App Password
+    
+        msg = MIMEText(f"Your Inventory System password reset code is: {otp_code}")
+        msg['Subject'] = 'Password Reset OTP'
         msg['From'] = sender_email
         msg['To'] = target_email
+
         try:
             with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
                 server.login(sender_email, sender_password)
@@ -772,33 +774,31 @@ class InventoryManagementSystem:
             return False
 
     def handle_forgot_password_view(self, registry):
-        st.title("🔑 Reset Admin Password")
+        st.title("🔑 Reset Password")
         comp_id = st.session_state.reset_target_id
-        st.info(f"A 6-digit code was sent to the registered email for **{comp_id}**")
+        st.info(f"An OTP has been sent to the registered email for {comp_id}")
     
-        input_otp = st.text_input("Enter 6-Digit Code")
+        input_otp = st.text_input("Enter 6-Digit OTP")
         new_p = st.text_input("New Password", type="password")
-        conf_p = st.text_input("Confirm New Password", type="password")
+        conf_p = st.text_input("Confirm Password", type="password")
     
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("✅ Reset Password"):
-                if input_otp == st.session_state.generated_otp:
-                    if new_p == conf_p and len(new_p) >= 6:
-                        registry[comp_id]["password"] = new_p
-                        with open("data/company_registry.pkl", "wb") as f:
-                            pickle.dump(registry, f)
-                        st.success("Password updated! Please login.")
-                        st.session_state.reset_mode = False
-                        st.rerun()
-                    else:
-                        st.error("Passwords must match (min 6 chars).")
+        if st.button("💾 Reset Password"):
+            if input_otp == st.session_state.get('generated_otp'):
+                if new_p == conf_p and len(new_p) >= 6:
+                    registry[comp_id]["password"] = new_p
+                    with open("data/company_registry.pkl", "wb") as f:
+                        pickle.dump(registry, f)
+                    st.success("✅ Password updated! Please login.")
+                    st.session_state.reset_mode = False
+                    st.rerun()
                 else:
-                    st.error("Invalid OTP code.")
-        with col2:
-            if st.button("❌ Cancel"):
-                st.session_state.reset_mode = False
-                st.rerun()
+                    st.error("Passwords must match and be 6+ characters.")
+            else:
+                st.error("Invalid OTP code.")
+    
+        if st.button("⬅️ Back to Login"):
+            st.session_state.reset_mode = False
+            st.rerun()
     
     def display_data_status(self):
         """Display current data loading status in sidebar"""
