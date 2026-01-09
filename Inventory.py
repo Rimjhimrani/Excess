@@ -11,7 +11,6 @@ import uuid
 import io
 import os
 import re
-import smtplib
 from typing import Union, Any, Optional, List, Dict
 from decimal import Decimal, InvalidOperation
 from collections import Counter
@@ -24,7 +23,6 @@ from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
 from pptx.chart.data import ChartData
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.enum.shapes import MSO_SHAPE
-from email.mime.text import MIMEText
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -626,50 +624,43 @@ class InventoryManagementSystem:
 
     def authenticate_user(self):
         st.sidebar.markdown("### 🔐 Corporate Login")
-        
         # Load registry
         path = "data/company_registry.pkl"
         if os.path.exists(path):
             with open(path, "rb") as f: registry = pickle.load(f)
         else: registry = {}
 
+        # NEW: Handle the password change screen if flag is set
+        if st.session_state.get('changing_password'):
+            self.handle_password_change(st.session_state.temp_comp_id, registry)
+            return
+
         if st.session_state.user_role is None:
             comp_id = st.sidebar.text_input("Company ID").upper().strip()
-            
-            # --- FORGOT PASSWORD UI ---
-            if st.sidebar.button("❓ Forgot Password"):
-                if comp_id in registry:
-                    code = str(uuid.uuid4())[:6].upper()
-                    st.session_state.reset_code = code
-                    if self.send_reset_email(registry[comp_id]['email'], code):
-                        st.sidebar.success(f"Check email: {registry[comp_id]['email']}")
-                else:
-                    st.sidebar.error("Company ID not found")
-
             role = st.sidebar.selectbox("Role", ["Select Role", "Admin", "User"])
-            
+        
             if role == "Admin":
                 password = st.sidebar.text_input("Password", type="password")
                 if st.sidebar.button("🔑 Login"):
                     if comp_id in registry and password == registry[comp_id]["password"]:
-                        # CHECK FOR FIRST LOGIN
-                        if registry[comp_id]["status"] == "FIRST_LOGIN":
-                            self.handle_password_change(comp_id, registry)
-                            return
-                        
+                        # CHECK FOR FIRST LOGIN - Sets flag to show change screen
+                        if registry[comp_id].get("status") == "FIRST_LOGIN":
+                            st.session_state.changing_password = True
+                            st.session_state.temp_comp_id = comp_id
+                            st.rerun()
+                    
                         st.session_state.user_role = "Admin"
                         st.session_state.company_id = comp_id
                         self.initialize_session_state()
                         st.rerun()
                     else:
                         st.sidebar.error("❌ Invalid Company ID or Password")
-            
+        
             elif role == "User":
                 if st.sidebar.button("👤 Enter as User"):
-                    registry = load_company_registry()
-                    if comp_id_input in registry:
+                    if comp_id in registry:
                         st.session_state.user_role = "User"
-                        st.session_state.company_id = comp_id_input
+                        st.session_state.company_id = comp_id
                         self.initialize_session_state()
                         st.rerun()
                     else:
@@ -678,10 +669,9 @@ class InventoryManagementSystem:
             # LOGGED IN VIEW
             st.sidebar.success(f"🏢 **{st.session_state.company_id}**")
             st.sidebar.info(f"👤 Role: {st.session_state.user_role}")
-            
+        
             self.display_data_status()
 
-            # Admin Quick-Switch
             if st.session_state.user_role == "Admin":
                 pfep_locked = st.session_state.get("persistent_pfep_locked", False)
                 if pfep_locked:
@@ -689,12 +679,11 @@ class InventoryManagementSystem:
                         st.session_state.user_role = "User"
                         st.rerun()
 
-                # Settings Expander (Locked to Company ID)
                 with st.sidebar.expander("⚙️ Analysis Settings"):
                     new_tol = st.selectbox("Tolerance %", [0, 10, 20, 30, 40, 50], 
                                            index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance))
                     new_ideal = st.number_input("Ideal Days", value=st.session_state.user_preferences['ideal_inventory_days'])
-                    
+                
                     if st.button("🔒 Lock Settings"):
                         st.session_state.admin_tolerance = new_tol
                         st.session_state.user_preferences['ideal_inventory_days'] = new_ideal
@@ -706,75 +695,62 @@ class InventoryManagementSystem:
                 st.session_state.user_role = None
                 st.session_state.company_id = None
                 st.rerun()
-        
-        # Hidden Developer console for YOU to add new clients
+    
         self.developer_console()
-
+    
     def developer_console(self):
-        """Tool for you to register clients with Email and Temp Passwords"""
-        with st.sidebar.expander("🛠️ Agilomatrix Developer Console"):
+        with st.sidebar.expander("🛠️ Developer Console"):
             dev_key = st.text_input("Developer Master Key", type="password")
             if dev_key == "AgiloSaaS2026":
                 st.subheader("Register New Corporate Client")
                 new_c = st.text_input("New Company ID").upper().strip()
-                new_email = st.text_input("Client Admin Email")
-                
-                if st.button("➕ Register & Generate Temp Pass"):
+            
+                if st.button("➕ Register Client"):
                     path = "data/company_registry.pkl"
-                    temp_pass = "Welcome@123" # Initial temporary password
-                    
+                    temp_pass = "Welcome@123" 
+                
                     if os.path.exists(path):
                         with open(path, "rb") as f: reg = pickle.load(f)
                     else: reg = {}
-                    
-                    # Store as a dictionary with metadata
+                
                     reg[new_c] = {
                         "password": temp_pass,
-                        "email": new_email,
-                        "status": "FIRST_LOGIN" # Forces them to change pass
+                        "status": "FIRST_LOGIN"
                     }
-                    
+                
                     if not os.path.exists('data'): os.makedirs('data')
                     with open(path, "wb") as f: pickle.dump(reg, f)
-                    st.success(f"✅ {new_c} registered. Email: {new_email}")
-                    st.info(f"Tell client to login with temp pass: {temp_pass}")
+                    st.success(f"✅ {new_c} registered.")
+                    st.info(f"Initial Password: {temp_pass}")
 
     def handle_password_change(self, comp_id, registry):
         """UI for clients to set their private password"""
-        st.warning("🛡️ Security Action Required: Please set your private password.")
+        st.title("🛡️ Secure Your Account")
+        st.warning(f"Required: Set a private password for **{comp_id}**")
+        
         new_p = st.text_input("New Private Password", type="password")
         conf_p = st.text_input("Confirm Password", type="password")
-        
-        if st.button("💾 Save Private Password"):
-            if new_p == conf_p and len(new_p) > 6:
+    
+        if st.button("💾 Save Password & Login"):
+            if new_p == conf_p and len(new_p) >= 6:
+                # Update values in memory
                 registry[comp_id]["password"] = new_p
                 registry[comp_id]["status"] = "ACTIVE"
+            
+                # Write back to the .pkl file
                 with open("data/company_registry.pkl", "wb") as f:
                     pickle.dump(registry, f)
-                st.success("✅ Password set! Please login again.")
-                st.session_state.user_role = None
+            
+                st.success("✅ Password set! Redirecting to dashboard...")
+            
+                # Log them in automatically
+                st.session_state.changing_password = False
+                st.session_state.user_role = "Admin"
+                st.session_state.company_id = comp_id
+                self.initialize_session_state()
                 st.rerun()
             else:
-                st.error("Passwords must match and be at least 7 characters.")
-
-    def send_reset_email(self, target_email, temp_code):
-        """Sends a numeric reset code to the client's email"""
-        sender_email = "your-email@gmail.com"
-        sender_password = "your-app-password" # Get this from Google Account Security
-        
-        msg = MIMEText(f"Your Inventory Management reset code is: {temp_code}")
-        msg['Subject'] = 'Password Reset Request'
-        msg['From'] = sender_email
-        msg['To'] = target_email
-
-        try:
-            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-                server.login(sender_email, sender_password)
-                server.sendmail(sender_email, target_email, msg.as_string())
-            return True
-        except Exception as e:
-            st.error(f"Mail Error: {e}")
-            return False
+                st.error("Passwords must match and be at least 6 characters.")
     
     def display_data_status(self):
         """Display current data loading status in sidebar"""
