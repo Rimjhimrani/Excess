@@ -772,8 +772,8 @@ class InventoryManagementSystem:
 
     def send_otp_email(target_email, otp_code):
         # SETTINGS: Update these with your own SMTP details
-        sender_email = "your-email@gmail.com" 
-        sender_password = "your-app-password" # Use a Google App Password
+        sender_email = "agilomatrix1@gmail.com" 
+        sender_password = "Agilomatrix@10" # Use a Google App Password
     
         msg = MIMEText(f"Your Inventory System password reset code is: {otp_code}")
         msg['Subject'] = 'Password Reset OTP'
