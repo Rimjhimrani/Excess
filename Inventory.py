@@ -791,7 +791,14 @@ class InventoryManagementSystem:
 
     def handle_forgot_password_view(self, registry):
         st.title("🔑 Reset Password")
-        comp_id = st.session_state.reset_target_id
+        comp_id = st.session_state.get('reset_target_id')
+        if not comp_id:
+            st.error("Session expired. Please start over.")
+            if st.button("Back to Login"):
+                st.session_state.reset_mode = False
+                st.rerun()
+            return
+
         st.info(f"An OTP has been sent to the registered email for {comp_id}")
     
         input_otp = st.text_input("Enter 6-Digit OTP")
@@ -806,6 +813,7 @@ class InventoryManagementSystem:
                         pickle.dump(registry, f)
                     st.success("✅ Password updated! Please login.")
                     st.session_state.reset_mode = False
+                    st.session_state.generated_otp = None # Clear OTP after use
                     st.rerun()
                 else:
                     st.error("Passwords must match and be 6+ characters.")
