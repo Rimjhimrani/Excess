@@ -135,6 +135,7 @@ class DataPersistence:
 
     @staticmethod
     def save_to_disk(company_id, data, locked=True):
+        # This ensures Company A's data goes into "data/COMPANYA_pfep_master.pkl"
         path = DataPersistence.get_path(company_id, "pfep_master.pkl")
         save_obj = {'payload': data, 'timestamp': datetime.now(), 'is_locked': locked}
         with open(path, 'wb') as f:
@@ -411,36 +412,40 @@ class InventoryManagementSystem:
         }
         
     def initialize_session_state(self):
-        """Initializes keys and loads company-specific data from disk"""
+        """Initializes keys and FORCES reload of company-specific data from disk"""
         if 'user_role' not in st.session_state: st.session_state.user_role = None
         if 'company_id' not in st.session_state: st.session_state.company_id = None
-        
+    
         comp_id = st.session_state.get('company_id')
         if not comp_id:
             return 
-
-        # Load settings
+        # --- 1. FORCE RELOAD SETTINGS ---
+        # We remove the "if not in session_state" check so it updates when company changes
         saved_settings = DataPersistence.load_settings(comp_id)
-        if 'admin_tolerance' not in st.session_state:
-            st.session_state.admin_tolerance = saved_settings['admin_tolerance'] if saved_settings else 30
-        if 'user_preferences' not in st.session_state:
-            ideal = saved_settings['ideal_inventory_days'] if saved_settings else 30
-            st.session_state.user_preferences = {'ideal_inventory_days': ideal, 'chart_theme': 'plotly'}
+        st.session_state.admin_tolerance = saved_settings['admin_tolerance'] if saved_settings else 30
+    
+        ideal = saved_settings['ideal_inventory_days'] if saved_settings else 30
+        st.session_state.user_preferences = {'ideal_inventory_days': ideal, 'chart_theme': 'plotly'}
 
-        # Initialize data slots
-        self.persistent_keys = ['persistent_pfep_data', 'persistent_pfep_locked', 'persistent_inventory_data', 'persistent_analysis_results']
-        for key in self.persistent_keys:
-            if key not in st.session_state: st.session_state[key] = None
+        # --- 2. RESET ANALYSIS DATA ---
+        # When switching companies, we MUST clear the previous company's results
+        st.session_state['persistent_inventory_data'] = None
+        st.session_state['persistent_analysis_results'] = None
 
-        # Load master data from disk for this company
+        # --- 3. FORCE RELOAD MASTER PFEP FROM DISK ---
         disk_data, is_locked, disk_ts = DataPersistence.load_from_disk(comp_id)
-        if disk_data and st.session_state.get('persistent_pfep_data') is None:
-            # We store it in the same dict format the session methods expect
+    
+        # We overwrite the session state with disk data to ensure 100% isolation
+        if disk_data:
             st.session_state['persistent_pfep_data'] = {
                 'data': disk_data, 
                 'timestamp': disk_ts
             }
             st.session_state['persistent_pfep_locked'] = is_locked
+        else:
+            # If this company has no data yet, make sure the session is empty
+            st.session_state['persistent_pfep_data'] = None
+            st.session_state['persistent_pfep_locked'] = False
     
     def safe_print(self, message):
         """Safely print to streamlit or console"""
@@ -711,8 +716,9 @@ class InventoryManagementSystem:
 
             st.sidebar.markdown("---")
             if st.sidebar.button("🚪 Logout"):
-                st.session_state.user_role = None
-                st.session_state.company_id = None
+                # This completely wipes the browser memory for this session
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
                 st.rerun()
     
         self.developer_console()
