@@ -412,30 +412,34 @@ class InventoryManagementSystem:
         }
         
     def initialize_session_state(self):
-        """Initializes keys and FORCES reload of company-specific data from disk"""
+        """Initializes keys and loads data ONLY when the company changes"""
+        # 1. Basic initialization
         if 'user_role' not in st.session_state: st.session_state.user_role = None
         if 'company_id' not in st.session_state: st.session_state.company_id = None
+        if 'last_loaded_company' not in st.session_state: st.session_state.last_loaded_company = None
     
         comp_id = st.session_state.get('company_id')
         if not comp_id:
             return 
-        # --- 1. FORCE RELOAD SETTINGS ---
-        # We remove the "if not in session_state" check so it updates when company changes
+
+        # 2. CHECK: Has the company changed since the last run?
+        # If comp_id is the same as last_loaded_company, STOP here so we don't wipe out "Run Analysis" results
+        if comp_id == st.session_state.last_loaded_company:
+             return
+
+        # 3. IF COMPANY IS DIFFERENT (New Login):
+        # Clear old company data and load new company data
+        st.session_state['persistent_inventory_data'] = None
+        st.session_state['persistent_analysis_results'] = None
+    
+        # Load settings for the new company
         saved_settings = DataPersistence.load_settings(comp_id)
         st.session_state.admin_tolerance = saved_settings['admin_tolerance'] if saved_settings else 30
-    
         ideal = saved_settings['ideal_inventory_days'] if saved_settings else 30
         st.session_state.user_preferences = {'ideal_inventory_days': ideal, 'chart_theme': 'plotly'}
 
-        # --- 2. RESET ANALYSIS DATA ---
-        # When switching companies, we MUST clear the previous company's results
-        st.session_state['persistent_inventory_data'] = None
-        st.session_state['persistent_analysis_results'] = None
-
-        # --- 3. FORCE RELOAD MASTER PFEP FROM DISK ---
+        # Load master data from disk for the new company
         disk_data, is_locked, disk_ts = DataPersistence.load_from_disk(comp_id)
-    
-        # We overwrite the session state with disk data to ensure 100% isolation
         if disk_data:
             st.session_state['persistent_pfep_data'] = {
                 'data': disk_data, 
@@ -443,9 +447,11 @@ class InventoryManagementSystem:
             }
             st.session_state['persistent_pfep_locked'] = is_locked
         else:
-            # If this company has no data yet, make sure the session is empty
             st.session_state['persistent_pfep_data'] = None
             st.session_state['persistent_pfep_locked'] = False
+
+        # Mark this company as loaded so we don't repeat this on next rerun
+        st.session_state.last_loaded_company = comp_id
     
     def safe_print(self, message):
         """Safely print to streamlit or console"""
