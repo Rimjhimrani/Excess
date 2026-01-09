@@ -813,7 +813,7 @@ class InventoryManagementSystem:
                         pickle.dump(registry, f)
                     st.success("✅ Password updated! Please login.")
                     st.session_state.reset_mode = False
-                    st.session_state.generated_otp = None # Clear OTP after use
+                    st.session_state.generated_otp = None # Clear OTP
                     st.rerun()
                 else:
                     st.error("Passwords must match and be 6+ characters.")
