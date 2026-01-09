@@ -1241,7 +1241,10 @@ class InventoryManagementSystem:
             with col_b:
                 if st.button("🔓 Unlock & Delete", type="secondary", help="Removes Master PFEP from disk and session"):
                     # Remove from disk
-                    self.persistence.delete_from_disk()
+                    # Get the current company ID
+                    comp_id = st.session_state.get('company_id')
+                    # Remove from disk using the Class Name and passing the comp_id
+                    DataPersistence.delete_from_disk(comp_id) 
                     # Clear session
                     st.session_state.persistent_pfep_data = None
                     st.session_state.persistent_pfep_locked = False
