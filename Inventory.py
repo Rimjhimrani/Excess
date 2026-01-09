@@ -627,26 +627,44 @@ class InventoryManagementSystem:
 
     def authenticate_user(self):
         st.sidebar.markdown("### 🔐 Corporate Login")
-        # Load registry
         path = "data/company_registry.pkl"
         if os.path.exists(path):
             with open(path, "rb") as f: registry = pickle.load(f)
         else: registry = {}
 
-        # NEW: Handle the password change screen if flag is set
+        # Handle View States
         if st.session_state.get('changing_password'):
             self.handle_password_change(st.session_state.temp_comp_id, registry)
+            return
+    
+        if st.session_state.get('reset_mode'):
+            self.handle_forgot_password_view(registry)
             return
 
         if st.session_state.user_role is None:
             comp_id = st.sidebar.text_input("Company ID").upper().strip()
-            role = st.sidebar.selectbox("Role", ["Select Role", "Admin", "User"])
         
+            # --- FORGOT PASSWORD BUTTON ---
+            if st.sidebar.button("❓ Forgot Password"):
+                if comp_id in registry:
+                    dest_email = registry[comp_id].get("email")
+                    if dest_email:
+                        otp = str(random.randint(100000, 999999))
+                        if self.send_otp_email(dest_email, otp):
+                            st.session_state.generated_otp = otp
+                            st.session_state.reset_target_id = comp_id
+                            st.session_state.reset_mode = True
+                            st.rerun()
+                    else:
+                        st.sidebar.error("No recovery email found for this ID.")
+                else:
+                    st.sidebar.error("Please enter a valid Company ID first.")
+
+            role = st.sidebar.selectbox("Role", ["Select Role", "Admin", "User"])
             if role == "Admin":
                 password = st.sidebar.text_input("Password", type="password")
                 if st.sidebar.button("🔑 Login"):
                     if comp_id in registry and password == registry[comp_id]["password"]:
-                        # CHECK FOR FIRST LOGIN - Sets flag to show change screen
                         if registry[comp_id].get("status") == "FIRST_LOGIN":
                             st.session_state.changing_password = True
                             st.session_state.temp_comp_id = comp_id
@@ -657,7 +675,7 @@ class InventoryManagementSystem:
                         self.initialize_session_state()
                         st.rerun()
                     else:
-                        st.sidebar.error("❌ Invalid Company ID or Password")
+                        st.sidebar.error("❌ Invalid ID or Password")
         
             elif role == "User":
                 if st.sidebar.button("👤 Enter as User"):
@@ -672,7 +690,6 @@ class InventoryManagementSystem:
             # LOGGED IN VIEW
             st.sidebar.success(f"🏢 **{st.session_state.company_id}**")
             st.sidebar.info(f"👤 Role: {st.session_state.user_role}")
-        
             self.display_data_status()
 
             if st.session_state.user_role == "Admin":
@@ -686,7 +703,6 @@ class InventoryManagementSystem:
                     new_tol = st.selectbox("Tolerance %", [0, 10, 20, 30, 40, 50], 
                                            index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance))
                     new_ideal = st.number_input("Ideal Days", value=st.session_state.user_preferences['ideal_inventory_days'])
-                
                     if st.button("🔒 Lock Settings"):
                         st.session_state.admin_tolerance = new_tol
                         st.session_state.user_preferences['ideal_inventory_days'] = new_ideal
