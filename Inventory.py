@@ -2496,28 +2496,6 @@ class InventoryManagementSystem:
             )
         else:
             st.success(f"✅ No items found in the '{selected_cat}' category.")
-                    
-    def display_export_options(self, analysis_results):
-        """Enhanced export options"""
-        st.header("📥 Export & Reporting Options")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            if st.button("📊 Export Full Analysis", type="primary"):
-                self.export_comprehensive_report(analysis_results)
-        with col2:
-            if st.button("🚨 Export Critical Items Only"):
-                self.export_critical_items(analysis_results)
-        with col3:
-            if st.button("📈 Export Executive Summary"):
-                self.export_executive_summary(analysis_results)
-        # Export format options
-        st.subheader("Export Format Options")
-        export_format = st.selectbox(
-            "Select Export Format",
-            ["Excel (.xlsx)", "CSV (.csv)", "PDF Report", "PowerPoint Summary"]
-        )
-        if st.button("🎯 Custom Export"):
-            self.export_custom_format(analysis_results, export_format)
             
     def export_comprehensive_report(self, analysis_results):
         """Export comprehensive analysis report"""
@@ -2899,9 +2877,6 @@ class InventoryManagementSystem:
         # Additional analysis sections
         st.markdown("---")
         self.display_trend_analysis(filtered_results)
-    
-        st.markdown("---")
-        self.display_export_options(filtered_results)
     
         st.markdown("---")
         self.display_help_and_documentation()
