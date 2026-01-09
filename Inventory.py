@@ -1393,17 +1393,15 @@ class InventoryManagementSystem:
                 if st.button("🚀 Run Analysis", type="primary"):
                     current_tolerance = st.session_state.get('admin_tolerance', 30)
                     results = self.analyzer.analyze_inventory(
-                        pfep_data, # This is now the correct list
+                        pfep_data, 
                         standardized_inv, 
                         tolerance=current_tolerance
                     )
-                    
                     if results:
+                        # Save to the persistent key
                         st.session_state['persistent_analysis_results'] = results
                         st.success(f"✅ Analysis generated for {len(results)} items.")
-                        st.rerun()
-                    else:
-                        st.error("❌ Analysis resulted in 0 items. Ensure Part Numbers match PFEP.")
+                        st.rerun() # Refresh to show the dashboard
 
         # 5. SHOW DASHBOARD
         if st.session_state.get('persistent_analysis_results'):
