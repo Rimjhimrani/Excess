@@ -11,6 +11,7 @@ import uuid
 import io
 import os
 import re
+import smtplib
 from typing import Union, Any, Optional, List, Dict
 from decimal import Decimal, InvalidOperation
 from collections import Counter
@@ -23,6 +24,7 @@ from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION
 from pptx.chart.data import ChartData
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 from pptx.enum.shapes import MSO_SHAPE
+from email.mime.text import MIMEText
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -107,64 +109,57 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 class DataPersistence:
-    """Handle data persistence across sessions"""
-    STORAGE_FILE = "pfep_master_data.pkl"
-    LOCK_FILE = "pfep_lock_status.txt"
-    SETTINGS_FILE = "inventory_settings.pkl" # NEW FILE FOR SETTINGS
-
+    """SaaS Persistence: Separates files by Company ID and handles session state"""
+    
     @staticmethod
-    def save_settings(tolerance, ideal_days):
-        """Saves tolerance and ideal days to disk"""
-        settings = {
-            'admin_tolerance': tolerance,
-            'ideal_inventory_days': ideal_days
-        }
-        with open(DataPersistence.SETTINGS_FILE, 'wb') as f:
-            pickle.dump(settings, f)
+    def get_path(company_id, filename):
+        if not os.path.exists('data'): 
+            os.makedirs('data')
+        return f"data/{company_id}_{filename}"
 
+    # --- DISK METHODS (Saves to server) ---
     @staticmethod
-    def load_settings():
-        """Loads settings from disk"""
-        if os.path.exists(DataPersistence.SETTINGS_FILE):
-            with open(DataPersistence.SETTINGS_FILE, 'rb') as f:
+    def save_settings(company_id, tolerance, ideal_days):
+        path = DataPersistence.get_path(company_id, "settings.pkl")
+        with open(path, 'wb') as f:
+            pickle.dump({'admin_tolerance': tolerance, 'ideal_inventory_days': ideal_days}, f)
+            
+    @staticmethod
+    def load_settings(company_id):
+        path = DataPersistence.get_path(company_id, "settings.pkl")
+        if os.path.exists(path):
+            with open(path, 'rb') as f:
                 return pickle.load(f)
         return None
 
     @staticmethod
-    def save_to_disk(data, locked=True):
-        """Saves Master Data AND the current Date/Time to the server disk"""
-        save_package = {
-            'payload': data,
-            'timestamp': datetime.now(), # <--- This is the date for the PPT
-            'is_locked': locked
-        }
-        with open(DataPersistence.STORAGE_FILE, 'wb') as f:
-            pickle.dump(save_package, f)
+    def save_to_disk(company_id, data, locked=True):
+        path = DataPersistence.get_path(company_id, "pfep_master.pkl")
+        save_obj = {'payload': data, 'timestamp': datetime.now(), 'is_locked': locked}
+        with open(path, 'wb') as f:
+            pickle.dump(save_obj, f)
             
     @staticmethod
-    def load_from_disk():
-        """Loads the payload and the saved timestamp"""
-        if os.path.exists(DataPersistence.STORAGE_FILE):
-            with open(DataPersistence.STORAGE_FILE, 'rb') as f:
-                package = pickle.load(f)
-                # Check if it's the new dictionary format or old list format
-                if isinstance(package, dict) and 'payload' in package:
-                    return package['payload'], package.get('is_locked', False), package.get('timestamp')
-                else:
-                    return package, False, None # Fallback for old files
+    def load_from_disk(company_id):
+        path = DataPersistence.get_path(company_id, "pfep_master.pkl")
+        if os.path.exists(path):
+            with open(path, 'rb') as f:
+                obj = pickle.load(f)
+                if isinstance(obj, dict) and 'payload' in obj:
+                    return obj['payload'], obj.get('is_locked', False), obj.get('timestamp')
+                return obj, False, None
         return None, False, None
 
     @staticmethod
-    def delete_from_disk():
-        """Removes the files when admin unlocks/deletes"""
-        if os.path.exists(DataPersistence.STORAGE_FILE):
-            os.remove(DataPersistence.STORAGE_FILE)
-        if os.path.exists(DataPersistence.LOCK_FILE):
-            os.remove(DataPersistence.LOCK_FILE)
-    
+    def delete_from_disk(company_id):
+        path = DataPersistence.get_path(company_id, "pfep_master.pkl")
+        if os.path.exists(path): 
+            os.remove(path)
+
+    # --- SESSION METHODS (Fixes your AttributeError) ---
     @staticmethod
     def save_data_to_session_state(key, data):
-        """Save data with timestamp to session state"""
+        """Saves data to session state with a timestamp"""
         st.session_state[key] = {
             'data': data,
             'timestamp': datetime.now(),
@@ -173,31 +168,26 @@ class DataPersistence:
     
     @staticmethod
     def load_data_from_session_state(key):
-        """Load data from session state if it exists"""
-        if key in st.session_state and isinstance(st.session_state[key], dict):
-            return st.session_state[key].get('data')
-        return None
-    
-    @staticmethod
-    def is_data_saved(key):
-        """Check if data is saved"""
-        if key in st.session_state and isinstance(st.session_state[key], dict):
-            return st.session_state[key].get('saved', False)
-        return False
+        """Loads actual data from the session state container"""
+        container = st.session_state.get(key)
+        if container and isinstance(container, dict):
+            return container.get('data')
+        return container # Return raw if not a dict
     
     @staticmethod
     def get_data_timestamp(key):
-        """Get data timestamp"""
-        if key in st.session_state and isinstance(st.session_state[key], dict):
-            return st.session_state[key].get('timestamp')
+        """Retrieves the timestamp for PPT generation"""
+        container = st.session_state.get(key)
+        if container and isinstance(container, dict):
+            return container.get('timestamp')
         return None
-
+        
 class InventoryAnalyzer:
     """Enhanced inventory analysis with comprehensive reporting"""
     
     def __init__(self):
         self.debug = False
-        self.persistence = self
+        self.persistence = DataPersistence()
         self.status_colors = {
             'Within Norms': '#4CAF50',    # Green
             'Excess Inventory': '#2196F3', # Blue
@@ -420,61 +410,36 @@ class InventoryManagementSystem:
         }
         
     def initialize_session_state(self):
-        """
-        Initialize session state variables with disk persistence.
-        Ensures Tolerance, Ideal Days, and PFEP Data survive browser refreshes.
-        """
-        # 1. Initialize User Role
-        if 'user_role' not in st.session_state:
-            st.session_state.user_role = None
+        """Initializes keys and loads company-specific data from disk"""
+        if 'user_role' not in st.session_state: st.session_state.user_role = None
+        if 'company_id' not in st.session_state: st.session_state.company_id = None
+        
+        comp_id = st.session_state.get('company_id')
+        if not comp_id:
+            return 
 
-        # 2. Load Global Settings (Tolerance and Ideal Days) from Disk
-        # This prevents the values from reverting to 30 on refresh
-        saved_settings = self.persistence.load_settings()
-
-        # 3. Initialize Analysis Tolerance
+        # Load settings
+        saved_settings = DataPersistence.load_settings(comp_id)
         if 'admin_tolerance' not in st.session_state:
-            if saved_settings and 'admin_tolerance' in saved_settings:
-                st.session_state.admin_tolerance = saved_settings['admin_tolerance']
-            else:
-                st.session_state.admin_tolerance = 30  # Default fallback if no disk file exists
-
-        # 4. Initialize User Preferences (Ideal Inventory Days)
+            st.session_state.admin_tolerance = saved_settings['admin_tolerance'] if saved_settings else 30
         if 'user_preferences' not in st.session_state:
-            default_ideal_days = 30
-            if saved_settings and 'ideal_inventory_days' in saved_settings:
-                default_ideal_days = saved_settings['ideal_inventory_days']
-            
-            st.session_state.user_preferences = {
-                'ideal_inventory_days': default_ideal_days,
-                'chart_theme': 'plotly'
-            }
+            ideal = saved_settings['ideal_inventory_days'] if saved_settings else 30
+            st.session_state.user_preferences = {'ideal_inventory_days': ideal, 'chart_theme': 'plotly'}
 
-        # 5. Define and Initialize Persistent Data Keys
-        self.persistent_keys = [
-            'persistent_pfep_data',
-            'persistent_pfep_locked',
-            'persistent_inventory_data', 
-            'persistent_inventory_locked',
-            'persistent_analysis_results'
-        ]
-        
+        # Initialize data slots
+        self.persistent_keys = ['persistent_pfep_data', 'persistent_pfep_locked', 'persistent_inventory_data', 'persistent_analysis_results']
         for key in self.persistent_keys:
-            if key not in st.session_state:
-                st.session_state[key] = None
+            if key not in st.session_state: st.session_state[key] = None
 
-        # 6. Load Master PFEP Data and Lock Status from Disk
-        # This ensures the "Locked" status persists for the Admin and User
-        disk_data, is_locked, disk_ts = self.persistence.load_from_disk()
-        
-        if disk_data:
-            # Structuring as a dict so self.persistence.get_data_timestamp works for the PPT
+        # Load master data from disk for this company
+        disk_data, is_locked, disk_ts = DataPersistence.load_from_disk(comp_id)
+        if disk_data and st.session_state.get('persistent_pfep_data') is None:
+            # We store it in the same dict format the session methods expect
             st.session_state['persistent_pfep_data'] = {
-                'data': disk_data,
+                'data': disk_data, 
                 'timestamp': disk_ts
             }
             st.session_state['persistent_pfep_locked'] = is_locked
-            logger.info("✅ Master Data and Lock Status synchronized from Disk Persistence.")
     
     def safe_print(self, message):
         """Safely print to streamlit or console"""
@@ -660,100 +625,156 @@ class InventoryManagementSystem:
         st.dataframe(summary_df, use_container_width=True)
 
     def authenticate_user(self):
-        """Enhanced authentication system with better UX and user switching"""
-        st.sidebar.markdown("### 🔐 Authentication")
+        st.sidebar.markdown("### 🔐 Corporate Login")
         
+        # Load registry
+        path = "data/company_registry.pkl"
+        if os.path.exists(path):
+            with open(path, "rb") as f: registry = pickle.load(f)
+        else: registry = {}
+
         if st.session_state.user_role is None:
-            role = st.sidebar.selectbox(
-                "Select Role", 
-                ["Select Role", "Admin", "User"],
-                help="Choose your role to access appropriate features"
-            )
+            comp_id = st.sidebar.text_input("Company ID").upper().strip()
+            
+            # --- FORGOT PASSWORD UI ---
+            if st.sidebar.button("❓ Forgot Password"):
+                if comp_id in registry:
+                    code = str(uuid.uuid4())[:6].upper()
+                    st.session_state.reset_code = code
+                    if self.send_reset_email(registry[comp_id]['email'], code):
+                        st.sidebar.success(f"Check email: {registry[comp_id]['email']}")
+                else:
+                    st.sidebar.error("Company ID not found")
+
+            role = st.sidebar.selectbox("Role", ["Select Role", "Admin", "User"])
             
             if role == "Admin":
-                with st.sidebar.container():
-                    st.markdown("**Admin Login**")
-                    password = st.text_input("Admin Password", type="password", key="admin_pass")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("🔑 Login", key="admin_login"):
-                            if password == "Agilomatrix@123":  # BUG: wrong password
-                                st.session_state.user_role = "Admin"
-                                st.success("✅ Admin authenticated!")
-                                st.rerun()
-                            else:
-                                st.error("❌ Invalid password")
-                    with col2:
-                        if st.button("🏠 Demo", key="admin_demo"):
-                            st.session_state.user_role = "Admin"
-                            st.info("🎮 Demo mode activated!")
-                            st.rerun()
+                password = st.sidebar.text_input("Password", type="password")
+                if st.sidebar.button("🔑 Login"):
+                    if comp_id in registry and password == registry[comp_id]["password"]:
+                        # CHECK FOR FIRST LOGIN
+                        if registry[comp_id]["status"] == "FIRST_LOGIN":
+                            self.handle_password_change(comp_id, registry)
+                            return
+                        
+                        st.session_state.user_role = "Admin"
+                        st.session_state.company_id = comp_id
+                        self.initialize_session_state()
+                        st.rerun()
+                    else:
+                        st.sidebar.error("❌ Invalid Company ID or Password")
             
             elif role == "User":
-                if st.sidebar.button("👤 Enter as User", key="user_login"):
-                    st.session_state.user_role = "User"
-                    st.sidebar.success("✅ User access granted!")
-                    st.rerun()
-        else:
-            # User info and controls
-            st.sidebar.success(f"✅ **{st.session_state.user_role}** logged in")
-            
-            # Display data status
-            self.display_data_status()
-            
-            # User switching option for Admin
-            if st.session_state.user_role == "Admin":
-                # ✅ Show PFEP lock status
-                pfep_locked = st.session_state.get("persistent_pfep_locked", False)
-                st.sidebar.markdown(f"🔒 PFEP Locked: **{pfep_locked}**")
-                # ✅ Always show switch role if PFEP is locked
-                if pfep_locked:
-                    st.sidebar.markdown("### 🔄 Switch Role")
-                    if st.sidebar.button("👤 Switch to User View", key="switch_to_user"):
+                if st.sidebar.button("👤 Enter as User"):
+                    registry = load_company_registry()
+                    if comp_id_input in registry:
                         st.session_state.user_role = "User"
-                        st.sidebar.success("✅ Switched to User view!")
+                        st.session_state.company_id = comp_id_input
+                        self.initialize_session_state()
                         st.rerun()
-                else:
-                    st.sidebar.info("ℹ️ PFEP is not locked. Lock PFEP to allow switching to User.")
+                    else:
+                        st.sidebar.error("❌ Company ID not recognized")
+        else:
+            # LOGGED IN VIEW
+            st.sidebar.success(f"🏢 **{st.session_state.company_id}**")
+            st.sidebar.info(f"👤 Role: {st.session_state.user_role}")
+            
+            self.display_data_status()
 
-            
-            # User preferences (for Admin only)
+            # Admin Quick-Switch
             if st.session_state.user_role == "Admin":
-                with st.sidebar.expander("⚙️ Preferences"):
-                    st.session_state.user_preferences['default_tolerance'] = st.selectbox(
-                        "Default Tolerance", [0, 10, 20, 30, 40, 50], 
-                        index=2, key="pref_tolerance"
-                    )
-                    # ✅ NEW: Admin setting for Ideal Inventory Days
-                    st.session_state.user_preferences['ideal_inventory_days'] = st.number_input(
-                        "Ideal Inventory Days",
-                        min_value=1,
-                        value=30,
-                        step=1,
-                        help="Used to calculate Ideal Inventory (Avg Consumption * Days)",
-                        key="admin_ideal_days"
-                    )
+                pfep_locked = st.session_state.get("persistent_pfep_locked", False)
+                if pfep_locked:
+                    if st.sidebar.button("🔄 Switch to User View"):
+                        st.session_state.user_role = "User"
+                        st.rerun()
+
+                # Settings Expander (Locked to Company ID)
+                with st.sidebar.expander("⚙️ Analysis Settings"):
+                    new_tol = st.selectbox("Tolerance %", [0, 10, 20, 30, 40, 50], 
+                                           index=[0, 10, 20, 30, 40, 50].index(st.session_state.admin_tolerance))
+                    new_ideal = st.number_input("Ideal Days", value=st.session_state.user_preferences['ideal_inventory_days'])
                     
-                    st.session_state.user_preferences['chart_theme'] = st.selectbox(
-                        "Chart Theme", ['plotly', 'plotly_white', 'plotly_dark'],
-                        key="pref_theme"
-                    )
-            
-            # Logout button
+                    if st.button("🔒 Lock Settings"):
+                        st.session_state.admin_tolerance = new_tol
+                        st.session_state.user_preferences['ideal_inventory_days'] = new_ideal
+                        DataPersistence.save_settings(st.session_state.company_id, new_tol, new_ideal)
+                        st.success("Settings saved for Company")
+
             st.sidebar.markdown("---")
-            if st.sidebar.button("🚪 Logout", key="logout_btn"):
-                # Only clear user session, not persistent data
-                keys_to_keep = self.persistent_keys + ['user_preferences']
-                session_copy = {k: v for k, v in st.session_state.items() if k in keys_to_keep}
-                
-                # Clear all session state
-                st.session_state.clear()
-                
-                # Restore persistent data
-                for k, v in session_copy.items():
-                    st.session_state[k] = v
-                
+            if st.sidebar.button("🚪 Logout"):
+                st.session_state.user_role = None
+                st.session_state.company_id = None
                 st.rerun()
+        
+        # Hidden Developer console for YOU to add new clients
+        self.developer_console()
+
+    def developer_console(self):
+        """Tool for you to register clients with Email and Temp Passwords"""
+        with st.sidebar.expander("🛠️ Agilomatrix Developer Console"):
+            dev_key = st.text_input("Developer Master Key", type="password")
+            if dev_key == "AgiloSaaS2026":
+                st.subheader("Register New Corporate Client")
+                new_c = st.text_input("New Company ID").upper().strip()
+                new_email = st.text_input("Client Admin Email")
+                
+                if st.button("➕ Register & Generate Temp Pass"):
+                    path = "data/company_registry.pkl"
+                    temp_pass = "Welcome@123" # Initial temporary password
+                    
+                    if os.path.exists(path):
+                        with open(path, "rb") as f: reg = pickle.load(f)
+                    else: reg = {}
+                    
+                    # Store as a dictionary with metadata
+                    reg[new_c] = {
+                        "password": temp_pass,
+                        "email": new_email,
+                        "status": "FIRST_LOGIN" # Forces them to change pass
+                    }
+                    
+                    if not os.path.exists('data'): os.makedirs('data')
+                    with open(path, "wb") as f: pickle.dump(reg, f)
+                    st.success(f"✅ {new_c} registered. Email: {new_email}")
+                    st.info(f"Tell client to login with temp pass: {temp_pass}")
+
+    def handle_password_change(self, comp_id, registry):
+        """UI for clients to set their private password"""
+        st.warning("🛡️ Security Action Required: Please set your private password.")
+        new_p = st.text_input("New Private Password", type="password")
+        conf_p = st.text_input("Confirm Password", type="password")
+        
+        if st.button("💾 Save Private Password"):
+            if new_p == conf_p and len(new_p) > 6:
+                registry[comp_id]["password"] = new_p
+                registry[comp_id]["status"] = "ACTIVE"
+                with open("data/company_registry.pkl", "wb") as f:
+                    pickle.dump(registry, f)
+                st.success("✅ Password set! Please login again.")
+                st.session_state.user_role = None
+                st.rerun()
+            else:
+                st.error("Passwords must match and be at least 7 characters.")
+
+    def send_reset_email(self, target_email, temp_code):
+        """Sends a numeric reset code to the client's email"""
+        sender_email = "your-email@gmail.com"
+        sender_password = "your-app-password" # Get this from Google Account Security
+        
+        msg = MIMEText(f"Your Inventory Management reset code is: {temp_code}")
+        msg['Subject'] = 'Password Reset Request'
+        msg['From'] = sender_email
+        msg['To'] = target_email
+
+        try:
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+                server.login(sender_email, sender_password)
+                server.sendmail(sender_email, target_email, msg.as_string())
+            return True
+        except Exception as e:
+            st.error(f"Mail Error: {e}")
+            return False
     
     def display_data_status(self):
         """Display current data loading status in sidebar"""
@@ -1126,8 +1147,9 @@ class InventoryManagementSystem:
             # If changed, update session AND disk immediately
             if new_tolerance != st.session_state.admin_tolerance:
                 st.session_state.admin_tolerance = new_tolerance
-                # Save to disk persistence
-                self.persistence.save_settings(
+                # FIX: Added st.session_state.company_id as the first argument
+                DataPersistence.save_settings(
+                    st.session_state.company_id, 
                     st.session_state.admin_tolerance, 
                     st.session_state.user_preferences['ideal_inventory_days']
                 )
@@ -1149,8 +1171,9 @@ class InventoryManagementSystem:
             # If changed, update session AND disk immediately
             if new_ideal_days != current_ideal:
                 st.session_state.user_preferences['ideal_inventory_days'] = new_ideal_days
-                # Save to disk persistence
-                self.persistence.save_settings(
+                # FIX: Added st.session_state.company_id as the first argument
+                DataPersistence.save_settings(
+                    st.session_state.company_id, 
                     st.session_state.admin_tolerance, 
                     st.session_state.user_preferences['ideal_inventory_days']
                 )
@@ -1209,24 +1232,30 @@ class InventoryManagementSystem:
                         # THE SAVE & LOCK BUTTON
                         if st.button("💾 Save & Lock PFEP Permanently", type="primary"):
                             final_data = st.session_state.get('temp_standardized_pfep')
-                            if final_data:
+                            
+                            # FIX: Get the current logged in company ID
+                            comp_id = st.session_state.get('company_id')
+                            
+                            if final_data and comp_id:
                                 current_now = datetime.now()
                                 
-                                # 1. Save to session (Structured for PPT date logic)
+                                # 1. Save to session state container
                                 st.session_state.persistent_pfep_data = {
                                     'data': final_data,
                                     'timestamp': current_now
                                 }
                                 st.session_state.persistent_pfep_locked = True
                                 
-                                # 2. Save to Disk (Writes the timestamp into the file)
-                                self.persistence.save_to_disk(final_data, locked=True)
+                                # 2. FIX: Pass comp_id as the first argument
+                                DataPersistence.save_to_disk(comp_id, final_data, locked=True)
                                 
-                                st.success(f"✅ Master PFEP locked on server. Date: {current_now.strftime('%d-%m-%Y')}")
+                                st.success(f"✅ Master PFEP locked for {comp_id}. Date: {current_now.strftime('%d-%m-%Y')}")
+                                
+                                # Cleanup
                                 del st.session_state['temp_standardized_pfep']
                                 st.rerun()
-                    else:
-                        st.error("❌ Data standardization failed. Please check column headers.")
+                            else:
+                                st.error("❌ Error: Missing data or Company ID. Please log in again.")
                 except Exception as e:
                     st.error(f"❌ File processing error: {str(e)}")
 
