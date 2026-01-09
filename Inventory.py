@@ -770,7 +770,9 @@ class InventoryManagementSystem:
             else:
                 st.error("Passwords must match and be at least 6 characters.")
 
-    def send_otp_email(target_email, otp_code):
+    def send_otp_email(self, target_email, otp_code):
+        # ^^^ YOU MUST HAVE 'self' AS THE FIRST WORD INSIDE THE BRACKETS ^^^
+        
         # SETTINGS: Update these with your own SMTP details
         sender_email = "agilomatrix1@gmail.com" 
         sender_password = "kgqg dfiq gelu vqli" # Use a Google App Password
@@ -788,7 +790,6 @@ class InventoryManagementSystem:
         except Exception as e:
             st.error(f"Mail Error: {e}")
             return False
-
     def handle_forgot_password_view(self, registry):
         st.title("🔑 Reset Password")
         comp_id = st.session_state.get('reset_target_id')
