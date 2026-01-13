@@ -101,11 +101,36 @@ This makes it presentation-ready for CXOs and management reviews.
 ---
 ## 🏗 System Architecture (Mermaid Diagram)
 
+## 🏗 System Architecture (Mermaid Diagram)
+
 ```mermaid
 flowchart TD
-    A[Corporate Login] --> B[Admin Module]
-    B --> C[User Module]
-    C --> D[Inventory Analysis Engine]
-    D --> E[Dashboards & Visualizations]
-    E --> F[PPT Report Generator]
+    A[Corporate Login System] --> B[Admin Module]
+    
+    B --> B1[PFEP Upload & Standardization]
+    B --> B2[Master Data Locking]
+    B --> B3[Tolerance & Ideal Days Settings]
 
+    B --> C[User Module]
+
+    C --> C1[Inventory Upload]
+    C --> C2[Matching & Validation]
+
+    C --> D[Inventory Analysis Engine]
+
+    D --> D1[Excess/Shortage Detection]
+    D --> D2[Deviation Value Calculation]
+    D --> D3[Vendor-wise Summary]
+    D --> D4[KPI Computation]
+
+    D --> E[Dashboards & Visualizations]
+
+    E --> E1[Plotly Charts]
+    E --> E2[Top 10 Parts Analysis]
+    E --> E3[Norm vs Actual Comparison]
+
+    E --> F[PPT Report Generator]
+    
+    F --> F1[Cover Slide]
+    F --> F2[KPI Performance Slide]
+    F --> F3[Status Breakdown Slide]
