@@ -99,4 +99,13 @@ This makes it presentation-ready for CXOs and management reviews.
 | Logging         | Python `logging` module                   |
 
 ---
+## 🏗 System Architecture (Mermaid Diagram)
+
+```mermaid
+flowchart TD
+    A[Corporate Login] --> B[Admin Module]
+    B --> C[User Module]
+    C --> D[Inventory Analysis Engine]
+    D --> E[Dashboards & Visualizations]
+    E --> F[PPT Report Generator]
 
