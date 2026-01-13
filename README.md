@@ -101,8 +101,6 @@ This makes it presentation-ready for CXOs and management reviews.
 ---
 ## 🏗 System Architecture (Mermaid Diagram)
 
-## 🏗 System Architecture (Mermaid Diagram)
-
 ```mermaid
 flowchart TD
     A[Corporate Login System] --> B[Admin Module]
