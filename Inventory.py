@@ -704,6 +704,9 @@ class InventoryManagementSystem:
             self.display_data_status()
 
             if st.session_state.user_role == "Admin":
+                # --- MOVED: DEVELOPER CONSOLE ONLY FOR LOGGED IN ADMIN ---
+                self.developer_console()
+
                 pfep_locked = st.session_state.get("persistent_pfep_locked", False)
                 if pfep_locked:
                     if st.sidebar.button("🔄 Switch to User View"):
@@ -722,12 +725,9 @@ class InventoryManagementSystem:
 
             st.sidebar.markdown("---")
             if st.sidebar.button("🚪 Logout"):
-                # This completely wipes the browser memory for this session
                 for key in list(st.session_state.keys()):
                     del st.session_state[key]
                 st.rerun()
-    
-        self.developer_console()
     
     def developer_console(self):
         with st.sidebar.expander("🛠️ Developer Console"):
@@ -802,6 +802,7 @@ class InventoryManagementSystem:
         except Exception as e:
             st.error(f"Mail Error: {e}")
             return False
+            
     def handle_forgot_password_view(self, registry):
         st.title("🔑 Reset Password")
         comp_id = st.session_state.get('reset_target_id')
