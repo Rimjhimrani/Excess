@@ -653,6 +653,10 @@ class InventoryManagementSystem:
             return
 
         if st.session_state.user_role is None:
+            # --- DEVELOPER CONSOLE VISIBLE AT LOGIN FOR REGISTRATION ---
+            self.developer_console()
+            st.sidebar.markdown("---")
+
             comp_id = st.sidebar.text_input("Company ID").upper().strip()
         
             # --- FORGOT PASSWORD BUTTON ---
@@ -704,9 +708,6 @@ class InventoryManagementSystem:
             self.display_data_status()
 
             if st.session_state.user_role == "Admin":
-                # --- MOVED: DEVELOPER CONSOLE ONLY FOR LOGGED IN ADMIN ---
-                self.developer_console()
-
                 pfep_locked = st.session_state.get("persistent_pfep_locked", False)
                 if pfep_locked:
                     if st.sidebar.button("🔄 Switch to User View"):
