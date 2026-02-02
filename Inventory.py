@@ -1360,7 +1360,6 @@ class InventoryManagementSystem:
     def user_inventory_upload(self):
         st.header("📦 User: Inventory Upload & Analysis")
         
-        # 1. Fetch the container (Dictionary)
         pfep_container = st.session_state.get('persistent_pfep_data')
         pfep_locked = st.session_state.get('persistent_pfep_locked', False)
         
@@ -1368,13 +1367,11 @@ class InventoryManagementSystem:
             st.error("❌ PFEP Master Data is not locked by Admin.")
             return
 
-        # 2. FIX: Extract the actual list of parts from the container
         if isinstance(pfep_container, dict) and 'data' in pfep_container:
             pfep_data = pfep_container['data']
         else:
-            pfep_data = pfep_container # Fallback for old list format
+            pfep_data = pfep_container 
 
-        # 3. UI for Inventory Upload
         uploaded_inv = st.file_uploader("Upload Current Inventory Dump", type=['xlsx', 'csv'], key="inv_up_user")
         
         if uploaded_inv:
@@ -1382,28 +1379,24 @@ class InventoryManagementSystem:
             standardized_inv = self.standardize_current_inventory(df_inv)
             
             if standardized_inv:
-                # MATCH CHECK (Now using the extracted list)
+                # --- ADD THIS LINE HERE TO FIX THE SIDEBAR STATUS ---
+                self.persistence.save_data_to_session_state('persistent_inventory_data', standardized_inv)
+                # ----------------------------------------------------
+
                 pfep_keys = set(str(item['Part_No']).strip().upper() for item in pfep_data)
                 inv_keys = set(str(item['Part_No']).strip().upper() for item in standardized_inv)
                 matches = pfep_keys.intersection(inv_keys)
                 
                 st.info(f"🔍 Match Check: Found {len(matches)} matching parts.")
 
-                # 4. RUN BUTTON (Passing the corrected list)
                 if st.button("🚀 Run Analysis", type="primary"):
                     current_tolerance = st.session_state.get('admin_tolerance', 30)
-                    results = self.analyzer.analyze_inventory(
-                        pfep_data, 
-                        standardized_inv, 
-                        tolerance=current_tolerance
-                    )
+                    results = self.analyzer.analyze_inventory(pfep_data, standardized_inv, tolerance=current_tolerance)
                     if results:
-                        # Save to the persistent key
                         st.session_state['persistent_analysis_results'] = results
                         st.success(f"✅ Analysis generated for {len(results)} items.")
-                        st.rerun() # Refresh to show the dashboard
+                        st.rerun()
 
-        # 5. SHOW DASHBOARD
         if st.session_state.get('persistent_analysis_results'):
             st.markdown("---")
             self.display_analysis_results()
