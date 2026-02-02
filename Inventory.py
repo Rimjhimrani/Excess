@@ -243,7 +243,6 @@ class InventoryAnalyzer:
                     'Current Inventory - VALUE': current_qty * unit_price,
                     'Stock Deviation Qty w.r.t Revised Norm': deviation_qty,
                     'Stock Deviation Value': deviation_value,
-                    'Status': status,
                     'INVENTORY REMARK STATUS': status
                 })
             except Exception as e:
