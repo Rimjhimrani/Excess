@@ -1805,18 +1805,21 @@ class InventoryManagementSystem:
         
         self.authenticate_user()
 
-        # --- NEW LOGO UPLOADER SECTION ---
-        st.sidebar.markdown("---")
-        st.sidebar.subheader("🖼️ Branding")
-        cust_logo = st.sidebar.file_uploader("Upload Customer Logo (Top Right)", type=['png', 'jpg', 'jpeg'])
-        if cust_logo:
-            st.session_state.customer_logo = cust_logo
-
         if st.session_state.user_role == "Admin":
+            # --- MOVED: BRANDING UPLOADER ONLY FOR LOGGED IN ADMIN ---
+            st.sidebar.markdown("---")
+            st.sidebar.subheader("🖼️ Branding")
+            cust_logo = st.sidebar.file_uploader("Upload Customer Logo (Top Right)", type=['png', 'jpg', 'jpeg'])
+            if cust_logo:
+                st.session_state.customer_logo = cust_logo
+            
+            # Show admin management
             self.admin_data_management()
+            
         elif st.session_state.user_role == "User":
+            # Regular user just sees the upload and analysis
             self.user_inventory_upload()
-
+            
     def display_validation_results(self, validation_result):
         """Display inventory validation results"""
         st.markdown("**📋 Validation Results**")
