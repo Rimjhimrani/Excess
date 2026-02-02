@@ -2983,10 +2983,6 @@ class InventoryManagementSystem:
             fig4.update_layout(title=f"Top {top_n} {status} Vendors (Actual vs Target)", xaxis_tickangle=-45, yaxis_ticksuffix=suffix, height=500)
             st.plotly_chart(fig4, use_container_width=True, key=f"vendor_{status}_chart")
             
-        except Exception as e:
-            st.error("❌ Error displaying Top Vendors by Status")
-            st.code(str(e))
-
 if __name__ == "__main__":
     app = InventoryManagementSystem()
     app.run()  # This runs the full dashboard
