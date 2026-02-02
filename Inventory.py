@@ -1806,19 +1806,19 @@ class InventoryManagementSystem:
         
         self.authenticate_user()
 
+        # Restricted access to Branding and Admin Management
         if st.session_state.user_role == "Admin":
-            # --- MOVED: BRANDING UPLOADER ONLY FOR LOGGED IN ADMIN ---
             st.sidebar.markdown("---")
             st.sidebar.subheader("🖼️ Branding")
             cust_logo = st.sidebar.file_uploader("Upload Customer Logo (Top Right)", type=['png', 'jpg', 'jpeg'])
             if cust_logo:
                 st.session_state.customer_logo = cust_logo
             
-            # Show admin management
+            # Allow Admin to manage PFEP data
             self.admin_data_management()
             
         elif st.session_state.user_role == "User":
-            # Regular user just sees the upload and analysis
+            # Normal user analysis flow
             self.user_inventory_upload()
             
     def display_validation_results(self, validation_result):
