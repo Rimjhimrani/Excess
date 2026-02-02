@@ -2998,7 +2998,7 @@ class InventoryManagementSystem:
                 st.plotly_chart(fig3, use_container_width=True, key=f"{status.lower().replace(' ', '_')}_parts")
         except Exception as e: st.error("❌ Error in Parts Status Charts")
 
-        # ✅ 4. Top N Vendors by Inventory Status
+        # ✅ 4. Top N Vendors by Inventory Status (FIXED HOVER)
         try:
             st.markdown(f"## 🏢 Top {top_n} Vendors by Inventory Status")
             for status, metric_name, color in [("Excess Inventory", "Excess Value Above Norm", "#2196F3"), ("Short Inventory", "Short Value Below Norm", "#F44336")]:
@@ -3009,19 +3009,59 @@ class InventoryManagementSystem:
                 for vendor, group in status_df.groupby(vendor_col):
                     actual_sum = group[value_col].sum()
                     ideal_sum = sum(float(r.get('AVG CONSUMPTION/DAY', 0) or 0) * ideal_days * float(r.get('UNIT PRICE', 0) or 0) for _, r in group.iterrows())
+                    # Sort by the magnitude of deviation
                     dev_sum = abs(group['Stock Deviation Value'].sum())
-                    vendor_stats.append({'Vendor': vendor, 'Actual_Value': actual_sum, 'Ideal_Value': ideal_sum, 'Dev_Value': dev_sum})
+                    vendor_stats.append({
+                        'Vendor': vendor, 
+                        'Actual_Value': actual_sum, 
+                        'Ideal_Value': ideal_sum, 
+                        'Dev_Value': dev_sum
+                    })
 
                 v_df = pd.DataFrame(vendor_stats).sort_values(by='Dev_Value', ascending=False).head(top_n)
                 v_df['Actual_Converted'] = v_df['Actual_Value'] / divisor
                 v_df['Ideal_Converted'] = v_df['Ideal_Value'] / divisor
 
+                # Create custom data for the hover to show full currency values
+                v_df['Hover_Text'] = v_df.apply(lambda r: (
+                    f"Vendor: {r['Vendor']}<br>"
+                    f"Total Actual: ₹{r['Actual_Value']:,.0f}<br>"
+                    f"Total Ideal Target: ₹{r['Ideal_Value']:,.0f}"
+                ), axis=1)
+
                 fig4 = go.Figure()
-                fig4.add_trace(go.Bar(x=v_df['Vendor'], y=v_df['Actual_Converted'], name='Actual Value', marker_color=color, hovertemplate=f'<b>{{x}}</b><br>Actual: ₹{{y:,.1f}} {suffix}<extra></extra>'))
-                fig4.add_trace(go.Scatter(x=v_df['Vendor'], y=v_df['Ideal_Converted'], mode='lines+markers', name='Ideal Target', line=dict(color='black', width=1.5), marker=dict(symbol='circle', size=6, color='black'), hovertemplate=f'<b>Ideal Target</b><br>Value: ₹{{y:,.1f}} {suffix}<extra></extra>'))
-                fig4.update_layout(title=f"Top {top_n} Vendors: {status} Actual vs Target", xaxis_title="Vendor", yaxis_title=f"Value (₹ {unit_name})", xaxis_tickangle=-45, yaxis=dict(tickformat=',.1f', ticksuffix=suffix), height=600, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-                st.plotly_chart(fig4, use_container_width=True, key=f"vendor_{status}_chart")
                 
+                # Corrected Bar Trace
+                fig4.add_trace(go.Bar(
+                    x=v_df['Vendor'], 
+                    y=v_df['Actual_Converted'], 
+                    name='Total Actual Value', 
+                    marker_color=color,
+                    customdata=v_df['Hover_Text'],
+                    hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>'
+                ))
+                
+                # Corrected Scatter Trace
+                fig4.add_trace(go.Scatter(
+                    x=v_df['Vendor'], 
+                    y=v_df['Ideal_Converted'], 
+                    mode='lines+markers', 
+                    name='Total Ideal Target', 
+                    line=dict(color='black', width=1.5), 
+                    marker=dict(symbol='circle', size=6, color='black'),
+                    hovertemplate='<b>Ideal Target</b><br>Value: ₹%{y:,.1f} ' + suffix + '<extra></extra>'
+                ))
+
+                fig4.update_layout(
+                    title=f"Top {top_n} Vendors: {status} (Actual vs Target)", 
+                    xaxis_title="Vendor", 
+                    yaxis_title=f"Value (₹ {unit_name})", 
+                    xaxis_tickangle=-45, 
+                    yaxis=dict(tickformat=',.1f', ticksuffix=suffix), 
+                    height=600, 
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                )
+                st.plotly_chart(fig4, use_container_width=True, key=f"vendor_{status.lower().replace(' ', '_')}_chart")
         except Exception as e: 
             st.error("❌ Error in Vendor Status Charts")
             
