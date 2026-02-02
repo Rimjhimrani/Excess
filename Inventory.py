@@ -2953,19 +2953,6 @@ class InventoryManagementSystem:
         df = pd.DataFrame(analysis_results)
         if 'Current Inventory - VALUE' not in df.columns:
             st.warning("⚠️ 'Current Inventory - VALUE' column missing from results. Some features may not work.")
-
-        filtered_df = self.apply_advanced_filters(df)
-        filtered_results = filtered_df.to_dict('records')
-    
-        # Display main dashboard
-        self.display_comprehensive_analysis(filtered_results)
-    
-        # Additional analysis sections
-        st.markdown("---")
-        self.display_trend_analysis(filtered_results)
-    
-        st.markdown("---")
-        self.display_help_and_documentation()
         
     def display_enhanced_analysis_charts(self, analysis_results):
         """Display enhanced visual summaries with Ideal Inventory Line Overlay"""
