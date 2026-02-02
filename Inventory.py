@@ -1942,15 +1942,19 @@ class InventoryManagementSystem:
     def display_enhanced_export_options(self, analysis_results):
         st.subheader("📤 Export Analysis Results")
         df = pd.DataFrame(analysis_results)
+        
+        # --- REMOVE DUPLICATE STATUS COLUMN ---
+        if 'Status' in df.columns and 'INVENTORY REMARK STATUS' in df.columns:
+            df = df.drop(columns=['Status'])
+            
         col1, col2 = st.columns(2)
         with col1:
             excel_buffer = io.BytesIO()
             df.to_excel(excel_buffer, index=False)
-            st.download_button("📊 Download Excel", data=excel_buffer.getvalue(), file_name="inventory.xlsx")
+            st.download_button("📊 Download Excel", data=excel_buffer.getvalue(), file_name="inventory_analysis.xlsx")
         with col2:
             if st.button("📑 Generate Professional PPT Report"):
                 with st.spinner("Generating professional report..."):
-                    # This calls the detailed function below
                     ppt_file = self.generate_ppt_report(analysis_results)
                     st.download_button(
                         label="📥 Download PPT Report",
