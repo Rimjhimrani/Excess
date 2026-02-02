@@ -2495,10 +2495,17 @@ class InventoryManagementSystem:
             st.success(f"✅ No items found in the '{selected_cat}' category.")
             
     def export_comprehensive_report(self, analysis_results):
-        """Export comprehensive analysis report"""
+        """Export comprehensive analysis report without duplicate status"""
         try:
             df = pd.DataFrame(analysis_results)
-            # Create Excel writer
+            
+            # --- REMOVE DUPLICATE STATUS COLUMN ---
+            if 'Status' in df.columns and 'INVENTORY REMARK STATUS' in df.columns:
+                df = df.drop(columns=['Status'])
+                
+            # Define status column name after dropping
+            status_col = 'INVENTORY REMARK STATUS'
+            
             from io import BytesIO
             output = BytesIO()
         
@@ -2507,23 +2514,23 @@ class InventoryManagementSystem:
                 df.to_excel(writer, sheet_name='Full Analysis', index=False)
                 # Summary sheet
                 summary_data = {
-                    'Status': df['Status'].value_counts().index.tolist(),
-                    'Count': df['Status'].value_counts().values.tolist(),
-                    'Total Value': [df[df['Status'] == status]['Current Inventory - VALUE'].sum() 
-                                    for status in df['Status'].value_counts().index]
+                    'Status': df[status_col].value_counts().index.tolist(),
+                    'Count': df[status_col].value_counts().values.tolist(),
+                    'Total Value': [df[df[status_col] == s]['Current Inventory - VALUE'].sum() 
+                                    for s in df[status_col].value_counts().index]
                 }
                 pd.DataFrame(summary_data).to_excel(writer, sheet_name='Summary', index=False)
                 # Critical items sheet
                 critical_items = df[df['Current Inventory - VALUE'] > 100000]
                 critical_items.to_excel(writer, sheet_name='Critical Items', index=False)
-                # Download button
-                st.download_button(
-                    label="📥 Download Comprehensive Report",
-                    data=output.getvalue(),
-                    file_name=f"inventory_analysis_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-                st.success("✅ Comprehensive report prepared for download!")
+                
+            st.download_button(
+                label="📥 Download Comprehensive Report",
+                data=output.getvalue(),
+                file_name=f"inventory_analysis_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            st.success("✅ Comprehensive report prepared for download!")
         except Exception as e:
             st.error(f"❌ Export failed: {str(e)}")
             
