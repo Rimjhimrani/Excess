@@ -1955,164 +1955,77 @@ class InventoryManagementSystem:
                     )
         
     def display_enhanced_summary_metrics(self, analysis_results):
-        """Enhanced summary metrics dashboard - Fixed Width Issues"""
+        """Enhanced summary metrics dashboard with Missing Parts Math"""
         st.header("📊 Executive Summary Dashboard")
-        # Add CSS with better responsive design
+        
+        # 1. Fetch data for the Math
+        pfep_container = st.session_state.get('persistent_pfep_data')
+        pfep_list = pfep_container['data'] if isinstance(pfep_container, dict) else pfep_container
+        inv_list = self.persistence.load_data_from_session_state('persistent_inventory_data')
+        
+        pfep_count = len(pfep_list) if pfep_list else 0
+        inv_count = len(inv_list) if inv_list else 0
+        missing_count = max(0, pfep_count - inv_count)
+
+        # CSS Styling
         st.markdown("""
         <style>
         .metric-card {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 1.5rem; /* Increased from 1.2rem */
-            border-radius: 12px; /* Slightly more rounded */
-            margin: 0.5rem 0; /* Increased margin */
-            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3); /* Enhanced shadow */
-            align: center;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            max-width: 100%;
-            box-sizing: border-box;
-            min-height: 140px; /* Increased from 120px */
-            transition: transform 0.2s ease; /* Added hover effect */
+            padding: 1.5rem; border-radius: 12px; margin: 0.5rem 0;
+            box-shadow: 0 6px 15px rgba(0, 0, 0, 0.3); min-height: 140px;
         }
-        .metric-card:hover {
-            transform: translateY(-2px); /* Subtle lift on hover */
-        }
-        /* Status-specific styling remains the same */
         .status-normal { background: linear-gradient(135deg, #4CAF50, #45a049); }
         .status-excess { background: linear-gradient(135deg, #2196F3, #1976D2); }
         .status-short { background: linear-gradient(135deg, #F44336, #D32F2F); }
         .status-total { background: linear-gradient(135deg, #FF9800, #F57C00); }
-        .metric-value {
-            color: white;
-            font-weight: bold;
-            font-size: 1.6rem; /* Increased from 1.4rem */
-            margin-bottom: 0.4rem; /* Increased spacing */
-            word-wrap: break-word;
-            line-height: 1.2;
-        }
-        .metric-label {
-            color: #f0f0f0;
-            font-size: 1.1rem; /* Increased from 1.0rem */
-            margin-bottom: 0.5rem; /* Increased spacing */
-            word-wrap: break-word;
-            font-weight: 500; /* Added font weight */
-        }
-        .metric-delta {
-            color: #e0e0e0;
-            font-size: 0.9rem; /* Increased from 0.85rem */
-            word-wrap: break-word;
-            font-weight: 400;
-        }
+        .metric-value { color: white; font-weight: bold; font-size: 1.6rem; }
+        .metric-label { color: #f0f0f0; font-size: 1.1rem; }
         .highlight-box {
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            padding: 1.2rem; /* Increased padding */
-            border-radius: 12px; /* Consistent with cards */
-            color: white;
-            margin: 1rem 0; /* Increased margin */
-            max-width: 85%;
-            box-sizing: border-box;
-        }
-        .dashboard-container {
-            max-width: 85%; /* Increased from 80% for more space */
-            overflow-x: auto;
-            margin: 0 auto; /* Center the container */
-        }
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            .metric-card {
-                min-height: 100px;
-                padding: 1rem;
-            }
-            .metric-value {
-                font-size: 1.3rem;
-            }
-            .metric-label {
-                font-size: 0.9rem;
-            }
-            .dashboard-container {
-                max-width: 95%;
-            }
+            padding: 1.2rem; border-radius: 12px; color: white; margin: 1rem 0;
         }
         </style>
         """, unsafe_allow_html=True)
-        # Wrap everything in a container with 70% max width
-        st.markdown('<div class="dashboard-container">', unsafe_allow_html=True)
-        # DataFrame prep
+
         df = pd.DataFrame(analysis_results)
-        # Identify value and status columns
         value_col = 'Stock Deviation Value'
         status_col = 'Status' if 'Status' in df.columns else 'INVENTORY REMARK STATUS'
-        # Compute KPI values safely
-        if not df.empty and value_col in df.columns and status_col in df.columns:
-            short_value = df[df[status_col] == 'Short Inventory'][value_col].sum()
-            excess_value = df[df[status_col] == 'Excess Inventory'][value_col].sum()
-        else:
-            short_value = 0
-            excess_value = 0
-        # Total values
-        total_parts = len(df)
-        inventory_value_col = next((col for col in [
-            'Current Inventory - VALUE', 'Stock_Value', 'VALUE'
-        ] if col in df.columns), None)
-        total_stock_value = df[inventory_value_col].sum() if inventory_value_col else 0
+        
+        short_value = df[df[status_col] == 'Short Inventory'][value_col].sum() if not df.empty else 0
+        excess_value = df[df[status_col] == 'Excess Inventory'][value_col].sum() if not df.empty else 0
+        
+        inv_val_col = next((c for c in ['Current Inventory - VALUE', 'Stock_Value'] if c in df.columns), None)
+        total_stock_value = df[inv_val_col].sum() if inv_val_col else 0
+
+        # math display in the highlight box
         st.markdown('<div class="highlight-box">', unsafe_allow_html=True)
         st.markdown(f"""
         ### 🎯 Key Inventory KPIs
-        - **Total Parts Analyzed**: {total_parts:,}
-        - **Total Inventory Value**: ₹{total_stock_value:,.0f}
-        - **Short Inventory Impact**: ₹{abs(short_value):,.0f}
-        - **Excess Inventory Impact**: ₹{excess_value:,.0f}
-        - **Net Financial Impact**: ₹{abs(short_value) - excess_value:,.0f}
+        - **Total Master PFEP Parts**: {pfep_count:,}
+        - **Parts in Current Inventory**: {inv_count:,}
+        - **Missing Parts calculation**: {pfep_count:,} (PFEP) - {inv_count:,} (Inv) = **{missing_count:,} Missing Parts**
+        - **Total Stock Value**: ₹{total_stock_value:,.0f}
+        - **Shortage Impact**: ₹{abs(short_value):,.0f} | **Excess Impact**: ₹{excess_value:,.0f}
         """)
         st.markdown('</div>', unsafe_allow_html=True)
-        # Status breakdown
-        status_values = {}
-        for label in ['Within Norms', 'Excess Inventory', 'Short Inventory']:
-            filtered = df[df[status_col] == label]
-            status_values[label] = {
-                'count': len(filtered),
-                'value': filtered[inventory_value_col].sum() if inventory_value_col in filtered.columns else 0
-            }
-        # Display 4 columns
-        cols = st.columns([1, 1, 1, 1])
-        with cols[0]:
-            norm = status_values.get('Within Norms', {'count': 0, 'value': 0})
-            st.markdown(f"""
-            <div class="metric-card status-normal">
-                <div class="metric-label">🟢 Within Norms</div>
-                <div class="metric-value">{norm['count']} parts</div>
-                <div class="metric-delta">₹{norm['value']:,.0f}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with cols[1]:
-            excess = status_values.get('Excess Inventory', {'count': 0, 'value': 0})
-            st.markdown(f"""
-            <div class="metric-card status-excess">
-                <div class="metric-label">🔵 Excess Inventory</div>
-                <div class="metric-value">{excess['count']} parts</div>
-                <div class="metric-delta">₹{excess['value']:,.0f}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with cols[2]:
-            short = status_values.get('Short Inventory', {'count': 0, 'value': 0})
-            st.markdown(f"""
-            <div class="metric-card status-short">
-                <div class="metric-label">🔴 Short Inventory</div>
-                <div class="metric-value">{short['count']} parts</div>
-                <div class="metric-delta">₹{short['value']:,.0f}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        with cols[3]:
-            st.markdown(f"""
-            <div class="metric-card status-total">
-                <div class="metric-label">📊 Total Inventory</div>
-                <div class="metric-value">{total_parts} parts</div>
-                <div class="metric-delta">₹{total_stock_value:,.0f}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        # Close the container
-        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Status cards
+        cols = st.columns(4)
+        status_map = [
+            ('Within Norms', '🟢 Within Norms', 'status-normal'),
+            ('Excess Inventory', '🔵 Excess Inventory', 'status-excess'),
+            ('Short Inventory', '🔴 Short Inventory', 'status-short')
+        ]
+        
+        for i, (stat, label, css) in enumerate(status_map):
+            filt = df[df[status_col] == stat]
+            val = filt[inv_val_col].sum() if inv_val_col in filt.columns else 0
+            cols[i].markdown(f"""<div class="metric-card {css}"><div class="metric-label">{label}</div>
+            <div class="metric-value">{len(filt)} parts</div><div style='color:white'>₹{val:,.0f}</div></div>""", unsafe_allow_html=True)
+        
+        cols[3].markdown(f"""<div class="metric-card status-total"><div class="metric-label">📊 Total Analyzed</div>
+        <div class="metric-value">{len(df)} parts</div><div style='color:white'>₹{total_stock_value:,.0f}</div></div>""", unsafe_allow_html=True)
             
     def display_enhanced_vendor_summary(self, analysis_results):
         """Enhanced vendor summary with better analytics"""
