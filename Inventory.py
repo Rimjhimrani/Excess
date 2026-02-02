@@ -3155,66 +3155,55 @@ class InventoryManagementSystem:
                 
                 status_df = df[df['INVENTORY REMARK STATUS'] == status]
                 if status == "Excess Inventory":
+                    # Sort by the most excess, but show the Total Value
                     status_df = status_df[status_df['Stock Deviation Value'] > 0]
                     status_df = status_df.sort_values(by='Stock Deviation Value', ascending=False).head(top_n)
-                    chart_title = f"Top {top_n} Excess Inventory Parts (₹ Excess Value in {unit_name})"
-                    y_title = f"Excess Inventory Value (₹ {unit_name})"
+                    chart_title = f"Top {top_n} Excess Parts: Actual Value vs Ideal Target (₹ {unit_name})"
+                    y_title = f"Inventory Value (₹ {unit_name})"
                 elif status == "Short Inventory":
                     status_df = status_df[status_df['Stock Deviation Value'] < 0]
                     status_df['Abs_Deviation_Value'] = abs(status_df['Stock Deviation Value'])
                     status_df = status_df.sort_values(by='Abs_Deviation_Value', ascending=False).head(top_n)
-                    chart_title = f"Top {top_n} Short Inventory Parts (₹ Shortage Value in {unit_name})"
-                    y_title = f"Shortage Value (₹ {unit_name})"
+                    chart_title = f"Top {top_n} Short Parts: Actual Value vs Ideal Target (₹ {unit_name})"
+                    y_title = f"Inventory Value (₹ {unit_name})"
                 
                 if status_df.empty:
                     st.info(f"No data found for '{status}' parts.")
                     continue
                 
-                # Convert Values
-                if status == "Excess Inventory":
-                    status_df['Value_Converted'] = status_df['Stock Deviation Value'] / divisor
-                    hover_value = status_df['Stock Deviation Value']
-                else:
-                    status_df['Value_Converted'] = status_df['Abs_Deviation_Value'] / divisor
-                    hover_value = status_df['Abs_Deviation_Value']
+                # Use Total Current Value for the Bar instead of just the deviation
+                status_df['Total_Val_Converted'] = status_df['Current Inventory - VALUE'] / divisor
                 
-                # ✅ Calculate Ideal Inventory for these parts to overlay
+                # Calculate Ideal Value Target for the Line
                 def get_ideal_val(row):
                     ac = float(row.get('AVG CONSUMPTION/DAY', 0) or 0)
                     up = float(row.get('UNIT PRICE', 0) or 0)
                     return (ac * ideal_days * up) / divisor
                 
                 status_df['Ideal_Value_Converted'] = status_df.apply(get_ideal_val, axis=1)
-
                 status_df['PART_DESC_NO'] = status_df['PART DESCRIPTION'].astype(str) + " (" + status_df['PART NO'].astype(str) + ")"
                 
-                status_df['HOVER_TEXT'] = status_df.apply(lambda row: (
-                    f"Description: {row.get('PART DESCRIPTION', 'N/A')}<br>"
-                    f"Part No: {row.get('PART NO')}<br>"
-                    f"{'Excess' if status == 'Excess Inventory' else 'Shortage'} Value: ₹{hover_value.loc[row.name]:,.0f}<br>"
-                    f"Ideal Value Target: ₹{(row['Ideal_Value_Converted'] * divisor):,.0f}"
-                ), axis=1)
-                
-                # Use Graph Objects for mixed traces
                 fig = go.Figure()
+                
+                # 1. BAR = TOTAL CURRENT VALUE
                 fig.add_trace(go.Bar(
                     x=status_df['PART_DESC_NO'],
-                    y=status_df['Value_Converted'],
+                    y=status_df['Total_Val_Converted'],
                     marker_color=color,
-                    hovertemplate='<b>%{x}</b><br>%{customdata}<extra></extra>',
-                    customdata=status_df['HOVER_TEXT'],
-                    name='Deviation Value'
+                    name='Current Actual Value',
+                    customdata=status_df['Stock Deviation Value'] / divisor,
+                    hovertemplate='<b>%{x}</b><br>Actual Value: ₹%{y:.2f}L<br>Deviation: ₹%{customdata:.2f}L<extra></extra>'
                 ))
                 
-                # ✅ Add Ideal Inventory Line Overlay
+                # 2. LINE = IDEAL TARGET
                 fig.add_trace(go.Scatter(
                     x=status_df['PART_DESC_NO'],
                     y=status_df['Ideal_Value_Converted'],
                     mode='lines+markers',
-                    name='Ideal Inventory',
-                    line=dict(color='black', width=1.5),
-                    marker=dict(symbol='circle', size=5, color='black'),
-                    hovertemplate='<b>Ideal Target</b><br>Value: %{y:.2f} ' + suffix + '<extra></extra>'
+                    name=f'Ideal Target ({ideal_days} Days)',
+                    line=dict(color='black', width=2),
+                    marker=dict(symbol='circle', size=8, color='black'),
+                    hovertemplate='<b>Ideal Target</b><br>Value: ₹%{y:.2f}L<extra></extra>'
                 ))
 
                 fig.update_layout(
