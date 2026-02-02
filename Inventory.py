@@ -243,6 +243,7 @@ class InventoryAnalyzer:
                     'Current Inventory - VALUE': current_qty * unit_price,
                     'Stock Deviation Qty w.r.t Revised Norm': deviation_qty,
                     'Stock Deviation Value': deviation_value,
+                    'Status': status,
                     'INVENTORY REMARK STATUS': status
                 })
             except Exception as e:
@@ -2865,7 +2866,7 @@ class InventoryManagementSystem:
         self.display_help_and_documentation()
         
     def display_enhanced_analysis_charts(self, analysis_results):
-        """Display visual summaries using Total Actual (Bar) vs Total Ideal (Line) with exact colors and hovers"""
+        """Display visual summaries using Total Actual (Bar) vs Total Ideal (Line) with exact requested colors and hovers"""
         st.subheader("📊 Enhanced Inventory Charts")
         
         # Add Unit Toggle AND Top N Slider
@@ -2875,7 +2876,7 @@ class InventoryManagementSystem:
         with col2:
             top_n = st.slider("Number of items to show:", min_value=5, max_value=50, value=10, step=5, key="top_n_slider")
         
-        # Get Admin Configured Ideal Days
+        # ✅ Get Admin Configured Ideal Days
         ideal_days = st.session_state.get('user_preferences', {}).get('ideal_inventory_days', 30)
         
         if chart_unit == "Millions":
@@ -2891,19 +2892,25 @@ class InventoryManagementSystem:
         if df.empty:
             st.warning("⚠️ No data available for charts.")
             return
-            
+
+        # Identify Value Column
         value_col = next((col for col in ['Current Inventory - VALUE', 'Stock_Value', 'Current Inventory-VALUE'] if col in df.columns), None)
-        color_map = {"Excess Inventory": "#2196F3", "Short Inventory": "#F44336", "Within Norms": "#4CAF50"}
+        
+        # Exact Colors requested
+        color_map = {
+            "Excess Inventory": "#2196F3",
+            "Short Inventory": "#F44336", 
+            "Within Norms": "#4CAF50"
+        }
 
         # ==========================================
-        # 1. TOP N PARTS BY VALUE (OVERALL)
+        # 1. Top N Parts (Overall)
         # ==========================================
         if value_col and 'PART NO' in df.columns:
-            st.markdown(f"### 🏆 Top {top_n} Parts: Actual vs Ideal Target")
+            st.markdown(f"### 🏆 Top {top_n} Parts: Actual vs Target")
             chart_data = df[df[value_col] > 0].sort_values(by=value_col, ascending=False).head(top_n).copy()
             
-            # Calculate metrics for hover and line
-            def calc_part_data(row):
+            def calc_part_metrics(row):
                 ac = float(row.get('AVG CONSUMPTION/DAY', 0) or 0)
                 up = float(row.get('UNIT PRICE', 0) or 0)
                 curr_q = float(row.get('Current Inventory - Qty', 0) or 0)
@@ -2913,61 +2920,54 @@ class InventoryManagementSystem:
                 dev_pct = ((curr_q - ideal_q) / ideal_q * 100) if ideal_q > 0 else 0
                 return actual_v, ideal_v, ideal_q, dev_pct
 
-            res = chart_data.apply(calc_part_data, axis=1, result_type='expand')
+            res = chart_data.apply(calc_part_metrics, axis=1, result_type='expand')
             chart_data['Actual_V'], chart_data['Ideal_V'], chart_data['Ideal_Q'], chart_data['Dev_Pct'] = res[0], res[1], res[2], res[3]
             chart_data['Part_Label'] = chart_data.apply(lambda r: f"{r['PART DESCRIPTION']}\n({r['PART NO']})", axis=1)
-            chart_data['Inventory_Status'] = chart_data['Status'] if 'Status' in chart_data.columns else 'Within Norms'
+            chart_data['Status_Key'] = chart_data['Status'] if 'Status' in chart_data.columns else 'Within Norms'
             
-            # HOVER TEXT
-            chart_data['HOVER_TEXT'] = chart_data.apply(lambda r: (
-                f"Description: {r['PART DESCRIPTION']}<br>Part No: {r['PART NO']}<br>"
-                f"<b>Status: {r['Inventory_Status']}</b><br>------------------<br>"
-                f"Actual Value: ₹{r[value_col]:,.0f}<br>Ideal Value: ₹{(r['Ideal_V']*divisor):,.0f}<br>"
-                f"Deviation: {r['Dev_Pct']:.1f}%"
-            ), axis=1)
-
             fig1 = go.Figure()
             for status, color in color_map.items():
-                status_df = chart_data[chart_data['Inventory_Status'] == status]
-                if not status_df.empty:
-                    fig1.add_trace(go.Bar(x=status_df['Part_Label'], y=status_df['Actual_V'], name=status, marker_color=color, customdata=status_df['HOVER_TEXT'], hovertemplate='%{customdata}<extra></extra>'))
+                subset = chart_data[chart_data['Status_Key'] == status]
+                if not subset.empty:
+                    fig1.add_trace(go.Bar(
+                        x=subset['Part_Label'], y=subset['Actual_V'], name=status, marker_color=color,
+                        customdata=subset.apply(lambda r: f"Description: {r['PART DESCRIPTION']}<br>Part No: {r['PART NO']}<br><b>Status: {r['Status_Key']}</b><br>Actual: ₹{r[value_col]:,.0f}<br>Ideal: ₹{(r['Ideal_V']*divisor):,.0f}<br>Dev: {r['Dev_Pct']:.1f}%", axis=1),
+                        hovertemplate='%{customdata}<extra></extra>'
+                    ))
             
-            fig1.add_trace(go.Scatter(x=chart_data['Part_Label'], y=chart_data['Ideal_V'], name='Ideal Target', line=dict(color='black', width=2), marker=dict(size=8, color='black'), hovertemplate='Ideal Target Value: ₹%{y:.2f}'+suffix+'<extra></extra>'))
-            fig1.update_layout(title=f"Top {top_n} Parts (Actual vs Target)", xaxis_tickangle=-45, yaxis_ticksuffix=suffix, height=550, legend=dict(orientation="h", y=1.1))
+            fig1.add_trace(go.Scatter(x=chart_data['Part_Label'], y=chart_data['Ideal_V'], name='Ideal Target', line=dict(color='black', width=1.5), marker=dict(size=6, color='black')))
+            fig1.update_layout(title=f"Top Parts: Actual Value vs Ideal Target", xaxis_tickangle=-45, yaxis_ticksuffix=suffix, height=550)
             st.plotly_chart(fig1, use_container_width=True)
 
         # ==========================================
-        # 2. VENDOR VS VALUE (OVERALL)
+        # 2. Vendor vs Value (Overall)
         # ==========================================
         vendor_col = next((col for col in ['Vendor Name', 'Vendor', 'VENDOR'] if col in df.columns), None)
         if vendor_col and value_col:
-            st.markdown(f"### 🏢 Top {top_n} Vendors: Actual vs Ideal Target")
+            st.markdown(f"### 🏢 Top {top_n} Vendors: Actual vs Target")
             v_group = df.groupby(vendor_col).agg({value_col: 'sum', 'AVG CONSUMPTION/DAY': 'sum', 'UNIT PRICE': 'mean'}).reset_index()
             
-            def calc_v_data(row):
+            def calc_v_metrics(row):
                 ac, up = float(row.get('AVG CONSUMPTION/DAY', 0) or 0), float(row.get('UNIT PRICE', 0) or 0)
                 ideal_v = (ac * ideal_days * up) / divisor
                 actual_v = row[value_col] / divisor
-                dev_pct = ((row[value_col] - (ideal_v * divisor)) / (ideal_v * divisor) * 100) if ideal_v > 0 else 0
-                return actual_v, ideal_v, dev_pct
+                return actual_v, ideal_v
 
-            res_v = v_group.apply(calc_v_data, axis=1, result_type='expand')
-            v_group['Actual_V'], v_group['Ideal_V'], v_group['Dev_Pct'] = res_v[0], res_v[1], res_v[2]
+            v_res = v_group.apply(calc_v_metrics, axis=1, result_type='expand')
+            v_group['Actual_V'], v_group['Ideal_V'] = v_res[0], v_res[1]
             v_group = v_group.sort_values('Actual_V', ascending=False).head(top_n)
 
             fig2 = go.Figure()
-            fig2.add_trace(go.Bar(x=v_group[vendor_col], y=v_group['Actual_V'], name='Actual Value', marker_color='#FF9800', 
-                                  customdata=v_group.apply(lambda r: f"Vendor: {r[vendor_col]}<br>Actual: ₹{(r['Actual_V']*divisor):,.0f}<br>Ideal: ₹{(r['Ideal_V']*divisor):,.0f}<br>Dev: {r['Dev_Pct']:.1f}%", axis=1),
-                                  hovertemplate='%{customdata}<extra></extra>'))
-            fig2.add_trace(go.Scatter(x=v_group[vendor_col], y=v_group['Ideal_V'], name='Ideal Target', line=dict(color='black', width=2), marker=dict(size=8, color='black')))
-            fig2.update_layout(title=f"Top {top_n} Vendors (Actual vs Target)", xaxis_tickangle=-45, yaxis_ticksuffix=suffix, height=550)
+            fig2.add_trace(go.Bar(x=v_group[vendor_col], y=v_group['Actual_V'], name='Actual Value', marker_color='#FF9800', hovertemplate='Vendor: %{x}<br>Actual: ₹%{y:.2f}'+suffix+'<extra></extra>'))
+            fig2.add_trace(go.Scatter(x=v_group[vendor_col], y=v_group['Ideal_V'], name='Ideal Target', line=dict(color='black', width=1.5), marker=dict(size=6, color='black')))
+            fig2.update_layout(title="Top Vendors: Actual vs Target", xaxis_tickangle=-45, yaxis_ticksuffix=suffix, height=500)
             st.plotly_chart(fig2, use_container_width=True)
 
         # ==========================================
-        # 3. TOP N PARTS BY STATUS (LOOP)
+        # 3. Top Parts by Status
         # ==========================================
         st.markdown(f"## 🧩 Top {top_n} Parts by Status")
-        for status, label, color in [("Excess Inventory", "🔵 Excess Inventory Parts", "#2196F3"), ("Short Inventory", "🔴 Short Inventory Parts", "#F44336")]:
+        for status, color in [("Excess Inventory", "#2196F3"), ("Short Inventory", "#F44336")]:
             status_df = df[df['INVENTORY REMARK STATUS'] == status].copy()
             if status == "Excess Inventory":
                 status_df = status_df.sort_values('Stock Deviation Value', ascending=False).head(top_n)
@@ -2975,28 +2975,30 @@ class InventoryManagementSystem:
                 status_df = status_df.sort_values('Stock Deviation Value', ascending=True).head(top_n)
             
             if status_df.empty: continue
-            st.subheader(label)
+            st.subheader(f"{'🔵' if 'Excess' in status else '🔴'} {status}")
             
-            res_s = status_df.apply(calc_part_data, axis=1, result_type='expand')
-            status_df['Actual_V'], status_df['Ideal_V'] = res_s[0], res_s[1]
+            sm = status_df.apply(calc_part_metrics, axis=1, result_type='expand')
+            status_df['Actual_V'], status_df['Ideal_V'] = sm[0], sm[1]
             status_df['Label'] = status_df.apply(lambda r: f"{r['PART DESCRIPTION'][:20]}... ({r['PART NO']})", axis=1)
 
             fig3 = go.Figure()
-            fig3.add_trace(go.Bar(x=status_df['Label'], y=status_df['Actual_V'], name='Actual Value', marker_color=color,
-                                  customdata=status_df.apply(lambda r: f"Part: {r['PART NO']}<br>Actual: ₹{(r['Actual_V']*divisor):,.0f}<br>Ideal: ₹{(r['Ideal_V']*divisor):,.0f}", axis=1),
-                                  hovertemplate='%{customdata}<extra></extra>'))
-            fig3.add_trace(go.Scatter(x=status_df['Label'], y=status_df['Ideal_V'], name='Ideal Target', line=dict(color='black', width=2), marker=dict(size=8, color='black')))
-            fig3.update_layout(title=f"Top {top_n} {status} (Actual vs Target)", xaxis_tickangle=-45, yaxis_ticksuffix=suffix, height=550)
-            st.plotly_chart(fig3, use_container_width=True, key=f"p_{status}")
+            fig3.add_trace(go.Bar(
+                x=status_df['Label'], y=status_df['Actual_V'], name='Actual Value', marker_color=color,
+                customdata=status_df.apply(lambda r: f"Part: {r['PART NO']}<br>Actual: ₹{r[value_col]:,.0f}<br>Ideal Target: ₹{(r['Ideal_V']*divisor):,.0f}<br>Deviation: ₹{abs(r['Stock Deviation Value']):,.0f}", axis=1),
+                hovertemplate='%{customdata}<extra></extra>'
+            ))
+            fig3.add_trace(go.Scatter(x=status_df['Label'], y=status_df['Ideal_V'], name='Ideal Target', line=dict(color='black', width=1.5), marker=dict(size=6, color='black')))
+            fig3.update_layout(title=f"Top {status} Parts: Actual vs Target", xaxis_tickangle=-45, yaxis_ticksuffix=suffix, height=550)
+            st.plotly_chart(fig3, use_container_width=True, key=f"ps_{status}")
 
         # ==========================================
-        # 4. TOP N VENDORS BY STATUS (LOOP)
+        # 4. Top Vendors by Status
         # ==========================================
         st.markdown(f"## 🏢 Top {top_n} Vendors by Status")
-        for status, label, color in [("Excess Inventory", "🔵 Excess Vendors", "#2196F3"), ("Short Inventory", "🔴 Short Vendors", "#F44336")]:
+        for status, color in [("Excess Inventory", "#2196F3"), ("Short Inventory", "#F44336")]:
             v_status_df = df[df['INVENTORY REMARK STATUS'] == status].copy()
             if v_status_df.empty: continue
-            st.subheader(label)
+            st.subheader(f"{'🔵' if 'Excess' in status else '🔴'} Vendors - {status}")
 
             v_stat = v_status_df.groupby(vendor_col).agg({value_col: 'sum', 'AVG CONSUMPTION/DAY': 'sum', 'UNIT PRICE': 'mean', 'Stock Deviation Value': 'sum'}).reset_index()
             if status == "Excess Inventory":
@@ -3004,16 +3006,14 @@ class InventoryManagementSystem:
             else:
                 v_stat = v_stat.sort_values('Stock Deviation Value', ascending=True).head(top_n)
 
-            res_v_s = v_stat.apply(calc_v_data, axis=1, result_type='expand')
-            v_stat['Actual_V'], v_stat['Ideal_V'] = res_v_s[0], res_v_s[1]
+            vsm = v_stat.apply(calc_v_metrics, axis=1, result_type='expand')
+            v_stat['Actual_V'], v_stat['Ideal_V'] = vsm[0], vsm[1]
 
             fig4 = go.Figure()
-            fig4.add_trace(go.Bar(x=v_stat[vendor_col], y=v_stat['Actual_V'], name='Actual Value', marker_color=color,
-                                  customdata=v_stat.apply(lambda r: f"Vendor: {r[vendor_col]}<br>Actual Total: ₹{(r['Actual_V']*divisor):,.0f}<br>Ideal Total: ₹{(r['Ideal_V']*divisor):,.0f}", axis=1),
-                                  hovertemplate='%{customdata}<extra></extra>'))
-            fig4.add_trace(go.Scatter(x=v_stat[vendor_col], y=v_stat['Ideal_V'], name='Ideal Target', line=dict(color='black', width=2), marker=dict(size=8, color='black')))
-            fig4.update_layout(title=f"Top {top_n} {status} Vendors (Actual vs Target)", xaxis_tickangle=-45, yaxis_ticksuffix=suffix, height=550)
-            st.plotly_chart(fig4, use_container_width=True, key=f"v_{status}")
+            fig4.add_trace(go.Bar(x=v_stat[vendor_col], y=v_stat['Actual_V'], name='Actual Value', marker_color=color, hovertemplate='Vendor: %{x}<br>Actual: ₹%{y:.2f}'+suffix+'<extra></extra>'))
+            fig4.add_trace(go.Scatter(x=v_stat[vendor_col], y=v_stat['Ideal_V'], name='Ideal Target', line=dict(color='black', width=1.5), marker=dict(size=6, color='black')))
+            fig4.update_layout(title=f"Top {status} Vendors: Actual vs Target", xaxis_tickangle=-45, yaxis_ticksuffix=suffix, height=550)
+            st.plotly_chart(fig4, use_container_width=True, key=f"vs_{status}")
             
 if __name__ == "__main__":
     app = InventoryManagementSystem()
