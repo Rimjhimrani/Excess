@@ -2935,6 +2935,29 @@ class InventoryManagementSystem:
         if st.sidebar.button("🔄 Analyze New File", type="secondary"):
             st.session_state.analysis_complete = False
             st.rerun()
+            
+    def display_analysis_results(self):
+        """Main method to display all analysis results"""
+        analysis_results = st.session_state.get('persistent_analysis_results')
+        
+        if not analysis_results:
+            st.warning("⚠️ No analysis results available yet. Please upload inventory and click 'Run Analysis'.")
+            return
+
+        # Define the results to be used by the charts below
+        # This bypasses the sidebar filtering logic entirely
+        filtered_results = analysis_results
+    
+        # Display main dashboard metrics and tables
+        self.display_comprehensive_analysis(filtered_results)
+    
+        # Display the coverage report and charts
+        st.markdown("---")
+        self.display_trend_analysis(filtered_results)
+    
+        # Display help section
+        st.markdown("---")
+        self.display_help_and_documentation()
         
     def display_enhanced_analysis_charts(self, analysis_results):
         """Display enhanced visual summaries with Ideal Inventory Line Overlay"""
