@@ -2935,24 +2935,6 @@ class InventoryManagementSystem:
         if st.sidebar.button("🔄 Analyze New File", type="secondary"):
             st.session_state.analysis_complete = False
             st.rerun()
-            
-    def display_analysis_results(self):
-        """Main method to display all analysis results"""
-        analysis_results = st.session_state.get('persistent_analysis_results')
-        
-        if not analysis_results:
-            st.warning("⚠️ No analysis results available yet. Please upload inventory and click 'Run Analysis'.")
-            return
-        # Debug: show sample keys to catch missing columns
-        st.code(f"Sample columns: {list(analysis_results[0].keys())}" if analysis_results else "No data structure found.")
-
-        # Display advanced filtering options
-        self.display_advanced_filtering_options(analysis_results)
-    
-        # Apply filters to data
-        df = pd.DataFrame(analysis_results)
-        if 'Current Inventory - VALUE' not in df.columns:
-            st.warning("⚠️ 'Current Inventory - VALUE' column missing from results. Some features may not work.")
         
     def display_enhanced_analysis_charts(self, analysis_results):
         """Display enhanced visual summaries with Ideal Inventory Line Overlay"""
